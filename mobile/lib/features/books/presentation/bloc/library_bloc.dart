@@ -63,6 +63,11 @@ final class LibraryStarted extends LibraryEvent {
   const LibraryStarted();
 }
 
+/// Forgets the shelf when its owner signs out.
+final class LibraryCleared extends LibraryEvent {
+  const LibraryCleared();
+}
+
 final class ImportRequested extends LibraryEvent {
   const ImportRequested();
 }
@@ -73,6 +78,7 @@ class LibraryBloc extends Bloc<LibraryEvent, LibraryState> {
       _pickEpub = pickEpub,
       super(const LibraryState()) {
     on<LibraryStarted>(_onStarted);
+    on<LibraryCleared>((_, emit) => emit(const LibraryState()));
     on<ImportRequested>(_onImportRequested);
   }
 

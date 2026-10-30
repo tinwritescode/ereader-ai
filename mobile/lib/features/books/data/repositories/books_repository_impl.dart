@@ -6,13 +6,9 @@ import '../../domain/entities/epub_source.dart';
 import '../../domain/repositories/books_repository.dart';
 
 class BooksRepositoryImpl implements BooksRepository {
-  const BooksRepositoryImpl(this._dio, {required String userId})
-    : _userId = userId;
+  const BooksRepositoryImpl(this._dio);
 
   final Dio _dio;
-  final String _userId;
-
-  Map<String, String> get _scope => {'userId': _userId};
 
   @override
   Future<Book> importEpub(
@@ -20,7 +16,6 @@ class BooksRepositoryImpl implements BooksRepository {
     required void Function(double progress) onProgress,
   }) async {
     final form = FormData.fromMap({
-      'userId': _userId,
       'file': await MultipartFile.fromFile(
         source.path,
         filename: source.fileName,
@@ -40,16 +35,13 @@ class BooksRepositoryImpl implements BooksRepository {
 
   @override
   Future<List<Book>> books() => _call(() async {
-    final response = await _dio.get<Object>('/books', queryParameters: _scope);
+    final response = await _dio.get<Object>('/books');
     return _list(response.data).map(_toBook).toList();
   });
 
   @override
   Future<List<ChapterSummary>> chapters(String bookId) => _call(() async {
-    final response = await _dio.get<Object>(
-      '/books/$bookId/chapters',
-      queryParameters: _scope,
-    );
+    final response = await _dio.get<Object>('/books/$bookId/chapters');
     return switch (response.data) {
       {'chapters': final List<Object?> chapters} =>
         chapters.map(_toChapterSummary).toList(),
@@ -59,10 +51,7 @@ class BooksRepositoryImpl implements BooksRepository {
 
   @override
   Future<ChapterText> original(String chapterId) => _call(() async {
-    final response = await _dio.get<Object>(
-      '/chapters/$chapterId',
-      queryParameters: _scope,
-    );
+    final response = await _dio.get<Object>('/chapters/$chapterId');
     return switch (response.data) {
       {'blocks': final List<Object?> blocks} => ChapterText(
         blocks.map(_toTextBlock).toList(),
@@ -76,7 +65,6 @@ class BooksRepositoryImpl implements BooksRepository {
       _call(() async {
         final response = await _dio.post<Object>(
           '/chapters/$chapterId/digest',
-          queryParameters: _scope,
           data: {'targetLang': 'vi', 'targetMinutes': minutes},
         );
         return switch (response.data) {
@@ -107,9 +95,7 @@ class BooksRepositoryImpl implements BooksRepository {
         chapterCount: chapterCount,
         minutes: minutes,
         coverUrl: hasCover
-            ? Uri.parse(
-                '${_dio.options.baseUrl}/books/$bookId/cover',
-              ).replace(queryParameters: _scope).toString()
+            ? '${_dio.options.baseUrl}/books/$bookId/cover'
             : null,
       ),
     _ => throw const BooksException('UNEXPECTED_RESPONSE'),

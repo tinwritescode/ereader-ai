@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
+import '../test/features/auth/fake_auth_repository.dart';
 import '../test/features/books/fake_books_repository.dart';
 import '../test/features/books/fake_reading_look_store.dart';
 import '../test/features/books/fake_reading_spot_store.dart';
@@ -25,6 +26,7 @@ void main() {
 
     await tester.pumpWidget(
       EReaderApp(
+        auth: FakeAuthRepository(),
         repository: FakeBooksRepository(shelf: [loeb]),
         speech: FakeSpeech(),
         looks: FakeReadingLookStore(),

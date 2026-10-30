@@ -14,8 +14,14 @@ void main() {
     'imports the EPUB from EPUB_FIXTURE into the live backend',
     () async {
       final repository = BooksRepositoryImpl(
-        Dio(BaseOptions(baseUrl: baseUrl!)),
-        userId: 'live-test',
+        Dio(
+          BaseOptions(
+            baseUrl: baseUrl!,
+            headers: {
+              'Authorization': 'Bearer ${Platform.environment['ACCESS_TOKEN']}',
+            },
+          ),
+        ),
       );
       final progress = <double>[];
 

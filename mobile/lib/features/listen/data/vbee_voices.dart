@@ -41,8 +41,11 @@ class VbeeVoices {
       final bytes = response.data;
       if (bytes == null) throw const SpeechException('CLOUD_VOICE_FAILED');
       return wavSamples(Uint8List.fromList(bytes));
-    } on DioException {
-      throw const SpeechException('CLOUD_VOICE_FAILED');
+    } on DioException catch (error) {
+      // The body is bytes here, so the status tells the plan's limit apart.
+      throw SpeechException(
+        error.response?.statusCode == 429 ? 'VBEE_LIMIT' : 'CLOUD_VOICE_FAILED',
+      );
     }
   }
 }

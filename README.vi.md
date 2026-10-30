@@ -18,6 +18,8 @@ flowchart LR
     llm(["Dịch vụ LLM"])
     hf(["Hugging Face"])
     vbee(["Vbee"])
+    workos(["WorkOS"])
+    admin(["Super admin"])
 
     subgraph app["eReader AI"]
         import(["Nhập sách EPUB"])
@@ -33,7 +35,17 @@ flowchart LR
         download(["Tải giọng đọc lần đầu"])
         tune(["Đổi giọng và tốc độ"])
         cloud(["Nghe bằng giọng Vbee"])
+        signin(["Đăng nhập"])
+        usage(["Xem gói và mức đã dùng"])
+        upgrade(["Yêu cầu nâng gói"])
+        grant(["Đổi gói cho một tài khoản"])
     end
+
+    reader --> signin
+    signin --> workos
+    reader --> usage
+    reader --> upgrade
+    admin --> grant
 
     reader --> import
     reader --> browse
@@ -68,9 +80,12 @@ flowchart LR
         api["API sách và chương"]
         digest["Rút gọn và cache"]
         speech["Proxy giọng Vbee"]
-        memory[("Bộ nhớ tạm")]
-        api --> memory
+        accounts["Tài khoản, gói, mức dùng"]
+        memory[("Cache trong bộ nhớ")]
+        db[("Postgres: tài khoản, mức dùng, sách, chương")]
         digest --> memory
+        api --> db
+        accounts --> db
         clips[("Postgres: các câu đã đọc")]
         bucket[("Railway bucket: file EPUB, âm thanh")]
         api --> bucket
@@ -81,7 +96,11 @@ flowchart LR
     llm["Dịch vụ LLM"]
     hf["Hugging Face"]
     vbee["Vbee batch TTS"]
+    workos["WorkOS AuthKit"]
 
+    ui -- "trang đăng nhập, PKCE" --> workos
+    ui -- "mã, rồi access token mỗi request" --> accounts
+    accounts -- "API key chỉ nằm trên server" --> workos
     ui -- "EPUB, yêu cầu chương" --> api
     ui -- "yêu cầu rút gọn" --> digest
     digest --> llm
@@ -96,9 +115,9 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 
 | | Hiện có | Dự kiến |
 |---|---|---|
-| Lưu sách | Danh sách sách ở bộ nhớ tạm, mất khi backend restart; file EPUB nằm trong Railway bucket | Danh sách sách trong PostgreSQL |
+| Lưu sách | Sách và chương trong PostgreSQL; file EPUB và ảnh bìa trong Railway bucket. Chương rút gọn được cache trong bộ nhớ, nên sau khi restart sẽ rút gọn (và tính lượt) lại | Chương rút gọn trong PostgreSQL |
 | Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
-| Người dùng | Một `demo-user`, chưa có đăng nhập | Đăng nhập và hạn mức token |
+| Tài khoản | Đăng nhập qua WorkOS. Gói Free, Plus, Max: 3, 30, 200 cuốn; 10, 100, 500 chương rút gọn mỗi tháng; 30, 300, 1.500 phút Vbee mỗi tháng; file EPUB tối đa 20, 100, 100 MB. Giọng trên máy và bản gốc không giới hạn. Tài khoản đầu tiên đăng nhập bằng `SUPER_ADMIN_EMAIL` đã xác minh thành super admin và duyệt gói | Thanh toán, xoá tài khoản trong app |
 | Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
@@ -120,7 +139,7 @@ Cần Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # điền LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN và VBEE_APP_ID không bắt buộc
+cp .env.example .env   # điền WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN và VBEE_APP_ID không bắt buộc
 npm ci
 npm run start:dev
 ```
@@ -168,7 +187,7 @@ Integration test ghi đè app đã cài trên simulator, nên phải build lại
 
 ## Deploy
 
-Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, trong biến môi trường của Railway, không đưa vào repo.
+Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, trong biến môi trường của Railway, không đưa vào repo.
 
 Bản iPhone trỏ vào backend đã deploy:
 

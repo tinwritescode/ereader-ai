@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../auth/domain/account.dart';
+import '../../../auth/presentation/account_page.dart';
+import '../../../auth/presentation/auth_cubit.dart';
+import '../../../auth/presentation/plans_page.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/mini_player.dart';
 import '../../domain/entities/book.dart';
@@ -42,6 +46,8 @@ class _LibraryPageState extends State<LibraryPage> {
     final listening = context.watch<ListenBloc>().state.heard != null;
     final spots = context.watch<ReadingSpotsCubit>().state;
     final latest = listening ? null : _latest(state.books, spots);
+    final auth = context.watch<AuthCubit>().state;
+    final account = auth is AuthSignedIn ? auth.account : null;
     final empty =
         !state.loading &&
         state.loadError == null &&
@@ -63,14 +69,28 @@ class _LibraryPageState extends State<LibraryPage> {
                     controller: _scroll,
                     padding: _pagePadding,
                     children: [
-                      Text(
-                        'Thư viện',
-                        style: readingStyle(
-                          size: 26,
-                          height: onGrid(26) * 2,
-                          weight: FontWeight.w600,
-                          color: Palette.ink,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Thư viện',
+                            style: readingStyle(
+                              size: 26,
+                              height: onGrid(26) * 2,
+                              weight: FontWeight.w600,
+                              color: Palette.ink,
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Tài khoản',
+                            icon: const Icon(
+                              Icons.person_outline,
+                              color: Palette.ink,
+                            ),
+                            onPressed: () =>
+                                Navigator.of(context).push(AccountPage.route()),
+                          ),
+                        ],
                       ),
                       if (latest case (final book, final spot))
                         _ContinueCard(book: book, spot: spot),
@@ -91,6 +111,7 @@ class _LibraryPageState extends State<LibraryPage> {
                       _Shelf(
                         books: state.books,
                         spots: spots,
+                        account: account,
                         onAdd: upload is Uploading
                             ? null
                             : () => context.read<LibraryBloc>().add(
@@ -203,23 +224,33 @@ class _ContinueCard extends StatelessWidget {
 
 /// Two books side by side, with a place for the next one at the end.
 class _Shelf extends StatelessWidget {
-  const _Shelf({required this.books, required this.spots, required this.onAdd});
+  const _Shelf({
+    required this.books,
+    required this.spots,
+    required this.account,
+    required this.onAdd,
+  });
 
   final List<Book> books;
   final Map<String, ReadingSpot> spots;
+  final Account? account;
   final VoidCallback? onAdd;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final width = (constraints.maxWidth - _shelfGap) / 2;
+      final account = this.account;
       return Wrap(
         spacing: _shelfGap,
         runSpacing: lineHeight,
         children: [
           for (final book in books)
             _ShelfBook(book: book, spot: spots[book.bookId], width: width),
-          _AddBook(width: width, onTap: onAdd),
+          if (account != null && books.length >= account.limits.books)
+            _ShelfFull(width: width, account: account)
+          else
+            _AddBook(width: width, onTap: onAdd),
         ],
       );
     },
@@ -313,6 +344,49 @@ class _AddBook extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// Takes the place of [_AddBook] once the plan's shelf is full.
+class _ShelfFull extends StatelessWidget {
+  const _ShelfFull({required this.width, required this.account});
+
+  final double width;
+  final Account account;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: width - 4,
+    height: (width - 4) * coverRatio,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).push(PlansPage.route()),
+      child: CustomPaint(
+        painter: _DashedOutline(),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Đã đủ ${account.limits.books} cuốn của gói ${account.plan.label}.',
+                textAlign: TextAlign.center,
+                style: readingStyle(size: 13, height: 1.4),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Xem các gói',
+                style: readingStyle(
+                  size: 13,
+                  weight: FontWeight.w600,
+                  color: Palette.ink,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     ),

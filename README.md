@@ -18,6 +18,8 @@ flowchart LR
     llm(["LLM service"])
     hf(["Hugging Face"])
     vbee(["Vbee"])
+    workos(["WorkOS"])
+    admin(["Super admin"])
 
     subgraph app["eReader AI"]
         import(["Import an EPUB"])
@@ -33,7 +35,17 @@ flowchart LR
         download(["Download the voice once"])
         tune(["Change voice and speed"])
         cloud(["Listen with a Vbee voice"])
+        signin(["Sign in"])
+        usage(["See plan and usage"])
+        upgrade(["Ask for a higher plan"])
+        grant(["Change an account's plan"])
     end
+
+    reader --> signin
+    signin --> workos
+    reader --> usage
+    reader --> upgrade
+    admin --> grant
 
     reader --> import
     reader --> browse
@@ -68,9 +80,12 @@ flowchart LR
         api["Books and chapters API"]
         digest["Shortening and cache"]
         speech["Vbee speech proxy"]
-        memory[("In-memory storage")]
-        api --> memory
+        accounts["Accounts, plans, usage"]
+        memory[("In-memory cache")]
+        db[("Postgres: accounts, usage, books, chapters")]
         digest --> memory
+        api --> db
+        accounts --> db
         clips[("Postgres: sentences read aloud")]
         bucket[("Railway bucket: EPUB files, speech audio")]
         api --> bucket
@@ -81,7 +96,11 @@ flowchart LR
     llm["LLM service"]
     hf["Hugging Face"]
     vbee["Vbee batch TTS"]
+    workos["WorkOS AuthKit"]
 
+    ui -- "sign-in page, PKCE" --> workos
+    ui -- "code, then access token on every request" --> accounts
+    accounts -- "API key stays on the server" --> workos
     ui -- "EPUB, chapter requests" --> api
     ui -- "shorten requests" --> digest
     digest --> llm
@@ -96,9 +115,9 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 
 | | Today | Planned |
 |---|---|---|
-| Book storage | Book list in memory, lost when the backend restarts; EPUB files in a Railway bucket | Book list in PostgreSQL |
+| Book storage | Books and chapters in PostgreSQL; EPUB files and covers in a Railway bucket. Shortened chapters are cached in memory, so a restart shortens (and charges) them again | Shortened chapters in PostgreSQL |
 | EPUB processing | Inside the backend process | Redis and BullMQ queue |
-| Users | One `demo-user`, no sign-in | Sign-in and token budgets |
+| Accounts | WorkOS sign-in. Plans Free, Plus, Max: 3, 30, 200 books; 10, 100, 500 shortened chapters a month; 30, 300, 1,500 Vbee minutes a month; EPUB up to 20, 100, 100 MB. Device voices and original text have no limit. The first account to sign in with the verified `SUPER_ADMIN_EMAIL` becomes super admin and grants plans | Payment, account deletion in the app |
 | Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
@@ -120,7 +139,7 @@ Requires Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # fill in LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN and VBEE_APP_ID are optional
+cp .env.example .env   # fill in WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN and VBEE_APP_ID are optional
 npm ci
 npm run start:dev
 ```
@@ -168,7 +187,7 @@ Integration tests replace the app installed on the simulator, so rebuild the rea
 
 ## Deploy
 
-The backend runs on Railway from `backend/Dockerfile`. Set `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN` and `VBEE_APP_ID` in Railway's environment variables, never in the repo.
+The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN` and `VBEE_APP_ID` in Railway's environment variables, never in the repo.
 
 To build for an iPhone against the deployed backend:
 

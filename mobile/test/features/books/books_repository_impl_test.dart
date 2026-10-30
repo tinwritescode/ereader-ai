@@ -42,7 +42,7 @@ void main() {
     expect(book.title, 'The Battle for Investment Survival');
     expect((book.chapterCount, book.minutes), (36, 557));
     expect(adapter.requests.single.uri.toString(), 'http://api.test/books');
-    expect(adapter.bodies.single, contains('name="userId"'));
+    expect(adapter.bodies.single, isNot(contains('name="userId"')));
     expect(adapter.bodies.single, contains('filename="loeb.epub"'));
     expect(progress.last, 1.0);
   });
@@ -53,14 +53,8 @@ void main() {
     final books = await _repository(adapter).books();
 
     expect(books.single.bookId, 'book-1');
-    expect(
-      books.single.coverUrl,
-      'http://api.test/books/book-1/cover?userId=user-1',
-    );
-    expect(
-      adapter.requests.single.uri.toString(),
-      'http://api.test/books?userId=user-1',
-    );
+    expect(books.single.coverUrl, 'http://api.test/books/book-1/cover');
+    expect(adapter.requests.single.uri.toString(), 'http://api.test/books');
   });
 
   test('reads chapter summaries and the original body', () async {
@@ -135,7 +129,7 @@ void main() {
     expect(text.blocks.map((block) => block.text), ['Một.', 'Hai.']);
     expect(
       adapter.requests.single.uri.toString(),
-      'http://api.test/chapters/c0/digest?userId=user-1',
+      'http://api.test/chapters/c0/digest',
     );
     expect(jsonDecode(adapter.bodies.single), {
       'targetLang': 'vi',
@@ -167,7 +161,6 @@ void main() {
 BooksRepositoryImpl _repository(HttpClientAdapter adapter) =>
     BooksRepositoryImpl(
       Dio(BaseOptions(baseUrl: 'http://api.test'))..httpClientAdapter = adapter,
-      userId: 'user-1',
     );
 
 typedef _Respond = (int, Object) Function(RequestOptions options);

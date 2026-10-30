@@ -14,6 +14,8 @@ String _failure(String code) => switch (code) {
   'VOICE_DOWNLOAD_CORRUPT' => 'File giọng đọc bị lỗi. Hãy tải lại.',
   'CLOUD_VOICE_FAILED' =>
     'Chưa gọi được giọng Vbee. Kiểm tra mạng, hoặc chọn giọng trên máy.',
+  'VBEE_LIMIT' =>
+    'Hết phút giọng Vbee tháng này. Chọn giọng trên máy để nghe tiếp.',
   _ => 'Chưa đọc được đoạn này.',
 };
 

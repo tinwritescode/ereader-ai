@@ -15,6 +15,7 @@ import 'package:ereader_mobile/features/books/domain/entities/reading_spot.dart'
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
 import 'package:ereader_mobile/features/listen/presentation/mini_player.dart';
 
+import 'features/auth/fake_auth_repository.dart';
 import 'features/books/fake_books_repository.dart';
 import 'features/books/fake_reading_look_store.dart';
 import 'features/books/fake_reading_spot_store.dart';
@@ -28,6 +29,7 @@ void main() {
     FakeSpeech? speech,
     FakeReadingLookStore? looks,
     FakeReadingSpotStore? spots,
+    FakeAuthRepository? auth,
   }) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
@@ -38,6 +40,7 @@ void main() {
     );
     await tester.pumpWidget(
       EReaderApp(
+        auth: auth ?? FakeAuthRepository(),
         repository: repository,
         speech: speech ?? FakeSpeech(),
         looks: looks ?? FakeReadingLookStore(),

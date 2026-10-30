@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../auth/presentation/account_widgets.dart';
+import '../../../auth/presentation/auth_cubit.dart';
 import '../../../listen/domain/listen_source.dart';
 import '../../../listen/domain/speech_plan.dart';
 import '../../../listen/presentation/listen_bloc.dart';
@@ -171,6 +173,9 @@ class _ReaderPageState extends State<ReaderPage> {
   }
 
   void _onText(BuildContext context, ReaderState state) {
+    if (state.text case ReaderTextFailed(code: 'DIGEST_LIMIT')) {
+      _showDigestLimit();
+    }
     if (state.text case ReaderTextLoaded(:final text)) {
       if (_placed) {
         _afterLayout(_remember);
@@ -179,6 +184,32 @@ class _ReaderPageState extends State<ReaderPage> {
         _place(text.blocks, state.option);
       }
     }
+  }
+
+  /// The limit never stops reading: the original is always one tap away.
+  void _showDigestLimit() {
+    final auth = context.read<AuthCubit>();
+    final original = widget.options.firstWhere(
+      (option) => option.length == ReadingLength.original,
+    );
+    unawaited(auth.refresh());
+    final state = auth.state;
+    final used = state is AuthSignedIn
+        ? 'Bạn đã dùng ${state.account.limits.monthlyDigests} trên ${state.account.limits.monthlyDigests} chương của gói ${state.account.plan.label}. Lượt mới có vào ${state.account.resetLabel}.'
+        : 'Bạn đã dùng hết lượt của gói này.';
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Palette.paper,
+      builder: (sheet) => LimitSheet(
+        title: 'Hết lượt rút gọn tháng này',
+        body: used,
+        way: 'Đọc bản gốc',
+        onWay: () {
+          Navigator.of(sheet).pop();
+          _chooseVersion(original);
+        },
+      ),
+    );
   }
 
   void _afterLayout(VoidCallback action) =>

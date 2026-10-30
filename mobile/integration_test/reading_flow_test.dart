@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-/// Runs on a simulator against a live backend that already holds one imported book for `USER_ID`:
+import '../test/features/auth/fake_auth_repository.dart';
+
+/// Runs on a simulator against a live backend that already holds one imported book for the account of `ACCESS_TOKEN`:
 /// `flutter test integration_test --dart-define=API_BASE_URL=http://localhost:3013`.
 /// Prints `SCREEN:<name>` and holds each screen for 2 s so a wrapper script can capture it.
 void main() {
@@ -29,19 +31,19 @@ void main() {
         'API_BASE_URL',
         defaultValue: 'http://localhost:3013',
       );
-      const userId = String.fromEnvironment(
-        'USER_ID',
-        defaultValue: 'demo-user',
+      // A real access token: this walks the live backend.
+      const accessToken = String.fromEnvironment('ACCESS_TOKEN');
+      final api = Dio(
+        BaseOptions(
+          baseUrl: baseUrl,
+          headers: {'Authorization': 'Bearer $accessToken'},
+        ),
       );
       await tester.pumpWidget(
         EReaderApp(
-          repository: BooksRepositoryImpl(
-            Dio(BaseOptions(baseUrl: baseUrl)),
-            userId: userId,
-          ),
-          speech: KokoroSpeech(
-            vbee: VbeeVoices(Dio(BaseOptions(baseUrl: baseUrl))),
-          ),
+          auth: FakeAuthRepository(),
+          repository: BooksRepositoryImpl(api),
+          speech: KokoroSpeech(vbee: VbeeVoices(api)),
           looks: PrefsReadingLookStore(),
           spots: PrefsReadingSpotStore(),
           pickEpub: () async => null,
