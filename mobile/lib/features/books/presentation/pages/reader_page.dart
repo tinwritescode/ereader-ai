@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -11,10 +13,12 @@ import '../../../listen/presentation/listen_panel.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
 import '../../domain/entities/reading_look.dart';
+import '../../domain/entities/reading_spot.dart';
 import '../../domain/repositories/books_repository.dart';
 import '../bloc/reader_bloc.dart';
 import '../formatting.dart';
 import '../reading_look_cubit.dart';
+import '../reading_spots_cubit.dart';
 import '../widgets.dart';
 import 'look_sheet.dart';
 
@@ -30,6 +34,8 @@ typedef _PageColors = ({
   Color muted,
   Color track,
   Color line,
+  Color button,
+  Color onButton,
 });
 
 _PageColors _colorsOf(Paper paper) => switch (paper) {
@@ -40,6 +46,8 @@ _PageColors _colorsOf(Paper paper) => switch (paper) {
     muted: Palette.muted,
     track: Palette.rose,
     line: Palette.rule,
+    button: Palette.ink,
+    onButton: Palette.sheet,
   ),
   Paper.night => (
     paper: Palette.night,
@@ -48,6 +56,8 @@ _PageColors _colorsOf(Paper paper) => switch (paper) {
     muted: Palette.nightMuted,
     track: Palette.nightRule,
     line: Palette.nightRule,
+    button: Palette.marker,
+    onButton: Palette.ink,
   ),
 };
 
@@ -57,15 +67,21 @@ typedef _Picked = ({SpokenSentence sentence, Offset at});
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
     super.key,
+    required this.bookId,
     required this.chapter,
     required this.options,
     this.listen = false,
+    this.resume = false,
     this.next,
     this.onNext,
   });
 
+  final String bookId;
   final ChapterSummary chapter;
   final List<LengthOption> options;
+
+  /// Goes to the saved spot without asking; the reader already chose to continue.
+  final bool resume;
 
   /// Starts reading aloud as soon as the text has loaded.
   final bool listen;
@@ -77,10 +93,12 @@ class ReaderPage extends StatefulWidget {
   static Route<void> route({
     required BooksRepository repository,
     required Speech speech,
+    required String bookId,
     required ChapterSummary chapter,
     required List<LengthOption> options,
     required LengthOption option,
     bool listen = false,
+    bool resume = false,
     ChapterSummary? next,
     VoidCallback? onNext,
   }) {
@@ -97,9 +115,11 @@ class ReaderPage extends StatefulWidget {
           BlocProvider(create: (_) => ListenBloc(speech)),
         ],
         child: ReaderPage(
+          bookId: bookId,
           chapter: chapter,
           options: options,
           listen: listen,
+          resume: resume,
           next: next,
           onNext: onNext,
         ),
@@ -120,6 +140,10 @@ class _ReaderPageState extends State<ReaderPage> {
   double _read = 0;
   bool _tools = false;
   _Picked? _picked;
+  late final _spots = context.read<ReadingSpotsCubit>();
+  // The opening text decides once whether to ask about the last spot.
+  bool _placed = false;
+  ReadingSpot? _offer;
 
   @override
   void initState() {
@@ -136,11 +160,117 @@ class _ReaderPageState extends State<ReaderPage> {
     super.dispose();
   }
 
-  void _listenIfAsked(BuildContext context, ReaderState state) {
-    if (state.text case ReaderTextLoaded(:final text) when _listenOnLoad) {
-      _listenOnLoad = false;
-      context.read<ListenBloc>().add(ListenRequested(text.blocks));
+  void _onText(BuildContext context, ReaderState state) {
+    if (state.text case ReaderTextLoaded(:final text)) {
+      if (_listenOnLoad) {
+        _listenOnLoad = false;
+        context.read<ListenBloc>().add(ListenRequested(text.blocks));
+      }
+      if (_placed) {
+        _afterLayout(_remember);
+      } else {
+        _placed = true;
+        _place(text.blocks, state.option);
+      }
     }
+  }
+
+  void _afterLayout(VoidCallback action) =>
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) action();
+      });
+
+  /// Goes back to the saved spot in this version of the chapter, or asks first.
+  void _place(List<TextBlock> blocks, LengthOption option) {
+    final spot = _spots.state[widget.bookId];
+    final saved =
+        spot != null &&
+            spot.chapterId == widget.chapter.chapterId &&
+            spot.option == option &&
+            spot.block > 0 &&
+            spot.block < blocks.length
+        ? spot
+        : null;
+    if (saved == null) {
+      _afterLayout(_remember);
+    } else if (widget.resume) {
+      _afterLayout(() => _goTo(saved.block));
+    } else {
+      setState(() => _offer = saved);
+    }
+  }
+
+  void _goTo(int block) {
+    final target = _blockKeys[block]?.currentContext;
+    if (target != null) Scrollable.ensureVisible(target, alignment: 0.08);
+    _afterLayout(_remember);
+  }
+
+  void _answerOffer({required bool resume}) {
+    final offer = _offer;
+    setState(() => _offer = null);
+    if (resume && offer != null) {
+      _afterLayout(() => _goTo(offer.block));
+    } else {
+      _afterLayout(_remember);
+    }
+  }
+
+  /// The first block whose bottom is below the top of the page.
+  int _topBlock() {
+    final top = MediaQuery.paddingOf(context).top + 52;
+    final indexes = _blockKeys.keys.toList()..sort();
+    for (final index in indexes) {
+      final box = _blockKeys[index]?.currentContext?.findRenderObject();
+      if (box is RenderBox &&
+          box.attached &&
+          box.localToGlobal(Offset(0, box.size.height)).dy > top) {
+        return index;
+      }
+    }
+    return 0;
+  }
+
+  /// Saves where reading is now. At the end of a chapter the spot moves to
+  /// the next one, or is cleared after the last.
+  void _remember() {
+    if (_offer != null || !_scroll.hasClients) return;
+    final state = context.read<ReaderBloc>().state;
+    if (state.text is! ReaderTextLoaded) return;
+    final position = _scroll.position;
+    final finished =
+        position.maxScrollExtent <= 0 ||
+        position.pixels >= position.maxScrollExtent - 24;
+    if (finished) {
+      final next = widget.next;
+      if (next == null) {
+        unawaited(_spots.clear(widget.bookId));
+      } else {
+        unawaited(
+          _spots.record(
+            widget.bookId,
+            ReadingSpot(
+              chapterId: next.chapterId,
+              chapterLabel: next.label,
+              minutesLeft: next.minutes,
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    unawaited(
+      _spots.record(
+        widget.bookId,
+        ReadingSpot(
+          chapterId: widget.chapter.chapterId,
+          chapterLabel: widget.chapter.label,
+          minutesLeft: (state.option.minutes * (1 - _read)).ceil(),
+          option: state.option,
+          block: _topBlock(),
+        ),
+      ),
+    );
   }
 
   void _reveal(SpokenSentence sentence) {
@@ -201,10 +331,12 @@ class _ReaderPageState extends State<ReaderPage> {
     // Only the reader's own drag hides the tools, not the scroll that follows speech.
     if (update.dragDetails == null) return false;
     final hideTools = _tools && !listening;
-    if (hideTools || _picked != null) {
+    if (hideTools || _picked != null || _offer != null) {
       setState(() {
         if (hideTools) _tools = false;
         _picked = null;
+        // Scrolling on answers the question: reading goes on from here.
+        _offer = null;
       });
     }
     return false;
@@ -238,7 +370,7 @@ class _ReaderPageState extends State<ReaderPage> {
 
     return MultiBlocListener(
       listeners: [
-        BlocListener<ReaderBloc, ReaderState>(listener: _listenIfAsked),
+        BlocListener<ReaderBloc, ReaderState>(listener: _onText),
         BlocListener<ListenBloc, ListenState>(
           listenWhen: (before, after) {
             final was = before.stage;
@@ -282,47 +414,54 @@ class _ReaderPageState extends State<ReaderPage> {
                   ),
                   Positioned.fill(
                     left: _textLeft,
-                    child: NotificationListener<ScrollUpdateNotification>(
-                      onNotification: (update) => _onScroll(update, listening),
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _tapPage,
-                        child: switch (state.text) {
-                          ReaderTextLoading() => _Waiting(
-                            shortened: shortened,
-                            color: colors.muted,
-                          ),
-                          ReaderTextFailed(:final code) => Center(
-                            child: TextButton(
-                              onPressed: () => context.read<ReaderBloc>().add(
-                                ReaderLengthChosen(state.option),
-                              ),
-                              child: Text('${errorMessage(code)} Thử lại'),
+                    child: NotificationListener<ScrollEndNotification>(
+                      onNotification: (_) {
+                        _remember();
+                        return false;
+                      },
+                      child: NotificationListener<ScrollUpdateNotification>(
+                        onNotification: (update) =>
+                            _onScroll(update, listening),
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: _tapPage,
+                          child: switch (state.text) {
+                            ReaderTextLoading() => _Waiting(
+                              shortened: shortened,
+                              color: colors.muted,
                             ),
-                          ),
-                          ReaderTextLoaded(:final text) =>
-                            SingleChildScrollView(
-                              controller: _scroll,
-                              padding: EdgeInsets.fromLTRB(
-                                0,
-                                safe.top + 52,
-                                24,
-                                safe.bottom + 96,
-                              ),
-                              child: _Chapter(
-                                chapter: widget.chapter,
-                                blocks: text.blocks,
-                                blockKeys: _blockKeys,
-                                marked: marked,
-                                look: look,
-                                colors: colors,
-                                next: widget.next,
-                                onNext: widget.onNext,
-                                onHold: (block, offset, global) =>
-                                    _pick(text.blocks, block, offset, global),
+                            ReaderTextFailed(:final code) => Center(
+                              child: TextButton(
+                                onPressed: () => context.read<ReaderBloc>().add(
+                                  ReaderLengthChosen(state.option),
+                                ),
+                                child: Text('${errorMessage(code)} Thử lại'),
                               ),
                             ),
-                        },
+                            ReaderTextLoaded(:final text) =>
+                              SingleChildScrollView(
+                                controller: _scroll,
+                                padding: EdgeInsets.fromLTRB(
+                                  0,
+                                  safe.top + 52,
+                                  24,
+                                  safe.bottom + 96,
+                                ),
+                                child: _Chapter(
+                                  chapter: widget.chapter,
+                                  blocks: text.blocks,
+                                  blockKeys: _blockKeys,
+                                  marked: marked,
+                                  look: look,
+                                  colors: colors,
+                                  next: widget.next,
+                                  onNext: widget.onNext,
+                                  onHold: (block, offset, global) =>
+                                      _pick(text.blocks, block, offset, global),
+                                ),
+                              ),
+                          },
+                        ),
                       ),
                     ),
                   ),
@@ -346,7 +485,7 @@ class _ReaderPageState extends State<ReaderPage> {
                       right: 0,
                       bottom: 0,
                       child: _Appear(
-                        visible: tools && !listening,
+                        visible: tools && !listening && _offer == null,
                         child: _ToolBar(
                           colors: colors,
                           minutesLeft: minutesLeft,
@@ -359,6 +498,19 @@ class _ReaderPageState extends State<ReaderPage> {
                             ListenRequested(loaded.blocks),
                           ),
                         ),
+                      ),
+                    ),
+                  if (_offer case final offer?
+                      when loaded != null && !listening)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _ResumeOffer(
+                        colors: colors,
+                        quote: loaded.blocks[offer.block].text,
+                        onResume: () => _answerOffer(resume: true),
+                        onStartOver: () => _answerOffer(resume: false),
                       ),
                     ),
                   if (picked != null && loaded != null)
@@ -725,6 +877,90 @@ class _ToolBar extends StatelessWidget {
               TextButton(
                 onPressed: onListen,
                 child: Text('Nghe', style: action),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Asks whether to go back to where reading stopped last time.
+class _ResumeOffer extends StatelessWidget {
+  const _ResumeOffer({
+    required this.colors,
+    required this.quote,
+    required this.onResume,
+    required this.onStartOver,
+  });
+
+  final _PageColors colors;
+  final String quote;
+  final VoidCallback onResume;
+  final VoidCallback onStartOver;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = quote.trim();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.paper,
+        border: Border(top: BorderSide(color: colors.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(_textLeft, 14, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Lần trước bạn đọc đến',
+                style: readingStyle(size: 12.5, color: colors.muted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '“$text”',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: readingStyle(size: 15, height: 1.45, color: colors.text),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                children: [
+                  TextButton(
+                    onPressed: onStartOver,
+                    child: Text(
+                      'Đọc từ đầu',
+                      style: readingStyle(
+                        size: 15,
+                        weight: FontWeight.w600,
+                        color: colors.title,
+                      ),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: onResume,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colors.button,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      'Đọc tiếp',
+                      style: readingStyle(
+                        size: 15,
+                        weight: FontWeight.w600,
+                        color: colors.onButton,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

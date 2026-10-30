@@ -69,11 +69,15 @@ class FakeBooksRepository implements BooksRepository {
   ];
 
   @override
-  Future<ChapterText> original(String chapterId) async => const ChapterText([
-    TextBlock(
+  Future<ChapterText> original(String chapterId) async => ChapterText([
+    const TextBlock(
       TextBlockKind.paragraph,
       'Tôi thực sự tin rằng, không có gì khó khăn hơn việc kiếm lợi nhuận.',
     ),
+    // Chapter One is long enough to scroll, so a reading spot can sit inside it.
+    if (chapterId == chapterOne.chapterId)
+      for (var i = 1; i <= 40; i++)
+        TextBlock(TextBlockKind.paragraph, 'Đoạn $i của chương một.'),
   ]);
 
   @override

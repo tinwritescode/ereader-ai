@@ -1,9 +1,13 @@
+import 'package:ereader_mobile/features/books/domain/entities/reading_length.dart';
+import 'package:ereader_mobile/features/books/domain/entities/reading_spot.dart';
 import 'package:ereader_mobile/main.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import '../test/features/books/fake_books_repository.dart';
 import '../test/features/books/fake_reading_look_store.dart';
+import '../test/features/books/fake_reading_spot_store.dart';
 import '../test/features/listen/fake_speech.dart';
 
 /// Walks the app on sample data for `tool/capture_screenshots.sh`, which saves
@@ -24,6 +28,15 @@ void main() {
         repository: FakeBooksRepository(shelf: [loeb]),
         speech: FakeSpeech(),
         looks: FakeReadingLookStore(),
+        spots: FakeReadingSpotStore({
+          'book-1': ReadingSpot(
+            chapterId: chapterOne.chapterId,
+            chapterLabel: chapterOne.label,
+            minutesLeft: 6,
+            option: lengthOptionsFor(chapterOne.minutes).first,
+            block: 12,
+          ),
+        }),
         pickEpub: () async => null,
       ),
     );
@@ -37,7 +50,12 @@ void main() {
     );
     await hold('choose-length');
 
-    await tester.tapAt(const Offset(200, 100));
+    await tester.tap(find.text('Bản gốc'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đọc bản gốc'));
+    await hold('resume');
+
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
     await tester.tap(find.text('Chương Sáu'));
     await hold('reader');

@@ -12,21 +12,29 @@ import '../../../listen/domain/speech.dart';
 import '../bloc/book_bloc.dart';
 import '../formatting.dart';
 import '../length_memory.dart';
+import '../reading_spots_cubit.dart';
 import '../widgets.dart';
 import 'choose_length_sheet.dart';
 import 'reader_page.dart';
 
 class BookPage extends StatefulWidget {
-  const BookPage({super.key, required this.book});
+  const BookPage({super.key, required this.book, this.resume = false});
 
   final Book book;
 
-  static Route<void> route(BuildContext context, Book book) {
+  /// Goes straight back to where reading stopped, once the chapters load.
+  final bool resume;
+
+  static Route<void> route(
+    BuildContext context,
+    Book book, {
+    bool resume = false,
+  }) {
     final repository = context.read<BooksRepository>();
     return MaterialPageRoute(
       builder: (_) => BlocProvider(
         create: (_) => BookBloc(repository)..add(BookStarted(book.bookId)),
-        child: BookPage(book: book),
+        child: BookPage(book: book, resume: resume),
       ),
     );
   }
@@ -37,6 +45,20 @@ class BookPage extends StatefulWidget {
 
 class _BookPageState extends State<BookPage> {
   final _scroll = ScrollController();
+  late bool _resume = widget.resume;
+
+  void _resumeOnLoad(BuildContext context, BookState state) {
+    if (state case BookLoaded(:final chapters) when _resume) {
+      _resume = false;
+      final spot = context.read<ReadingSpotsCubit>().state[widget.book.bookId];
+      final index = chapters.indexWhere(
+        (chapter) => chapter.chapterId == spot?.chapterId,
+      );
+      if (spot != null && index >= 0) {
+        unawaited(_open(chapters, index, option: spot.option, resume: true));
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -49,89 +71,101 @@ class _BookPageState extends State<BookPage> {
     final state = context.watch<BookBloc>().state;
     final book = widget.book;
     final author = book.author;
-    return Scaffold(
-      body: RuledPaper(
-        scroll: _scroll,
-        child: SafeArea(
-          bottom: false,
-          child: Stack(
-            children: [
-              CustomScrollView(
-                controller: _scroll,
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      marginWidth + 12,
-                      lineHeight,
-                      18,
-                      lineHeight,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            book.title,
-                            style: readingStyle(
-                              size: 21,
-                              height: onGrid(21),
-                              weight: FontWeight.w600,
-                              color: Palette.ink,
-                            ),
-                          ),
-                          Text(
-                            [?author, '${book.chapterCount} chương'].join(', '),
-                            style: readingStyle(
-                              size: 13,
-                              height: onGrid(13),
-                              color: Palette.muted,
-                            ),
-                          ),
-                        ],
+    return BlocListener<BookBloc, BookState>(
+      listener: _resumeOnLoad,
+      child: Scaffold(
+        body: RuledPaper(
+          scroll: _scroll,
+          child: SafeArea(
+            bottom: false,
+            child: Stack(
+              children: [
+                CustomScrollView(
+                  controller: _scroll,
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(
+                        marginWidth + 12,
+                        lineHeight,
+                        18,
+                        lineHeight,
                       ),
-                    ),
-                  ),
-                  switch (state) {
-                    BookLoading() => const SliverFillRemaining(
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    BookFailed(:final code) => SliverFillRemaining(
-                      child: Center(
-                        child: TextButton(
-                          onPressed: () => context.read<BookBloc>().add(
-                            BookStarted(book.bookId),
-                          ),
-                          child: Text('${errorMessage(code)} Thử lại'),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              book.title,
+                              style: readingStyle(
+                                size: 21,
+                                height: onGrid(21),
+                                weight: FontWeight.w600,
+                                color: Palette.ink,
+                              ),
+                            ),
+                            Text(
+                              [
+                                ?author,
+                                '${book.chapterCount} chương',
+                              ].join(', '),
+                              style: readingStyle(
+                                size: 13,
+                                height: onGrid(13),
+                                color: Palette.muted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                    BookLoaded(:final chapters) => SliverList.builder(
-                      itemCount: chapters.length,
-                      itemBuilder: (context, index) => _ChapterRow(
-                        chapter: chapters[index],
-                        onTap: () => _open(chapters, index),
+                    switch (state) {
+                      BookLoading() => const SliverFillRemaining(
+                        child: Center(child: CircularProgressIndicator()),
                       ),
+                      BookFailed(:final code) => SliverFillRemaining(
+                        child: Center(
+                          child: TextButton(
+                            onPressed: () => context.read<BookBloc>().add(
+                              BookStarted(book.bookId),
+                            ),
+                            child: Text('${errorMessage(code)} Thử lại'),
+                          ),
+                        ),
+                      ),
+                      BookLoaded(:final chapters) => SliverList.builder(
+                        itemCount: chapters.length,
+                        itemBuilder: (context, index) => _ChapterRow(
+                          chapter: chapters[index],
+                          onTap: () => _open(chapters, index),
+                        ),
+                      ),
+                    },
+                    const SliverPadding(
+                      padding: EdgeInsets.only(bottom: lineHeight * 2),
                     ),
-                  },
-                  const SliverPadding(
-                    padding: EdgeInsets.only(bottom: lineHeight * 2),
-                  ),
-                ],
-              ),
-              const Positioned(
-                left: 2,
-                top: 0,
-                child: BackButton(color: Palette.ink),
-              ),
-            ],
+                  ],
+                ),
+                const Positioned(
+                  left: 2,
+                  top: 0,
+                  child: BackButton(color: Palette.ink),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  /// Opens chapter [index]: asks for a length first unless it is short.
-  Future<void> _open(List<ChapterSummary> chapters, int index) async {
+  /// Opens chapter [index]: asks for a length first, unless it is short or
+  /// [option] is already known.
+  Future<void> _open(
+    List<ChapterSummary> chapters,
+    int index, {
+    LengthOption? option,
+    bool resume = false,
+  }) async {
     final chapter = chapters[index];
     final next = index + 1 < chapters.length ? chapters[index + 1] : null;
     final options = lengthOptionsFor(chapter.minutes);
@@ -139,7 +173,9 @@ class _BookPageState extends State<BookPage> {
     final navigator = Navigator.of(context);
     final repository = context.read<BooksRepository>();
     final speech = context.read<Speech>();
-    final choice = options.length == 1
+    final choice = option != null
+        ? LengthChoice(option)
+        : options.length == 1
         ? LengthChoice(options.single)
         : await showModalBottomSheet<LengthChoice>(
             context: context,
@@ -156,6 +192,8 @@ class _BookPageState extends State<BookPage> {
       ReaderPage.route(
         repository: repository,
         speech: speech,
+        bookId: widget.book.bookId,
+        resume: resume,
         chapter: chapter,
         options: options,
         option: choice.option,

@@ -37,6 +37,6 @@ void main() {
 }
 
 String _text(ReaderState state) => switch (state.text) {
-  ReaderTextLoaded(:final text) => text.blocks.single.text,
+  ReaderTextLoaded(:final text) => text.blocks.first.text,
   final other => fail('expected loaded text, got $other'),
 };

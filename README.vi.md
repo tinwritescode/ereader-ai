@@ -4,9 +4,9 @@
 
 Ứng dụng đọc sách trên iPhone. Nhập file EPUB, chọn thời gian bạn có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app đọc to bằng giọng tiếng Việt chạy ngay trên máy.
 
-| Thư viện | Chương | Chọn độ dài | Đọc | Nghe |
-|---|---|---|---|---|
-| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) |
+| Thư viện | Chương | Chọn độ dài | Đọc tiếp | Đọc | Nghe |
+|---|---|---|---|---|---|
+| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Đọc tiếp](docs/screenshots/resume.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) |
 
 Ảnh chụp từ simulator với dữ liệu mẫu. Tạo lại bằng `mobile/tool/capture_screenshots.sh`.
 
@@ -27,6 +27,7 @@ flowchart LR
         listen(["Nghe đọc offline"])
         pick(["Chạm giữ câu để nghe từ đó"])
         look(["Chỉnh cỡ chữ, giãn dòng, trang Đêm"])
+        resume(["Đọc tiếp chỗ lần trước"])
         download(["Tải giọng đọc lần đầu"])
         tune(["Đổi giọng và tốc độ"])
     end
@@ -38,6 +39,7 @@ flowchart LR
     reader --> listen
     reader --> pick
     reader --> look
+    reader --> resume
     reader --> tune
 
     read -. "gồm" .-> shorten
@@ -82,7 +84,7 @@ Chỉ giọng đọc là offline. Nội dung chương vẫn lấy từ server, n
 | Lưu sách | Bộ nhớ tạm, mất khi backend restart | PostgreSQL và S3 |
 | Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
 | Người dùng | Một `demo-user`, chưa có đăng nhập | Đăng nhập và hạn mức token |
-| Tiến độ đọc | Chưa lưu | Lưu vị trí và đọc tiếp |
+| Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |

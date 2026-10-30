@@ -5,6 +5,7 @@ import '../../../../app/theme.dart';
 import '../../domain/entities/book.dart';
 import '../bloc/library_bloc.dart';
 import '../formatting.dart';
+import '../reading_spots_cubit.dart';
 import '../widgets.dart';
 import 'book_page.dart';
 
@@ -116,6 +117,7 @@ class _BookEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final author = book.author;
+    final spot = context.watch<ReadingSpotsCubit>().state[book.bookId];
     return Padding(
       padding: const EdgeInsets.only(bottom: lineHeight),
       child: Column(
@@ -130,9 +132,25 @@ class _BookEntry extends StatelessWidget {
                 Navigator.of(context).push(BookPage.route(context, book)),
           ),
           const SizedBox(height: 8),
-          _Note(
-            '${book.chapterCount} chương, khoảng ${durationLabel(book.minutes)} đọc',
-          ),
+          if (spot == null)
+            _Note(
+              '${book.chapterCount} chương, khoảng ${durationLabel(book.minutes)} đọc',
+            )
+          else
+            InkWell(
+              onTap: () => Navigator.of(
+                context,
+              ).push(BookPage.route(context, book, resume: true)),
+              child: Text(
+                'Đọc tiếp ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}',
+                style: readingStyle(
+                  size: 14.5,
+                  height: onGrid(14.5),
+                  weight: FontWeight.w600,
+                  color: Palette.ink,
+                ),
+              ),
+            ),
         ],
       ),
     );

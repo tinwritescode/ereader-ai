@@ -4,9 +4,9 @@
 
 An iPhone reading app. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the app reads aloud in a Vietnamese voice that runs on the device.
 
-| Library | Chapters | Choose length | Read | Listen |
-|---|---|---|---|---|
-| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) |
+| Library | Chapters | Choose length | Continue | Read | Listen |
+|---|---|---|---|---|---|
+| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Continue reading](docs/screenshots/resume.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) |
 
 Screenshots come from the simulator with sample data. Regenerate them with `mobile/tool/capture_screenshots.sh`.
 
@@ -27,6 +27,7 @@ flowchart LR
         listen(["Listen offline"])
         pick(["Hold a sentence to listen from there"])
         look(["Set text size, spacing, and night paper"])
+        resume(["Continue where reading stopped"])
         download(["Download the voice once"])
         tune(["Change voice and speed"])
     end
@@ -38,6 +39,7 @@ flowchart LR
     reader --> listen
     reader --> pick
     reader --> look
+    reader --> resume
     reader --> tune
 
     read -. "includes" .-> shorten
@@ -82,7 +84,7 @@ Only the voice is offline. Chapter text still comes from the server, so a chapte
 | Book storage | In memory, lost when the backend restarts | PostgreSQL and S3 |
 | EPUB processing | Inside the backend process | Redis and BullMQ queue |
 | Users | One `demo-user`, no sign-in | Sign-in and token budgets |
-| Reading progress | Not saved | Save position and resume |
+| Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
 | Platforms | iOS 16 and later | Android not tested yet |

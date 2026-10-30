@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:ereader_mobile/features/books/data/repositories/books_repository_impl.dart';
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_look_store.dart';
+import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_spot_store.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
 import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,7 @@ void main() {
           ),
           speech: KokoroSpeech(),
           looks: PrefsReadingLookStore(),
+          spots: PrefsReadingSpotStore(),
           pickEpub: () async => null,
         ),
       );
