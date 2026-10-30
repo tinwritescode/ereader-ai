@@ -4,9 +4,9 @@
 
 An iPhone reading app. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the app reads aloud in a Vietnamese voice that runs on the device.
 
-| Library | Chapters | Choose length | Listen |
-|---|---|---|---|
-| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Player](docs/screenshots/player.png) |
+| Library | Chapters | Choose length | Read | Listen |
+|---|---|---|---|---|
+| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) |
 
 Screenshots come from the simulator with sample data. Regenerate them with `mobile/tool/capture_screenshots.sh`.
 
@@ -25,6 +25,8 @@ flowchart LR
         read(["Read the original or a shorter version"])
         shorten(["AI shortens the chapter"])
         listen(["Listen offline"])
+        pick(["Hold a sentence to listen from there"])
+        look(["Set text size, spacing, and night paper"])
         download(["Download the voice once"])
         tune(["Change voice and speed"])
     end
@@ -34,6 +36,8 @@ flowchart LR
     reader --> length
     reader --> read
     reader --> listen
+    reader --> pick
+    reader --> look
     reader --> tune
 
     read -. "includes" .-> shorten
@@ -79,6 +83,7 @@ Only the voice is offline. Chapter text still comes from the server, so a chapte
 | EPUB processing | Inside the backend process | Redis and BullMQ queue |
 | Users | One `demo-user`, no sign-in | Sign-in and token budgets |
 | Reading progress | Not saved | Save position and resume |
+| Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
 | Platforms | iOS 16 and later | Android not tested yet |
 
@@ -89,7 +94,7 @@ The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Viet
 - `backend/`: NestJS 11, TypeScript. Modules `books`, `processing`, `ai-reading`.
 - `mobile/`: Flutter 3.41, `flutter_bloc`. Features `books`, `digest`, `listen`.
 - `mobile/tool/build_speech_assets.py`: builds the phoneme table and voice packs in `mobile/assets/speech/`.
-- `design/`: HTML mockups. The current one is `reader-flow-v2.html`.
+- `design/`: HTML mockups. `reader-flow-v2.html` covers the whole flow; `reader-flow-v3.html` is the current reading page.
 
 ## Run the backend
 

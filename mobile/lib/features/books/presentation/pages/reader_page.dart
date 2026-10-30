@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
@@ -9,9 +10,49 @@ import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/listen_panel.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
+import '../../domain/entities/reading_look.dart';
 import '../../domain/repositories/books_repository.dart';
 import '../bloc/reader_bloc.dart';
 import '../formatting.dart';
+import '../reading_look_cubit.dart';
+import '../widgets.dart';
+import 'look_sheet.dart';
+
+// The red margin line; the minutes left are written by hand to its left.
+const _marginLine = 26.0;
+const _textLeft = 40.0;
+
+/// Colours of the page on each [Paper].
+typedef _PageColors = ({
+  Color paper,
+  Color text,
+  Color title,
+  Color muted,
+  Color track,
+  Color line,
+});
+
+_PageColors _colorsOf(Paper paper) => switch (paper) {
+  Paper.day => (
+    paper: Palette.paper,
+    text: Palette.text,
+    title: Palette.ink,
+    muted: Palette.muted,
+    track: Palette.rose,
+    line: Palette.rule,
+  ),
+  Paper.night => (
+    paper: Palette.night,
+    text: Palette.nightText,
+    title: Palette.nightText,
+    muted: Palette.nightMuted,
+    track: Palette.nightRule,
+    line: Palette.nightRule,
+  ),
+};
+
+/// A sentence held down by the reader, and where the finger was.
+typedef _Picked = ({SpokenSentence sentence, Offset at});
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -19,6 +60,8 @@ class ReaderPage extends StatefulWidget {
     required this.chapter,
     required this.options,
     this.listen = false,
+    this.next,
+    this.onNext,
   });
 
   final ChapterSummary chapter;
@@ -27,6 +70,10 @@ class ReaderPage extends StatefulWidget {
   /// Starts reading aloud as soon as the text has loaded.
   final bool listen;
 
+  /// The chapter after this one, and how to open it; null on the last chapter.
+  final ChapterSummary? next;
+  final VoidCallback? onNext;
+
   static Route<void> route({
     required BooksRepository repository,
     required Speech speech,
@@ -34,6 +81,8 @@ class ReaderPage extends StatefulWidget {
     required List<LengthOption> options,
     required LengthOption option,
     bool listen = false,
+    ChapterSummary? next,
+    VoidCallback? onNext,
   }) {
     return MaterialPageRoute(
       builder: (_) => MultiBlocProvider(
@@ -47,7 +96,13 @@ class ReaderPage extends StatefulWidget {
           ),
           BlocProvider(create: (_) => ListenBloc(speech)),
         ],
-        child: ReaderPage(chapter: chapter, options: options, listen: listen),
+        child: ReaderPage(
+          chapter: chapter,
+          options: options,
+          listen: listen,
+          next: next,
+          onNext: onNext,
+        ),
       ),
     );
   }
@@ -58,10 +113,13 @@ class ReaderPage extends StatefulWidget {
 
 class _ReaderPageState extends State<ReaderPage> {
   final _scroll = ScrollController();
-  // One key per block, so the sentence being read can be found on the page.
+  final _stack = GlobalKey();
+  // One key per block, so a sentence can be found on the page.
   final _blockKeys = <int, GlobalKey>{};
   late bool _listenOnLoad = widget.listen;
   double _read = 0;
+  bool _tools = false;
+  _Picked? _picked;
 
   @override
   void initState() {
@@ -104,14 +162,79 @@ class _ReaderPageState extends State<ReaderPage> {
     );
   }
 
+  /// One tap clears a held sentence, or else shows or hides the tools.
+  void _tapPage() => setState(() {
+    if (_picked != null) {
+      _picked = null;
+    } else {
+      _tools = !_tools;
+    }
+  });
+
+  void _pick(List<TextBlock> blocks, int block, int offset, Offset global) {
+    final plan = planSpeech(blocks);
+    final stack = _stack.currentContext?.findRenderObject();
+    if (plan.isEmpty || stack is! RenderBox) return;
+    HapticFeedback.selectionClick();
+    setState(
+      () => _picked = (
+        sentence: plan[sentenceAt(plan, block, offset)],
+        at: stack.globalToLocal(global),
+      ),
+    );
+  }
+
+  void _listenFromPicked(List<TextBlock> blocks) {
+    final picked = _picked;
+    if (picked == null) return;
+    setState(() => _picked = null);
+    context.read<ListenBloc>().add(
+      ListenRequested(
+        blocks,
+        block: picked.sentence.block,
+        offset: picked.sentence.start,
+      ),
+    );
+  }
+
+  bool _onScroll(ScrollUpdateNotification update, bool listening) {
+    // Only the reader's own drag hides the tools, not the scroll that follows speech.
+    if (update.dragDetails == null) return false;
+    final hideTools = _tools && !listening;
+    if (hideTools || _picked != null) {
+      setState(() {
+        if (hideTools) _tools = false;
+        _picked = null;
+      });
+    }
+    return false;
+  }
+
+  void _chooseVersion(LengthOption option) {
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    context.read<ListenBloc>().add(const ListenStopped());
+    context.read<ReaderBloc>().add(ReaderLengthChosen(option));
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<ReaderBloc>().state;
+    final look = context.watch<ReadingLookCubit>().state;
+    final colors = _colorsOf(look.paper);
     final listen = context.watch<ListenBloc>().state.stage;
-    final spoken = listen is ListenPlaying ? listen.sentence : null;
+    final listening = listen is! ListenOff;
+    final marked =
+        (listen is ListenPlaying ? listen.sentence : null) ?? _picked?.sentence;
+    final loaded = switch (state.text) {
+      ReaderTextLoaded(:final text) => text,
+      _ => null,
+    };
+    // With nothing to read yet, or while listening, the tools stay up.
+    final tools = _tools || loaded == null || listening;
     final minutesLeft = (state.option.minutes * (1 - _read)).ceil();
-    final subtitle = widget.chapter.subtitle;
     final shortened = state.option.length != ReadingLength.original;
+    final safe = MediaQuery.paddingOf(context);
+    final picked = _picked;
 
     return MultiBlocListener(
       listeners: [
@@ -129,200 +252,480 @@ class _ReaderPageState extends State<ReaderPage> {
             }
           },
         ),
+        // After listening, Nghe stays one tap away.
+        BlocListener<ListenBloc, ListenState>(
+          listenWhen: (before, after) =>
+              before.stage is! ListenOff && after.stage is ListenOff,
+          listener: (_, _) => setState(() => _tools = true),
+        ),
       ],
       child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    // The red margin line doubles as reading progress.
-                    Positioned(
-                      left: 18,
-                      top: 10,
-                      bottom: 0,
-                      width: 3,
-                      child: _MarginProgress(read: _read),
+        backgroundColor: colors.paper,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Stack(
+                key: _stack,
+                children: [
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: _marginLine + 3,
+                    child: _Margin(
+                      read: _read,
+                      track: colors.track,
+                      minutesLeft: loaded == null ? null : minutesLeft,
+                      highest: safe.top + 64,
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 30),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              const BackButton(color: Palette.ink),
-                              const Spacer(),
-                              if (widget.options.length > 1)
-                                for (final option in widget.options)
-                                  _VersionTab(
-                                    option: option,
-                                    selected: option == state.option,
-                                    onTap: () {
-                                      if (_scroll.hasClients) _scroll.jumpTo(0);
-                                      context.read<ListenBloc>().add(
-                                        const ListenStopped(),
-                                      );
-                                      context.read<ReaderBloc>().add(
-                                        ReaderLengthChosen(option),
-                                      );
-                                    },
-                                  ),
-                              const SizedBox(width: 10),
-                            ],
+                  ),
+                  Positioned.fill(
+                    left: _textLeft,
+                    child: NotificationListener<ScrollUpdateNotification>(
+                      onNotification: (update) => _onScroll(update, listening),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _tapPage,
+                        child: switch (state.text) {
+                          ReaderTextLoading() => _Waiting(
+                            shortened: shortened,
+                            color: colors.muted,
                           ),
-                          Expanded(
-                            child: switch (state.text) {
-                              ReaderTextLoading() => Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircularProgressIndicator(),
-                                    if (shortened) ...[
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'AI đang rút gọn chương, thường mất 15–30 giây.',
-                                        style: readingStyle(
-                                          size: 13,
-                                          color: Palette.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                          ReaderTextFailed(:final code) => Center(
+                            child: TextButton(
+                              onPressed: () => context.read<ReaderBloc>().add(
+                                ReaderLengthChosen(state.option),
                               ),
-                              ReaderTextFailed(:final code) => Center(
-                                child: TextButton(
-                                  onPressed: () => context
-                                      .read<ReaderBloc>()
-                                      .add(ReaderLengthChosen(state.option)),
-                                  child: Text('${errorMessage(code)} Thử lại'),
-                                ),
-                              ),
-                              ReaderTextLoaded(:final text) =>
-                                SingleChildScrollView(
-                                  controller: _scroll,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    8,
-                                    6,
-                                    22,
-                                    32,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (subtitle != null) ...[
-                                        Text(
-                                          widget.chapter.label,
-                                          style: readingStyle(
-                                            size: 12.5,
-                                            color: Palette.muted,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                      ],
-                                      Text(
-                                        displayTitle(
-                                          subtitle ?? widget.chapter.label,
-                                        ),
-                                        style: readingStyle(
-                                          size: 22,
-                                          height: 1.3,
-                                          weight: FontWeight.w600,
-                                          color: Palette.ink,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      for (final (index, block)
-                                          in text.blocks.indexed)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            bottom: 12,
-                                          ),
-                                          child: _Block(
-                                            key: _blockKeys.putIfAbsent(
-                                              index,
-                                              GlobalKey.new,
-                                            ),
-                                            block: block,
-                                            spoken: spoken?.block == index
-                                                ? spoken
-                                                : null,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                            },
+                              child: Text('${errorMessage(code)} Thử lại'),
+                            ),
                           ),
-                          if (listen is ListenOff)
-                            Container(
-                              padding: const EdgeInsets.fromLTRB(8, 10, 22, 22),
-                              decoration: const BoxDecoration(
-                                border: Border(
-                                  top: BorderSide(color: Palette.rule),
-                                ),
+                          ReaderTextLoaded(:final text) =>
+                            SingleChildScrollView(
+                              controller: _scroll,
+                              padding: EdgeInsets.fromLTRB(
+                                0,
+                                safe.top + 52,
+                                24,
+                                safe.bottom + 96,
                               ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'còn ${durationLabel(minutesLeft)}',
-                                    style: handStyle(size: 20),
-                                  ),
-                                  if (state.text case ReaderTextLoaded(
-                                    :final text,
-                                  ))
-                                    TextButton.icon(
-                                      onPressed: () => context
-                                          .read<ListenBloc>()
-                                          .add(ListenRequested(text.blocks)),
-                                      icon: const Icon(
-                                        Icons.volume_up,
-                                        size: 18,
-                                      ),
-                                      label: Text(
-                                        'Nghe',
-                                        style: readingStyle(
-                                          size: 15,
-                                          weight: FontWeight.w600,
-                                          color: Palette.ink,
-                                        ),
-                                      ),
-                                    ),
-                                  if (shortened)
-                                    Flexible(
-                                      child: Text(
-                                        'AI viết lại từ bản gốc',
-                                        textAlign: TextAlign.end,
-                                        style: readingStyle(
-                                          size: 12.5,
-                                          color: Palette.muted,
-                                        ),
-                                      ),
-                                    ),
-                                ],
+                              child: _Chapter(
+                                chapter: widget.chapter,
+                                blocks: text.blocks,
+                                blockKeys: _blockKeys,
+                                marked: marked,
+                                look: look,
+                                colors: colors,
+                                next: widget.next,
+                                onNext: widget.onNext,
+                                onHold: (block, offset, global) =>
+                                    _pick(text.blocks, block, offset, global),
                               ),
                             ),
-                        ],
+                        },
                       ),
                     ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    top: 0,
+                    child: _Appear(
+                      visible: tools,
+                      child: _TopBar(
+                        colors: colors,
+                        options: widget.options,
+                        selected: state.option,
+                        onChoose: _chooseVersion,
+                      ),
+                    ),
+                  ),
+                  if (loaded != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _Appear(
+                        visible: tools && !listening,
+                        child: _ToolBar(
+                          colors: colors,
+                          minutesLeft: minutesLeft,
+                          shortened: shortened,
+                          onLook: () => showModalBottomSheet<void>(
+                            context: context,
+                            builder: (_) => const LookSheet(),
+                          ),
+                          onListen: () => context.read<ListenBloc>().add(
+                            ListenRequested(loaded.blocks),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (picked != null && loaded != null)
+                    _ListenHere(
+                      at: picked.at,
+                      highest: safe.top + 8,
+                      width: MediaQuery.sizeOf(context).width,
+                      onTap: () => _listenFromPicked(loaded.blocks),
+                    ),
+                ],
+              ),
+            ),
+            if (listening)
+              ListenPanel(
+                blocks: loaded?.blocks ?? const [],
+                minutes: state.option.minutes,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Fades the tools in and out; gone means gone, not just transparent.
+class _Appear extends StatelessWidget {
+  const _Appear({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => AnimatedSwitcher(
+    duration: const Duration(milliseconds: 180),
+    child: visible ? child : const SizedBox.shrink(),
+  );
+}
+
+class _Waiting extends StatelessWidget {
+  const _Waiting({required this.shortened, required this.color});
+
+  final bool shortened;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        if (shortened) ...[
+          const SizedBox(height: 16),
+          Text(
+            'AI đang rút gọn chương, thường mất 15–30 giây.',
+            style: readingStyle(size: 13, color: color),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _Chapter extends StatelessWidget {
+  const _Chapter({
+    required this.chapter,
+    required this.blocks,
+    required this.blockKeys,
+    required this.marked,
+    required this.look,
+    required this.colors,
+    required this.next,
+    required this.onNext,
+    required this.onHold,
+  });
+
+  final ChapterSummary chapter;
+  final List<TextBlock> blocks;
+  final Map<int, GlobalKey> blockKeys;
+  final SpokenSentence? marked;
+  final ReadingLook look;
+  final _PageColors colors;
+  final ChapterSummary? next;
+  final VoidCallback? onNext;
+  final void Function(int block, int offset, Offset global) onHold;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = chapter.subtitle;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (subtitle != null) ...[
+          Text(
+            chapter.label,
+            style: readingStyle(size: 12.5, color: colors.muted),
+          ),
+          const SizedBox(height: 4),
+        ],
+        Text(
+          displayTitle(subtitle ?? chapter.label),
+          style: readingStyle(
+            size: 22,
+            height: 1.3,
+            weight: FontWeight.w600,
+            color: colors.title,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (final (index, block) in blocks.indexed)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: _Block(
+              textKey: blockKeys.putIfAbsent(index, GlobalKey.new),
+              block: block,
+              marked: marked?.block == index ? marked : null,
+              look: look,
+              colors: colors,
+              onHold: (offset, global) => onHold(index, offset, global),
+            ),
+          ),
+        const SizedBox(height: 28),
+        _ChapterEnd(
+          chapter: chapter,
+          next: next,
+          onNext: onNext,
+          colors: colors,
+        ),
+      ],
+    );
+  }
+}
+
+/// A block of the chapter, with the sentence being read or held in yellow marker.
+/// Holding it reports the character under the finger.
+class _Block extends StatelessWidget {
+  const _Block({
+    required this.textKey,
+    required this.block,
+    required this.marked,
+    required this.look,
+    required this.colors,
+    required this.onHold,
+  });
+
+  final GlobalKey textKey;
+  final TextBlock block;
+  final SpokenSentence? marked;
+  final ReadingLook look;
+  final _PageColors colors;
+  final void Function(int offset, Offset global) onHold;
+
+  bool get _heading => block.kind == TextBlockKind.heading;
+
+  Widget _text() {
+    if (_heading) {
+      return Text(
+        displayTitle(block.text),
+        key: textKey,
+        style: readingStyle(
+          size: look.size.points + 1,
+          weight: FontWeight.w600,
+          color: marked == null ? colors.title : Palette.text,
+        ).copyWith(backgroundColor: marked == null ? null : Palette.marker),
+      );
+    }
+    final style = readingStyle(
+      size: look.size.points,
+      height: look.spacing.factor,
+      color: colors.text,
+    );
+    final sentence = marked;
+    if (sentence == null) return Text(block.text, key: textKey, style: style);
+    return Text.rich(
+      key: textKey,
+      TextSpan(
+        style: style,
+        children: [
+          TextSpan(text: block.text.substring(0, sentence.start)),
+          TextSpan(
+            text: block.text.substring(sentence.start, sentence.end),
+            // Dark text on the marker, whatever the paper.
+            style: const TextStyle(
+              backgroundColor: Palette.marker,
+              color: Palette.text,
+            ),
+          ),
+          TextSpan(text: block.text.substring(sentence.end)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onLongPressStart: (details) {
+      final paragraph = textKey.currentContext?.findRenderObject();
+      // A heading's displayed title is not its stored text, so offsets differ.
+      final offset = paragraph is RenderParagraph && !_heading
+          ? paragraph.getPositionForOffset(details.localPosition).offset
+          : 0;
+      onHold(offset, details.globalPosition);
+    },
+    child: _text(),
+  );
+}
+
+class _ChapterEnd extends StatelessWidget {
+  const _ChapterEnd({
+    required this.chapter,
+    required this.next,
+    required this.onNext,
+    required this.colors,
+  });
+
+  final ChapterSummary chapter;
+  final ChapterSummary? next;
+  final VoidCallback? onNext;
+  final _PageColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    final next = this.next;
+    final onNext = this.onNext;
+    void backToChapters() => Navigator.of(context).pop();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Transform.rotate(
+            angle: -0.035,
+            alignment: Alignment.centerLeft,
+            child: Text('Xong ${chapter.label}', style: handStyle(size: 30)),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          next == null
+              ? 'Đây là chương cuối.'
+              : 'Tiếp theo là ${next.label}, dài ${durationLabel(next.minutes)}.',
+          style: readingStyle(size: 14, color: colors.muted),
+        ),
+        const SizedBox(height: 18),
+        if (next != null && onNext != null) ...[
+          PrimaryButton(label: 'Đọc ${next.label}', onPressed: onNext),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: backToChapters,
+            child: Text(
+              'Về danh sách chương',
+              style: readingStyle(
+                size: 15,
+                weight: FontWeight.w600,
+                color: colors.title,
+              ),
+            ),
+          ),
+        ] else
+          PrimaryButton(
+            label: 'Về danh sách chương',
+            onPressed: backToChapters,
+          ),
+      ],
+    );
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({
+    required this.colors,
+    required this.options,
+    required this.selected,
+    required this.onChoose,
+  });
+
+  final _PageColors colors;
+  final List<LengthOption> options;
+  final LengthOption selected;
+  final ValueChanged<LengthOption> onChoose;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: colors.paper,
+      border: Border(bottom: BorderSide(color: colors.line)),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8, right: 10),
+        child: Row(
+          children: [
+            BackButton(color: colors.title),
+            const Spacer(),
+            if (options.length > 1)
+              for (final option in options)
+                _VersionTab(
+                  option: option,
+                  selected: option == selected,
+                  muted: colors.muted,
+                  onTap: () => onChoose(option),
+                ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _ToolBar extends StatelessWidget {
+  const _ToolBar({
+    required this.colors,
+    required this.minutesLeft,
+    required this.shortened,
+    required this.onLook,
+    required this.onListen,
+  });
+
+  final _PageColors colors;
+  final int minutesLeft;
+  final bool shortened;
+  final VoidCallback onLook;
+  final VoidCallback onListen;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = readingStyle(
+      size: 15,
+      weight: FontWeight.w600,
+      color: colors.title,
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.paper,
+        border: Border(top: BorderSide(color: colors.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(_textLeft, 10, 12, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'còn ${durationLabel(minutesLeft)}',
+                      style: handStyle(size: 20),
+                    ),
+                    if (shortened)
+                      Text(
+                        'AI viết lại từ bản gốc',
+                        style: readingStyle(size: 12.5, color: colors.muted),
+                      ),
                   ],
                 ),
               ),
-              if (listen is! ListenOff)
-                ListenPanel(
-                  blocks: switch (state.text) {
-                    ReaderTextLoaded(:final text) => text.blocks,
-                    _ => const [],
-                  },
-                  minutes: state.option.minutes,
-                ),
+              TextButton(
+                onPressed: onLook,
+                child: Text('Aa', style: action),
+              ),
+              TextButton(
+                onPressed: onListen,
+                child: Text('Nghe', style: action),
+              ),
             ],
           ),
         ),
@@ -331,59 +734,100 @@ class _ReaderPageState extends State<ReaderPage> {
   }
 }
 
-/// A block of the chapter, with the sentence being read in yellow marker.
-class _Block extends StatelessWidget {
-  const _Block({super.key, required this.block, required this.spoken});
+/// The one action offered on a held sentence.
+class _ListenHere extends StatelessWidget {
+  const _ListenHere({
+    required this.at,
+    required this.highest,
+    required this.width,
+    required this.onTap,
+  });
 
-  final TextBlock block;
-  final SpokenSentence? spoken;
+  final Offset at;
+  final double highest;
+  final double width;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    if (block.kind == TextBlockKind.heading) {
-      return Text(
-        displayTitle(block.text),
-        style: readingStyle(
-          size: 18,
-          weight: FontWeight.w600,
-        ).copyWith(backgroundColor: spoken == null ? null : Palette.marker),
-      );
-    }
-    final style = readingStyle(size: 17, height: 1.7);
-    final sentence = spoken;
-    if (sentence == null) return Text(block.text, style: style);
-    return Text.rich(
-      TextSpan(
-        style: style,
-        children: [
-          TextSpan(text: block.text.substring(0, sentence.start)),
-          TextSpan(
-            text: block.text.substring(sentence.start, sentence.end),
-            style: const TextStyle(backgroundColor: Palette.marker),
+    final above = at.dy - 68;
+    return Positioned(
+      left: (at.dx - 40).clamp(12, width - 200),
+      // Under the finger when there is no room above it.
+      top: above < highest ? at.dy + 28 : above,
+      child: Material(
+        color: Palette.ink,
+        borderRadius: BorderRadius.circular(14),
+        elevation: 2,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+            child: Text(
+              'Nghe từ câu này',
+              style: readingStyle(
+                size: 15,
+                weight: FontWeight.w600,
+                color: Palette.sheet,
+              ),
+            ),
           ),
-          TextSpan(text: block.text.substring(sentence.end)),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _MarginProgress extends StatelessWidget {
-  const _MarginProgress({required this.read});
+/// The red margin line, filled as far as the reader has read, with the
+/// minutes left written beside where it ends.
+class _Margin extends StatelessWidget {
+  const _Margin({
+    required this.read,
+    required this.track,
+    required this.minutesLeft,
+    required this.highest,
+  });
 
   final double read;
+  final Color track;
+  final int? minutesLeft;
+
+  /// Keeps the minutes clear of the status bar at the start of a chapter.
+  final double highest;
 
   @override
-  Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(color: Palette.rose),
-    child: Align(
-      alignment: Alignment.topCenter,
-      child: FractionallySizedBox(
-        heightFactor: read.clamp(0, 1),
-        widthFactor: 1,
-        child: const ColoredBox(color: Palette.red),
-      ),
-    ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final height = constraints.maxHeight;
+      final reached = height * read.clamp(0, 1);
+      final minutes = minutesLeft;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 3,
+            child: ColoredBox(color: track),
+          ),
+          Positioned(
+            right: 0,
+            top: 0,
+            height: reached,
+            width: 3,
+            child: const ColoredBox(color: Palette.red),
+          ),
+          if (minutes != null)
+            Positioned(
+              right: 7,
+              top: (reached - 10).clamp(highest, height - 24),
+              child: Text("$minutes'", style: handStyle(size: 20, height: 1)),
+            ),
+        ],
+      );
+    },
   );
 }
 
@@ -391,11 +835,13 @@ class _VersionTab extends StatelessWidget {
   const _VersionTab({
     required this.option,
     required this.selected,
+    required this.muted,
     required this.onTap,
   });
 
   final LengthOption option;
   final bool selected;
+  final Color muted;
   final VoidCallback onTap;
 
   @override
@@ -421,10 +867,7 @@ class _VersionTab extends StatelessWidget {
               option.length == ReadingLength.original
                   ? 'gốc'
                   : "${option.minutes}'",
-              style: handStyle(
-                size: 21,
-                color: selected ? Palette.red : Palette.muted,
-              ),
+              style: handStyle(size: 21, color: selected ? Palette.red : muted),
             ),
           ),
         ),

@@ -8,7 +8,11 @@ import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ereader_mobile/app/theme.dart';
+import 'package:ereader_mobile/features/books/domain/entities/reading_look.dart';
+
 import 'features/books/fake_books_repository.dart';
+import 'features/books/fake_reading_look_store.dart';
 import 'features/listen/fake_speech.dart';
 
 void main() {
@@ -17,6 +21,7 @@ void main() {
     List<Book>? shelf,
     BooksException? shortenedError,
     FakeSpeech? speech,
+    FakeReadingLookStore? looks,
   }) async {
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
@@ -29,12 +34,19 @@ void main() {
       EReaderApp(
         repository: repository,
         speech: speech ?? FakeSpeech(),
+        looks: looks ?? FakeReadingLookStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/loeb.epub', fileName: 'loeb.epub'),
       ),
     );
     await tester.pumpAndSettle();
     return repository;
+  }
+
+  /// Tools stay hidden while reading; one tap on the page shows them.
+  Future<void> showTools(WidgetTester tester) async {
+    await tester.tapAt(const Offset(200, 600));
+    await tester.pumpAndSettle();
   }
 
   testWidgets('an empty library invites the first import', (tester) async {
@@ -87,6 +99,7 @@ void main() {
     gate.complete();
     await tester.pumpAndSettle();
     expect(find.text('Bản 2 phút của book-1-c0.'), findsOneWidget);
+    await showTools(tester);
     expect(find.text('AI viết lại từ bản gốc'), findsOneWidget);
     expect(repository.shortenedRequests.single.minutes, 2);
 
@@ -164,6 +177,7 @@ void main() {
     await pumpApp(tester, shelf: [loeb], speech: speech);
     await openOriginalChapter(tester);
 
+    await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
 
@@ -192,6 +206,7 @@ void main() {
     await pumpApp(tester, shelf: [loeb], speech: speech);
     await openOriginalChapter(tester);
 
+    await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
     expect(
@@ -209,6 +224,7 @@ void main() {
     final speech = FakeSpeech();
     await pumpApp(tester, shelf: [loeb], speech: speech);
     await openOriginalChapter(tester);
+    await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
 
@@ -247,5 +263,102 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Nghe'), findsOneWidget);
     expect(speech.stops, greaterThan(0));
+  });
+
+  testWidgets('the page shows only the text until tapped', (tester) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+
+    expect(find.text('Aa'), findsNothing);
+    expect(find.text('Nghe'), findsNothing);
+
+    await tester.tap(find.textContaining('Tôi thực sự tin rằng'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Aa'), findsOneWidget);
+    expect(find.text('Nghe'), findsOneWidget);
+    expect(speech.played, isEmpty);
+  });
+
+  testWidgets('long pressing a sentence offers to read from there', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+
+    await tester.longPress(find.textContaining('Tôi thực sự tin rằng'));
+    await tester.pumpAndSettle();
+    expect(speech.played, isEmpty);
+
+    await tester.tap(find.text('Nghe từ câu này'));
+    await tester.pumpAndSettle();
+
+    expect(speech.played, [1]);
+    expect(find.text('Nghe từ câu này'), findsNothing);
+  });
+
+  testWidgets('night paper and loose spacing are kept for next time', (
+    tester,
+  ) async {
+    final looks = FakeReadingLookStore();
+    await pumpApp(tester, shelf: [loeb], looks: looks);
+    await openOriginalChapter(tester);
+    await showTools(tester);
+
+    await tester.tap(find.text('Aa'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đêm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Thoáng'));
+    await tester.pumpAndSettle();
+
+    expect(
+      looks.saved,
+      const ReadingLook(paper: Paper.night, spacing: LineSpacing.loose),
+    );
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
+      Palette.night,
+    );
+  });
+
+  testWidgets('a saved look applies when a chapter opens', (tester) async {
+    await pumpApp(
+      tester,
+      shelf: [loeb],
+      looks: FakeReadingLookStore(const ReadingLook(paper: Paper.night)),
+    );
+    await openOriginalChapter(tester);
+
+    expect(
+      tester.widget<Scaffold>(find.byType(Scaffold).last).backgroundColor,
+      Palette.night,
+    );
+  });
+
+  testWidgets('the end of a chapter leads to the next one', (tester) async {
+    await pumpApp(tester, shelf: [loeb]);
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ý chính'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đọc bản 2 phút'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Xong Chương Một'), findsOneWidget);
+    expect(find.text('Tiếp theo là Chương Sáu, dài 4 phút.'), findsOneWidget);
+
+    await tester.tap(find.text('Đọc Chương Sáu'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
+    expect(find.text('Xong Chương Sáu'), findsOneWidget);
+    expect(find.text('Về danh sách chương'), findsOneWidget);
   });
 }

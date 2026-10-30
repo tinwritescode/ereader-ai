@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Patrick+Hand&display=swap&subset=vietnamese" rel="stylesheet">
+<style>
+:root{--paper:#F6F5FC;--line:#D3D0EC;--ink:#2A1F6E;--text:#1E1A3A;--soft:#6A6690;--red:#D8344F;--rose:#F3C3CC;--marker:#FBE36B;--white:#FFFFFF;--ruler:#FCF0B4;--edge:#D9BE3C;
+--night:#17123F;--night-text:#DAD6F2;--night-soft:#9C97C9;--night-line:#3A3370}
+*{box-sizing:border-box;margin:0}
+.wall{display:flex;flex-wrap:wrap;gap:26px 20px;justify-content:center}
+figure{width:224px}
+figcaption{font:13px/1.45 var(--font-sans,system-ui);color:var(--foreground,#1E1A3A);margin-top:10px}
+.ph{zoom:.68;position:relative;width:330px;height:690px;border-radius:38px;overflow:hidden;background:var(--paper);color:var(--text);font-family:Literata,serif;border:1px solid var(--line)}
+.hand{font-family:"Patrick Hand",cursive}
+
+/* The margin stays on every state: it is the only thing left while reading. */
+.margin{position:absolute;left:28px;top:0;bottom:0;width:3px;background:var(--rose)}
+.margin i{position:absolute;left:0;top:0;width:3px;background:var(--red)}
+.left{position:absolute;right:calc(100% + 4px);transform:translateY(-14px);font:20px/20px "Patrick Hand",cursive;color:var(--red);white-space:nowrap}
+
+.page{position:absolute;left:44px;right:24px;top:58px;bottom:0;overflow:hidden}
+.page small{font-size:12.5px;line-height:22px;color:var(--soft);display:block}
+.page h2{font-size:22px;line-height:29px;font-weight:600;color:var(--ink);margin-bottom:14px}
+.page p{font-size:17px;line-height:29px;margin-bottom:14.5px}
+.page.mid{top:0;padding-top:58px}
+
+.top{position:absolute;top:0;left:0;right:0;height:100px;padding:50px 16px 0 36px;background:var(--paper);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;color:var(--ink)}
+.top>span{font-size:26px;line-height:44px}
+.vs{display:flex;gap:16px;font:19px/28px "Patrick Hand",cursive;color:var(--soft)}
+.vs b{font-weight:400;color:var(--red);border-bottom:2px solid var(--red)}
+.tools{position:absolute;left:0;right:0;bottom:0;height:88px;padding:0 20px 18px 44px;background:var(--paper);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.tools .where{font-size:12.5px;line-height:18px;color:var(--soft)}
+.tools .where b{display:block;font:400 20px/22px "Patrick Hand",cursive;color:var(--red)}
+.tools .acts{display:flex;gap:6px;font-size:15px;font-weight:600;color:var(--ink)}
+.tools .acts span{height:44px;min-width:48px;padding:0 10px;line-height:44px;text-align:center}
+
+.shade{position:absolute;inset:0;background:rgba(30,26,58,.32)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--white);border-radius:24px 24px 0 0;padding:12px 20px 30px}
+.grip{width:34px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 16px}
+.sheet h3{font-size:16px;line-height:24px;font-weight:600;color:var(--ink)}
+.ruler{position:relative;height:58px;margin:18px 0 20px;background:var(--ruler);border:1px solid var(--edge);border-radius:6px}
+.ticks{position:absolute;top:0;left:14px;right:14px;height:14px;background-image:repeating-linear-gradient(to right,var(--text) 0 1px,transparent 1px 25%);border-right:1px solid var(--text)}
+.nm{position:absolute;top:20px;width:40px;margin-left:-20px;text-align:center;color:var(--text);font-family:Literata,serif;line-height:30px}
+.nm.on{color:var(--red)}
+.pin{position:absolute;top:-13px;width:0;height:0;margin-left:-8px;border:8px solid transparent;border-top:12px solid var(--red);border-bottom:0}
+.papers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.pp{height:64px;border-radius:14px;border:1.5px solid var(--line);padding:9px 14px;font-size:14px;line-height:20px;color:var(--text);background:var(--paper)}
+.pp.dark{background:var(--night);color:var(--night-text);border-color:var(--night)}
+.pp.on{border:2px solid var(--red)}
+.pp small{display:block;font-size:12px;line-height:18px;opacity:.75}
+
+.pop{position:absolute;left:58px;top:236px;width:190px;background:var(--ink);color:#fff;border-radius:14px;font-size:15px;font-weight:600;line-height:46px;text-align:center}
+.pop::after{content:"";position:absolute;left:30px;bottom:-7px;width:14px;height:14px;background:var(--ink);transform:rotate(45deg)}
+mark{background:var(--marker);color:inherit;padding:2px 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+
+.end{position:absolute;left:44px;right:24px;bottom:34px}
+.done{font:30px/34px "Patrick Hand",cursive;color:var(--red);transform:rotate(-2deg);transform-origin:left;margin-bottom:6px}
+.sub{font-size:14px;line-height:22px;color:var(--soft);margin-bottom:18px}
+.btn{height:52px;border-radius:14px;background:var(--ink);color:#fff;font:600 16px/52px Literata,serif;text-align:center}
+.back-link{font-size:15px;font-weight:600;line-height:44px;color:var(--ink);text-align:center;margin-top:4px}
+
+.night{background:var(--night);color:var(--night-text);border-color:var(--night)}
+.night .page small{color:var(--night-soft)}
+.night .page h2{color:var(--night-text)}
+.night .margin{background:var(--night-line)}
+</style></head><body>
+<div class="wall">
+
+<figure><div class="ph">
+<div class="margin"><i style="height:210px"></i><span class="left" style="top:210px">6'</span></div>
+<div class="page">
+<small>Chương Một</small><h2>Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</h2>
+<p>Tôi thực sự tin rằng, không có gì khó khăn hơn việc kiếm lợi nhuận. Ai cũng nghĩ mình làm được, cho đến khi tự tay thử.</p>
+<p>Người mới vào nghề thường chỉ thấy phần dễ. Họ mua khi giá lên, và tin rằng giá sẽ còn lên mãi. Họ không hỏi vì sao mình có quyền thắng người đã ở đây hai mươi năm.</p>
+<p>Kiến thức có thể học. Kinh nghiệm phải trả tiền mới có. Còn năng khiếu thì mỗi người tự biết sau vài lần thua.</p>
+<p>Vì thế, câu đầu tiên tôi hỏi một người muốn đầu tư không phải là bạn có bao nhiêu tiền.</p>
+</div></div>
+<figcaption>Khi đọc, màn hình chỉ còn chữ. Đường lề đỏ vẫn là tiến độ, và số phút còn lại viết tay ở lề, đi xuống cùng bạn như số phút trong danh sách chương.</figcaption></figure>
+
+<figure><div class="ph">
+<div class="margin"><i style="height:262px"></i><span class="left" style="top:262px">6'</span></div>
+<div class="page mid">
+<p>Người mới vào nghề thường chỉ thấy phần dễ. Họ mua khi giá lên, và tin rằng giá sẽ còn lên mãi. Họ không hỏi vì sao mình có quyền thắng người đã ở đây hai mươi năm.</p>
+<p>Kiến thức có thể học. Kinh nghiệm phải trả tiền mới có. Còn năng khiếu thì mỗi người tự biết sau vài lần thua.</p>
+<p>Vì thế, câu đầu tiên tôi hỏi một người muốn đầu tư không phải là bạn có bao nhiêu tiền.</p>
+<p>Tôi hỏi họ đã từng mất tiền chưa, và sau đó họ làm gì.</p>
+</div>
+<div class="top"><span>‹</span><div class="vs"><span>gốc</span><b>4'</b><span>2'</span></div></div>
+<div class="tools"><div class="where"><b>còn 6 phút</b>AI viết lại từ bản gốc</div><div class="acts"><span>Aa</span><span>Nghe</span></div></div>
+</div>
+<figcaption>Chạm một lần để hiện công cụ, chạm lần nữa hoặc cuộn tiếp thì chúng tự ẩn. Quay lại, đổi bản, cỡ chữ và Nghe chỉ xuất hiện khi bạn cần.</figcaption></figure>
+
+<figure><div class="ph">
+<div class="margin"><i style="height:262px"></i></div>
+<div class="page mid">
+<p>Người mới vào nghề thường chỉ thấy phần dễ. Họ mua khi giá lên, và tin rằng giá sẽ còn lên mãi.</p>
+<p>Kiến thức có thể học. Kinh nghiệm phải trả tiền mới có.</p>
+</div>
+<div class="shade"></div>
+<div class="sheet"><div class="grip"></div>
+<h3>Cỡ chữ</h3>
+<div class="ruler"><div class="ticks"></div><div class="pin" style="left:50%"></div>
+<div class="nm" style="left:14%;font-size:15px">A</div><div class="nm on" style="left:50%;font-size:19px">A</div><div class="nm" style="left:86%;font-size:25px">A</div></div>
+<h3>Giãn dòng</h3>
+<div class="ruler"><div class="ticks"></div><div class="pin" style="left:50%"></div>
+<div class="nm" style="left:14%;font-size:13px;width:70px;margin-left:-35px">Sít</div><div class="nm on" style="left:50%;font-size:13px;width:70px;margin-left:-35px">Vừa</div><div class="nm" style="left:86%;font-size:13px;width:70px;margin-left:-35px">Thoáng</div></div>
+<h3>Trang giấy</h3>
+<div class="papers"><div class="pp on">Giấy<small>Ban ngày</small></div><div class="pp dark">Đêm<small>Giảm chói khi tối</small></div></div>
+</div></div>
+<figcaption>Cỡ chữ và giãn dòng dùng lại cây thước của màn chọn độ dài, nên không phải học thêm thứ mới. Ngoài trang giấy hiện tại chỉ thêm một lựa chọn: Đêm.</figcaption></figure>
+
+<figure><div class="ph night">
+<div class="margin"><i style="height:210px"></i><span class="left" style="top:210px">6'</span></div>
+<div class="page">
+<small>Chương Một</small><h2>Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</h2>
+<p>Tôi thực sự tin rằng, không có gì khó khăn hơn việc kiếm lợi nhuận. Ai cũng nghĩ mình làm được, cho đến khi tự tay thử.</p>
+<p>Người mới vào nghề thường chỉ thấy phần dễ. Họ mua khi giá lên, và tin rằng giá sẽ còn lên mãi.</p>
+<p>Kiến thức có thể học. Kinh nghiệm phải trả tiền mới có. Còn năng khiếu thì mỗi người tự biết sau vài lần thua.</p>
+</div></div>
+<figcaption>Trang Đêm lấy nền từ màu mực tím, không phải đen. Bút đỏ ở lề giữ nguyên nên vẫn là cuốn vở đó, chỉ là đọc dưới đèn ngủ.</figcaption></figure>
+
+<figure><div class="ph">
+<div class="margin"><i style="height:262px"></i></div>
+<div class="page mid">
+<p>Người mới vào nghề thường chỉ thấy phần dễ. Họ mua khi giá lên, và tin rằng giá sẽ còn lên mãi. <mark>Họ không hỏi vì sao mình có quyền thắng người đã ở đây hai mươi năm.</mark></p>
+<p>Kiến thức có thể học. Kinh nghiệm phải trả tiền mới có. Còn năng khiếu thì mỗi người tự biết sau vài lần thua.</p>
+</div>
+<div class="pop" style="top:88px">Nghe từ câu này</div>
+</div>
+<figcaption>Chọn câu để nghe chuyển sang chạm giữ. Câu được tô bút dạ, kèm một nút duy nhất. Người chỉ đọc không bao giờ bật tiếng vì chạm nhầm.</figcaption></figure>
+
+<figure><div class="ph">
+<div class="margin"><i style="height:690px"></i></div>
+<div class="page">
+<p>Tôi hỏi họ đã từng mất tiền chưa, và sau đó họ làm gì.</p>
+<p>Câu trả lời đó nói cho tôi biết nhiều hơn mọi con số trong tài khoản của họ.</p>
+</div>
+<div class="end">
+<div class="done">Xong Chương Một</div>
+<div class="sub">Tiếp theo là Chương Hai, dài 6 phút.</div>
+<div class="btn">Đọc Chương Hai</div>
+<div class="back-link">Về danh sách chương</div>
+</div></div>
+<figcaption>Hết chương, đường lề đỏ kín trang và bút đỏ ghi xong. Đọc tiếp ngay tại đây, không phải lùi về danh sách.</figcaption></figure>
+
+</div></body></html>

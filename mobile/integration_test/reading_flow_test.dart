@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:ereader_mobile/features/books/data/repositories/books_repository_impl.dart';
+import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_look_store.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
 import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +38,7 @@ void main() {
             userId: userId,
           ),
           speech: KokoroSpeech(),
+          looks: PrefsReadingLookStore(),
           pickEpub: () async => null,
         ),
       );
@@ -61,6 +63,9 @@ void main() {
         await tester.pump(const Duration(seconds: 1));
         if (find.byType(CircularProgressIndicator).evaluate().isEmpty) break;
       }
+      // Tools stay hidden while reading; one tap shows them.
+      await tester.tapAt(const Offset(200, 600));
+      await tester.pumpAndSettle();
       expect(find.text('AI viết lại từ bản gốc'), findsOneWidget);
       await hold(tester, 'reader-shortened');
 

@@ -14,6 +14,12 @@ abstract final class Palette {
   static const ruler = Color(0xFFFCF0B4);
   static const rulerEdge = Color(0xFFD9BE3C);
   static const marker = Color(0xFFFBE36B);
+
+  // The reading page at night: the purple ink becomes the paper.
+  static const night = Color(0xFF17123F);
+  static const nightText = Color(0xFFDAD6F2);
+  static const nightMuted = Color(0xFF9C97C9);
+  static const nightRule = Color(0xFF3A3370);
 }
 
 const _read = 'Literata';

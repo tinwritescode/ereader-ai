@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
 import '../test/features/books/fake_books_repository.dart';
+import '../test/features/books/fake_reading_look_store.dart';
 import '../test/features/listen/fake_speech.dart';
 
 /// Walks the app on sample data for `tool/capture_screenshots.sh`, which saves
@@ -22,6 +23,7 @@ void main() {
       EReaderApp(
         repository: FakeBooksRepository(shelf: [loeb]),
         speech: FakeSpeech(),
+        looks: FakeReadingLookStore(),
         pickEpub: () async => null,
       ),
     );
@@ -38,7 +40,11 @@ void main() {
     await tester.tapAt(const Offset(200, 100));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Chương Sáu'));
-    await tester.pumpAndSettle();
+    await hold('reader');
+
+    await tester.tapAt(const Offset(200, 600));
+    await hold('reader-tools');
+
     await tester.tap(find.text('Nghe'));
     await hold('player');
   });

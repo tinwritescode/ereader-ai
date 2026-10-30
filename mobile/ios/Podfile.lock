@@ -18,6 +18,9 @@ PODS:
     - onnxruntime-objc/Core (= 1.28.0)
   - onnxruntime-objc/Core (1.28.0):
     - onnxruntime-c (= 1.28.0)
+  - shared_preferences_foundation (0.0.1):
+    - Flutter
+    - FlutterMacOS
 
 DEPENDENCIES:
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
@@ -26,6 +29,7 @@ DEPENDENCIES:
   - flutter_onnxruntime (from `.symlinks/plugins/flutter_onnxruntime/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - just_audio (from `.symlinks/plugins/just_audio/darwin`)
+  - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
 
 SPEC REPOS:
   trunk:
@@ -45,6 +49,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/integration_test/ios"
   just_audio:
     :path: ".symlinks/plugins/just_audio/darwin"
+  shared_preferences_foundation:
+    :path: ".symlinks/plugins/shared_preferences_foundation/darwin"
 
 SPEC CHECKSUMS:
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
@@ -55,6 +61,7 @@ SPEC CHECKSUMS:
   just_audio: 4e391f57b79cad2b0674030a00453ca5ce817eed
   onnxruntime-c: 1cf87aaca94f53ab33bb9729104ec0a5b88291e9
   onnxruntime-objc: f98b9629e1f78020afc354e33a5afd947654c76d
+  shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
 
 PODFILE CHECKSUM: c0915517eae1a513480956f02c7781054ca94770
 

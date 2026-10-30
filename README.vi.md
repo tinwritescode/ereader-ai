@@ -4,9 +4,9 @@
 
 Ứng dụng đọc sách trên iPhone. Nhập file EPUB, chọn thời gian bạn có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app đọc to bằng giọng tiếng Việt chạy ngay trên máy.
 
-| Thư viện | Chương | Chọn độ dài | Nghe |
-|---|---|---|---|
-| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Trình phát](docs/screenshots/player.png) |
+| Thư viện | Chương | Chọn độ dài | Đọc | Nghe |
+|---|---|---|---|---|
+| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) |
 
 Ảnh chụp từ simulator với dữ liệu mẫu. Tạo lại bằng `mobile/tool/capture_screenshots.sh`.
 
@@ -25,6 +25,8 @@ flowchart LR
         read(["Đọc bản gốc hoặc bản rút gọn"])
         shorten(["AI rút gọn chương"])
         listen(["Nghe đọc offline"])
+        pick(["Chạm giữ câu để nghe từ đó"])
+        look(["Chỉnh cỡ chữ, giãn dòng, trang Đêm"])
         download(["Tải giọng đọc lần đầu"])
         tune(["Đổi giọng và tốc độ"])
     end
@@ -34,6 +36,8 @@ flowchart LR
     reader --> length
     reader --> read
     reader --> listen
+    reader --> pick
+    reader --> look
     reader --> tune
 
     read -. "gồm" .-> shorten
@@ -79,6 +83,7 @@ Chỉ giọng đọc là offline. Nội dung chương vẫn lấy từ server, n
 | Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
 | Người dùng | Một `demo-user`, chưa có đăng nhập | Đăng nhập và hạn mức token |
 | Tiến độ đọc | Chưa lưu | Lưu vị trí và đọc tiếp |
+| Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
@@ -89,7 +94,7 @@ Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architec
 - `backend/`: NestJS 11, TypeScript. Module `books`, `processing`, `ai-reading`.
 - `mobile/`: Flutter 3.41, `flutter_bloc`. Feature `books`, `digest`, `listen`.
 - `mobile/tool/build_speech_assets.py`: tạo bảng phiên âm và voice pack trong `mobile/assets/speech/`.
-- `design/`: mockup HTML. Bản đang dùng là `reader-flow-v2.html`.
+- `design/`: mockup HTML. `reader-flow-v2.html` cho cả luồng; `reader-flow-v3.html` là màn đọc hiện tại.
 
 ## Chạy backend
 

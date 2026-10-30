@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -105,8 +107,10 @@ class _BookPageState extends State<BookPage> {
                     ),
                     BookLoaded(:final chapters) => SliverList.builder(
                       itemCount: chapters.length,
-                      itemBuilder: (context, index) =>
-                          _ChapterRow(chapter: chapters[index]),
+                      itemBuilder: (context, index) => _ChapterRow(
+                        chapter: chapters[index],
+                        onTap: () => _open(chapters, index),
+                      ),
                     ),
                   },
                   const SliverPadding(
@@ -125,18 +129,60 @@ class _BookPageState extends State<BookPage> {
       ),
     );
   }
+
+  /// Opens chapter [index]: asks for a length first unless it is short.
+  Future<void> _open(List<ChapterSummary> chapters, int index) async {
+    final chapter = chapters[index];
+    final next = index + 1 < chapters.length ? chapters[index + 1] : null;
+    final options = lengthOptionsFor(chapter.minutes);
+    final memory = context.read<LengthMemory>();
+    final navigator = Navigator.of(context);
+    final repository = context.read<BooksRepository>();
+    final speech = context.read<Speech>();
+    final choice = options.length == 1
+        ? LengthChoice(options.single)
+        : await showModalBottomSheet<LengthChoice>(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => ChooseLengthSheet(
+              chapter: chapter,
+              options: options,
+              preselected: memory.last,
+            ),
+          );
+    if (choice == null) return;
+    memory.last = choice.option.length;
+    await navigator.push(
+      ReaderPage.route(
+        repository: repository,
+        speech: speech,
+        chapter: chapter,
+        options: options,
+        option: choice.option,
+        listen: choice.listen,
+        next: next,
+        onNext: next == null
+            ? null
+            : () {
+                navigator.pop();
+                if (mounted) unawaited(_open(chapters, index + 1));
+              },
+      ),
+    );
+  }
 }
 
 class _ChapterRow extends StatelessWidget {
-  const _ChapterRow({required this.chapter});
+  const _ChapterRow({required this.chapter, required this.onTap});
 
   final ChapterSummary chapter;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final subtitle = chapter.subtitle;
     return InkWell(
-      onTap: () => _open(context),
+      onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -185,37 +231,6 @@ class _ChapterRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Future<void> _open(BuildContext context) async {
-    final options = lengthOptionsFor(chapter.minutes);
-    final memory = context.read<LengthMemory>();
-    final navigator = Navigator.of(context);
-    final repository = context.read<BooksRepository>();
-    final speech = context.read<Speech>();
-    final choice = options.length == 1
-        ? LengthChoice(options.single)
-        : await showModalBottomSheet<LengthChoice>(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => ChooseLengthSheet(
-              chapter: chapter,
-              options: options,
-              preselected: memory.last,
-            ),
-          );
-    if (choice == null) return;
-    memory.last = choice.option.length;
-    await navigator.push(
-      ReaderPage.route(
-        repository: repository,
-        speech: speech,
-        chapter: chapter,
-        options: options,
-        option: choice.option,
-        listen: choice.listen,
       ),
     );
   }
