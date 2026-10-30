@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
 import { BooksModule } from './books.module';
-import { buildEpub } from './testing/epub-fixture';
+import { buildEpub, COVER_PNG } from './testing/epub-fixture';
 
 const MAX_UPLOAD_BYTES = 64 * 1024;
 
@@ -55,6 +55,34 @@ describe('POST /books (EPUB import)', () => {
       .query({ userId: 'user-1' })
       .expect(200)
       .expect(({ body }) => expect(body.status).toBe('READY'));
+  });
+
+  it.each(['epub3', 'epub2'] as const)('serves the cover of an %s book', async (cover) => {
+    const created = await upload(await buildEpub({ cover })).expect(202);
+    expect(created.body.hasCover).toBe(true);
+
+    const response = await request(app.getHttpServer())
+      .get(`/books/${created.body.bookId}/cover`)
+      .query({ userId: 'user-1' })
+      .expect(200);
+
+    expect(response.headers['content-type']).toContain('image/png');
+    expect(response.body).toEqual(COVER_PNG);
+  });
+
+  it('has no cover to serve for a book without one, or for another user', async () => {
+    const plain = await upload(await buildEpub()).expect(202);
+    expect(plain.body.hasCover).toBe(false);
+    await request(app.getHttpServer())
+      .get(`/books/${plain.body.bookId}/cover`)
+      .query({ userId: 'user-1' })
+      .expect(404);
+
+    const covered = await upload(await buildEpub({ cover: 'epub3' })).expect(202);
+    await request(app.getHttpServer())
+      .get(`/books/${covered.body.bookId}/cover`)
+      .query({ userId: 'user-2' })
+      .expect(404);
   });
 
   it('returns the existing book when the same user uploads the same file again', async () => {

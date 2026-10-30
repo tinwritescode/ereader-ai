@@ -1,5 +1,10 @@
 export type BookStatus = 'PROCESSING' | 'READY' | 'FAILED';
 
+export type BookCover = {
+  key: string;
+  mediaType: string;
+};
+
 export type BookRecord = {
   id: string;
   userId: string;
@@ -9,6 +14,7 @@ export type BookRecord = {
   status: BookStatus;
   sourceChecksum: string;
   sourceKey: string;
+  cover: BookCover | null;
 };
 
 export type Block = {

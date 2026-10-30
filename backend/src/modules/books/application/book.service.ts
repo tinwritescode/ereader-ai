@@ -3,8 +3,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { countWords, readingMinutes } from '../../../shared/reading-time';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
-import { BookImportResult, BookRecord, ChapterRecord } from '../domain/book';
-import { EpubChapter, readEpub } from './epub-reader';
+import { BookCover, BookImportResult, BookRecord, ChapterRecord } from '../domain/book';
+import { EpubChapter, EpubCover, readEpub } from './epub-reader';
 
 export type ImportBookCommand = {
   userId: string;
@@ -37,13 +37,16 @@ export class BookService {
     // Content-addressed key: a retried or concurrent upload rewrites the same object.
     await this.storage.put({ key: sourceKey, bytes });
 
+    // Content-addressed like the source, and stored first so nothing awaits between the lookup and the insert.
+    const { metadata, chapters, cover } = epub.book;
+    const storedCover = await this.storeCover(sourceChecksum, cover);
+
     // No await between this lookup and the insert, so duplicates cannot race past it.
     const existing = this.findBySource(userId, sourceChecksum);
     if (existing) {
       return { kind: 'existing', book: existing };
     }
     // Chapters are split during import for now; the BullMQ normalize job replaces this step later.
-    const { metadata, chapters } = epub.book;
     const book: BookRecord = {
       id: randomUUID(),
       userId,
@@ -53,6 +56,7 @@ export class BookService {
       status: 'READY',
       sourceChecksum,
       sourceKey,
+      cover: storedCover,
     };
     this.books.set(book.id, book);
     this.chaptersByBook.set(book.id, chapters.map((chapter, index) => toChapterRecord(book.id, index, chapter)));
@@ -80,6 +84,15 @@ export class BookService {
     return book;
   }
 
+  async cover(userId: string, id: string): Promise<EpubCover> {
+    const { cover } = this.status(userId, id);
+    const bytes = cover && (await this.storage.get(cover.key));
+    if (!cover || !bytes) {
+      throw new NotFoundException('COVER_NOT_FOUND');
+    }
+    return { bytes, mediaType: cover.mediaType };
+  }
+
   chapters(userId: string, bookId: string): ChapterRecord[] {
     return this.chaptersByBook.get(this.status(userId, bookId).id) ?? [];
   }
@@ -90,6 +103,13 @@ export class BookService {
       throw new NotFoundException('CHAPTER_NOT_FOUND');
     }
     return chapter;
+  }
+
+  private async storeCover(sourceChecksum: string, cover: EpubCover | null): Promise<BookCover | null> {
+    if (!cover) return null;
+    const key = `covers/${sourceChecksum}`;
+    await this.storage.put({ key, bytes: cover.bytes });
+    return { key, mediaType: cover.mediaType };
   }
 
   private findBySource(userId: string, sourceChecksum: string): BookRecord | undefined {

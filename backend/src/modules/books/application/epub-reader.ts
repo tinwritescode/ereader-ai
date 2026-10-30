@@ -20,9 +20,15 @@ export type EpubChapter = {
   blocks: EpubBlock[];
 };
 
+export type EpubCover = {
+  bytes: Buffer;
+  mediaType: string;
+};
+
 export type EpubBook = {
   metadata: EpubMetadata;
   chapters: EpubChapter[];
+  cover: EpubCover | null;
 };
 
 export type EpubReadResult =
@@ -76,7 +82,11 @@ export async function readEpub(bytes: Buffer): Promise<EpubReadResult> {
   const toc = await readToc(zip, manifest);
   return {
     kind: 'ok',
-    book: { metadata: packageMetadata(packageDocument), chapters: splitChapters(blocks, spine, toc) },
+    book: {
+      metadata: packageMetadata(packageDocument),
+      chapters: splitChapters(blocks, spine, toc),
+      cover: await readCover(zip, packageDocument, manifest),
+    },
   };
 }
 
@@ -121,20 +131,33 @@ function packageMetadata(packageDocument: unknown): EpubMetadata {
   };
 }
 
-type ManifestItem = { id: string; path: string; properties: string[] };
+type ManifestItem = { id: string; path: string; mediaType: string | null; properties: string[] };
 
 function manifestItems(packageDocument: unknown, baseDir: string): ManifestItem[] {
   return list(child(child(packageDocument, 'manifest'), 'item')).flatMap((item) => {
     const id = child(item, '@_id');
     const href = child(item, '@_href');
     const properties = child(item, '@_properties');
+    const mediaType = child(item, '@_media-type');
     if (typeof id !== 'string' || typeof href !== 'string') return [];
     return [{
       id,
       path: resolvePath(baseDir, href),
+      mediaType: typeof mediaType === 'string' ? mediaType : null,
       properties: typeof properties === 'string' ? properties.split(/\s+/) : [],
     }];
   });
+}
+
+/** EPUB 3 marks the image in the manifest; EPUB 2 names it in a `cover` meta. */
+async function readCover(zip: JSZip, packageDocument: unknown, manifest: ManifestItem[]): Promise<EpubCover | null> {
+  const coverMeta = list(child(child(packageDocument, 'metadata'), 'meta'))
+    .find((meta) => child(meta, '@_name') === 'cover');
+  const item = manifest.find((candidate) => candidate.properties.includes('cover-image'))
+    ?? manifest.find((candidate) => candidate.id === child(coverMeta, '@_content'));
+  if (item?.mediaType?.startsWith('image/') !== true) return null;
+  const bytes = await zip.file(item.path)?.async('nodebuffer');
+  return bytes === undefined ? null : { bytes, mediaType: item.mediaType };
 }
 
 async function readSpine(zip: JSZip, packageDocument: unknown, manifest: ManifestItem[]): Promise<SpineDocument[]> {

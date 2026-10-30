@@ -93,6 +93,12 @@ export class BooksController {
     return this.books.status(userId, id);
   }
 
+  @Get(':id/cover')
+  async cover(@Param('id') id: string, @Query() query: unknown, @Res() response: Response) {
+    const { bytes, mediaType } = await this.books.cover(parseUserId(query), id);
+    response.type(mediaType).send(bytes);
+  }
+
   @Get(':id/chapters')
   chapters(@Param('id') id: string, @Query() query: unknown) {
     return { bookId: id, chapters: this.books.chapters(parseUserId(query), id).map(toChapterSummary) };
@@ -110,8 +116,8 @@ export class ChaptersController {
   }
 }
 
-function toBookResponse({ id, status, title, author, language, chapterCount, minutes }: BookSummary) {
-  return { bookId: id, status, title, author, language, chapterCount, minutes };
+function toBookResponse({ id, status, title, author, language, cover, chapterCount, minutes }: BookSummary) {
+  return { bookId: id, status, title, author, language, hasCover: cover !== null, chapterCount, minutes };
 }
 
 function toChapterSummary({ id, index, label, subtitle, wordCount, minutes }: Omit<ChapterRecord, 'blocks'>) {

@@ -4,7 +4,11 @@ export type EpubFixtureOptions = {
   mimetype?: string;
   title?: string;
   withNav?: boolean;
+  /** How the package names its cover image; none by default. */
+  cover?: 'epub3' | 'epub2';
 };
+
+export const COVER_PNG = Buffer.from('fake-png-bytes');
 
 const words = (count: number, word: string) => Array.from({ length: count }, () => word).join(' ');
 
@@ -16,6 +20,7 @@ export async function buildEpub({
   mimetype = 'application/epub+zip',
   title = 'Synthetic Book',
   withNav = true,
+  cover,
 }: EpubFixtureOptions = {}): Promise<Buffer> {
   const zip = new JSZip();
   zip.file('mimetype', mimetype, { compression: 'STORE' });
@@ -30,15 +35,18 @@ export async function buildEpub({
     <dc:title>${title}</dc:title>
     <dc:creator id="author">Ada Writer</dc:creator>
     <dc:language>vi</dc:language>
+    ${cover === 'epub2' ? '<meta name="cover" content="art"/>' : ''}
   </metadata>
   <manifest>
     ${withNav ? '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' : ''}
     <item id="cover" href="text/cover.xhtml" media-type="application/xhtml+xml"/>
+    ${cover === undefined ? '' : `<item id="art" href="images/art.png" media-type="image/png"${cover === 'epub3' ? ' properties="cover-image"' : ''}/>`}
     <item id="c1" href="text/c1.xhtml" media-type="application/xhtml+xml"/>
     <item id="c2" href="text/c2.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine><itemref idref="cover"/><itemref idref="c1"/><itemref idref="c2"/></spine>
 </package>`);
+  if (cover !== undefined) zip.file('OEBPS/images/art.png', COVER_PNG);
   zip.file('OEBPS/nav.xhtml', `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body>
 <nav epub:type="toc"><ol>
