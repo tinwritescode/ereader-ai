@@ -58,6 +58,7 @@ class EReaderApp extends StatelessWidget {
               ..add(const LibraryStarted()),
         child: MaterialApp(
           title: 'eReader AI',
+          debugShowCheckedModeBanner: false,
           theme: buildTheme(),
           home: const LibraryPage(),
         ),
