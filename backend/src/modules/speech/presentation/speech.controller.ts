@@ -11,12 +11,16 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { SpeechService } from '../application/speech.service';
 import { TTS_GATEWAY, TtsError, TtsGateway } from '../application/tts-gateway';
 import { SpeechRequestSchema } from '../domain/cloud-voice';
 
 @Controller('speech')
 export class SpeechController {
-  constructor(@Optional() @Inject(TTS_GATEWAY) private readonly tts: TtsGateway | null) {}
+  constructor(
+    @Optional() @Inject(TTS_GATEWAY) private readonly tts: TtsGateway | null,
+    private readonly speech: SpeechService,
+  ) {}
 
   @Get('voices')
   async voices() {
@@ -34,7 +38,7 @@ export class SpeechController {
     if (!voices.some((voice) => voice.code === voiceCode)) {
       throw new BadRequestException({ code: 'VOICE_UNKNOWN' });
     }
-    const audio = await this.upstream(() => tts.speak(text, voiceCode));
+    const audio = await this.upstream(() => this.speech.speak(tts, text, voiceCode));
     response.status(200).type('audio/wav').send(audio);
   }
 

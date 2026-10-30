@@ -69,6 +69,11 @@ flowchart LR
         memory[("In-memory storage")]
         api --> memory
         digest --> memory
+        clips[("Postgres: sentences read aloud")]
+        bucket[("Railway bucket: EPUB files, speech audio")]
+        api --> bucket
+        speech --> clips
+        speech --> bucket
     end
 
     llm["LLM service"]
@@ -89,13 +94,13 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 
 | | Today | Planned |
 |---|---|---|
-| Book storage | In memory, lost when the backend restarts | PostgreSQL and S3 |
+| Book storage | Book list in memory, lost when the backend restarts; EPUB files in a Railway bucket | Book list in PostgreSQL |
 | EPUB processing | Inside the backend process | Redis and BullMQ queue |
 | Users | One `demo-user`, no sign-in | Sign-in and token budgets |
 | Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
-| Vbee voices | Batch API, 2 to 10 seconds per sentence, read ahead | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
+| Vbee voices | Batch API, 2 to 10 seconds per sentence, read ahead. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
 | Platforms | iOS 16 and later | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.

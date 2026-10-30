@@ -8,6 +8,7 @@ import { DigestService } from '../ai-reading/application/digest.service';
 import { DigestController } from '../ai-reading/presentation/digest.controller';
 import { LLM_GATEWAY, LlmError } from '../../shared/llm/llm-gateway';
 import { ScriptedLlmGateway } from '../../shared/llm/testing/scripted-llm.gateway';
+import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
 import { BooksModule } from './books.module';
 import { buildEpub } from './testing/epub-fixture';
 
@@ -20,7 +21,7 @@ describe('Reading an imported book', () => {
     llm = new ScriptedLlmGateway(() => ({ paragraphs: ['Ý chính thứ nhất.', 'Ý chính thứ hai.'] }));
     storageDir = await mkdtemp(join(tmpdir(), 'reading-e2e-'));
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storageDir })],
+      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
       controllers: [DigestController],
       providers: [DigestService, { provide: LLM_GATEWAY, useValue: llm }],
     }).compile();

@@ -69,6 +69,11 @@ flowchart LR
         memory[("Bộ nhớ tạm")]
         api --> memory
         digest --> memory
+        clips[("Postgres: các câu đã đọc")]
+        bucket[("Railway bucket: file EPUB, âm thanh")]
+        api --> bucket
+        speech --> clips
+        speech --> bucket
     end
 
     llm["Dịch vụ LLM"]
@@ -89,13 +94,13 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 
 | | Hiện có | Dự kiến |
 |---|---|---|
-| Lưu sách | Bộ nhớ tạm, mất khi backend restart | PostgreSQL và S3 |
+| Lưu sách | Danh sách sách ở bộ nhớ tạm, mất khi backend restart; file EPUB nằm trong Railway bucket | Danh sách sách trong PostgreSQL |
 | Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
 | Người dùng | Một `demo-user`, chưa có đăng nhập | Đăng nhập và hạn mức token |
 | Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
-| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu, tạo trước vài câu | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
+| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu, tạo trước vài câu. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.

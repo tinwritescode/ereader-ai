@@ -11,6 +11,25 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ereader_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-retries 30
+      s3:
+        image: localstack/localstack:3
+        env:
+          SERVICES: s3
+        ports: ['4566:4566']
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/ereader_test
+      TEST_S3_ENDPOINT: http://localhost:4566
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

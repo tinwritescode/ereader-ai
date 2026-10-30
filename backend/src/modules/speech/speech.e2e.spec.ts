@@ -3,6 +3,8 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { CloudVoice } from './domain/cloud-voice';
 import { TtsError, TtsGateway } from './application/tts-gateway';
+import { InMemorySpeechClipIndex } from './application/speech-clip-index';
+import { StorageGateway } from '../../shared/storage/storage-gateway';
 import { SpeechModule } from './speech.module';
 
 const ngocHuyen: CloudVoice = { code: 'hn_female_ngochuyen_full_48k-fhg', name: 'HN - Ngọc Huyền', gender: 'female' };
@@ -23,18 +25,37 @@ class FakeTts implements TtsGateway {
   }
 }
 
+class FakeStorage implements StorageGateway {
+  objects = new Map<string, Buffer>();
+  broken = false;
+
+  async put({ key, bytes }: { key: string; bytes: Buffer }) {
+    if (this.broken) throw new Error('storage down');
+    this.objects.set(key, bytes);
+  }
+
+  async get(key: string) {
+    if (this.broken) throw new Error('storage down');
+    return this.objects.get(key) ?? null;
+  }
+}
+
 describe('speech', () => {
   let app: INestApplication;
   let tts: FakeTts;
+  let storage: FakeStorage;
 
   const start = async (gateway: TtsGateway | null) => {
-    const moduleRef = await Test.createTestingModule({ imports: [SpeechModule.register(gateway)] }).compile();
+    const moduleRef = await Test.createTestingModule({
+      imports: [SpeechModule.register({ tts: gateway, storage, index: new InMemorySpeechClipIndex() })],
+    }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
   };
 
   beforeEach(async () => {
     tts = new FakeTts();
+    storage = new FakeStorage();
     await start(tts);
   });
 
@@ -62,6 +83,36 @@ describe('speech', () => {
 
     expect(response.body).toEqual(wav);
     expect(tts.spoken).toEqual([{ text: 'Xin chào bạn.', voiceCode: ngocHuyen.code }]);
+  });
+
+  const speak = (text: string) =>
+    request(app.getHttpServer())
+      .post('/speech')
+      .send({ text, voiceCode: ngocHuyen.code })
+      .buffer(true)
+      .parse((res, done) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => done(null, Buffer.concat(chunks)));
+      });
+
+  it('keeps each sentence it reads, and reads it again from storage without asking Vbee', async () => {
+    await speak('Xin chào bạn.').expect(200);
+    expect(storage.objects.size).toBe(1);
+
+    const again = await speak(' Xin chào bạn. ').expect(200);
+
+    expect(again.body).toEqual(wav);
+    expect(tts.spoken).toHaveLength(1);
+  });
+
+  it('still reads aloud when storage is down', async () => {
+    storage.broken = true;
+
+    const response = await speak('Xin chào bạn.').expect(200);
+
+    expect(response.body).toEqual(wav);
+    expect(tts.spoken).toHaveLength(1);
   });
 
   it('refuses a voice that is not offered', async () => {

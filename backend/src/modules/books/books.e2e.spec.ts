@@ -4,6 +4,7 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
 import { BooksModule } from './books.module';
 import { buildEpub } from './testing/epub-fixture';
 
@@ -16,7 +17,7 @@ describe('POST /books (EPUB import)', () => {
   beforeEach(async () => {
     storageDir = await mkdtemp(join(tmpdir(), 'books-e2e-'));
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: MAX_UPLOAD_BYTES, storageDir })],
+      imports: [BooksModule.register({ maxUploadBytes: MAX_UPLOAD_BYTES, storage: new LocalDiskStorageGateway(storageDir) })],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
@@ -117,7 +118,7 @@ describe('POST /books (EPUB import)', () => {
     if (!fixture) return;
     await app.close();
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storageDir })],
+      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
