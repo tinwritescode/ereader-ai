@@ -110,4 +110,25 @@ describe('VbeeTtsGateway', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1].url).toContain('cursor=c%2F2%3D%3D');
   });
+
+  it('puts the chosen community voices first, without the word "Giọng" in their names', async () => {
+    const page = (voices: unknown[]) =>
+      json({ status: 1, result: { voices, pagination: { has_next_page: false, next_cursor: null } } });
+    const { fetch, calls } = fakeFetch({
+      'https://vbee.vn/api/public/v1/voices?voice_ownership=COMMUNITY': [
+        () =>
+          page([
+            { code: 'community-1', name: 'Giọng HatDe1', gender: 'female', language_code: 'vi-VN' },
+          ]),
+      ],
+      'https://vbee.vn/api/public/v1/voices': [
+        () => page([{ code: 'a_48k-fhg', name: 'HN - A', gender: 'female', language_code: 'vi-VN' }]),
+      ],
+    });
+
+    const voices = await new VbeeTtsGateway({ ...options, fetch, communityVoices: ['community-1'] }).voices();
+
+    expect(voices.map((voice) => voice.name)).toEqual(['HatDe1', 'HN - A']);
+    expect(calls.some((call) => call.url.includes('code=community-1'))).toBe(true);
+  });
 });

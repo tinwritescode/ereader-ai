@@ -12,9 +12,13 @@ const UNUSED_WEBHOOK = 'https://example.com/vbee-callback';
 // Vbee lists these voices but answers "Bad Request" when asked to read with them.
 const REFUSED_VOICES = new Set(['sg_male_anhtu_yt_24k-pre', 'sg_female_thanhmai_yt_24k-pre']);
 
+// Community voices offered before Vbee's own. Vbee lists thousands; these are picked by hand.
+export const PICKED_COMMUNITY_VOICES = ['s_hochiminh_female_gionghatde1_book_vc'];
+
 export type VbeeOptions = {
   token: string;
   appId: string;
+  communityVoices?: string[];
   pollIntervalMs?: number;
   timeoutMs?: number;
   fetch?: typeof globalThis.fetch;
@@ -28,7 +32,9 @@ const VbeeEnvSchema = z.object({
 /** Vbee is optional: without both settings the app simply offers no cloud voices. */
 export function vbeeOptionsFromEnv(env: Record<string, string | undefined>): VbeeOptions | null {
   const parsed = VbeeEnvSchema.safeParse(env);
-  return parsed.success ? { token: parsed.data.VBEE_TOKEN, appId: parsed.data.VBEE_APP_ID } : null;
+  return parsed.success
+    ? { token: parsed.data.VBEE_TOKEN, appId: parsed.data.VBEE_APP_ID, communityVoices: PICKED_COMMUNITY_VOICES }
+    : null;
 }
 
 const CreatedSchema = z.object({ requestId: z.string().min(1) });
@@ -111,17 +117,28 @@ export class VbeeTtsGateway implements TtsGateway {
 
   private async listVoices(): Promise<CloudVoice[]> {
     const voices: CloudVoice[] = [];
+    for (const code of this.options.communityVoices ?? []) {
+      voices.push(...(await this.voicePages({ voice_ownership: 'COMMUNITY', code })));
+    }
+    voices.push(...(await this.voicePages({ voice_ownership: 'VBEE', language_code: 'vi-VN' })));
+    return voices;
+  }
+
+  private async voicePages(filter: Record<string, string>): Promise<CloudVoice[]> {
+    const voices: CloudVoice[] = [];
     let cursor: string | null = null;
     do {
       const url = new URL(VOICES_URL);
-      url.searchParams.set('voice_ownership', 'VBEE');
-      url.searchParams.set('language_code', 'vi-VN');
+      for (const [name, value] of Object.entries(filter)) url.searchParams.set(name, value);
       url.searchParams.set('limit', String(VOICES_PER_PAGE));
       if (cursor) url.searchParams.set('cursor', cursor);
       const page = VoicesPageSchema.safeParse(await this.json(url.toString(), { method: 'GET' }));
       if (!page.success) throw new TtsError('UPSTREAM_ERROR');
       for (const { code, name, gender, language_code } of page.data.result.voices) {
-        if (language_code === 'vi-VN' && !REFUSED_VOICES.has(code)) voices.push({ code, name, gender });
+        if (language_code === 'vi-VN' && !REFUSED_VOICES.has(code)) {
+          // The app already says "Giọng" before every name.
+          voices.push({ code, name: name.replace(/^Giọng\s+/u, ''), gender });
+        }
       }
       const { has_next_page, next_cursor } = page.data.result.pagination;
       cursor = has_next_page ? next_cursor : null;
