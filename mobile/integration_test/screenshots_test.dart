@@ -35,6 +35,9 @@ void main() {
             minutesLeft: 6,
             option: lengthOptionsFor(chapterOne.minutes).first,
             block: 12,
+            quote:
+                'Tôi thực sự tin rằng, không có gì khó khăn hơn việc kiếm lợi nhuận.',
+            listened: true,
           ),
         }),
         pickEpub: () async => null,
@@ -42,7 +45,7 @@ void main() {
     );
     await hold('library');
 
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await hold('book');
 
     await tester.tap(
@@ -65,5 +68,8 @@ void main() {
 
     await tester.tap(find.text('Nghe'));
     await hold('player');
+
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await hold('still-listening');
   });
 }

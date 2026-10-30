@@ -8,6 +8,9 @@ class ReadingSpot {
     required this.minutesLeft,
     this.option,
     this.block = 0,
+    this.offset = 0,
+    this.quote,
+    this.listened = false,
   });
 
   final String chapterId;
@@ -21,4 +24,13 @@ class ReadingSpot {
 
   /// The first block at the top of the page when reading stopped.
   final int block;
+
+  /// The character the voice stopped at inside [block].
+  final int offset;
+
+  /// The words reading stopped on; null when the chapter is not yet opened.
+  final String? quote;
+
+  /// The voice got here, so going on means listening.
+  final bool listened;
 }

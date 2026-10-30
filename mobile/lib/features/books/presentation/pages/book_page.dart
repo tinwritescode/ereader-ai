@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../listen/domain/listen_source.dart';
+import '../../../listen/presentation/listen_bloc.dart';
+import '../../../listen/presentation/mini_player.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
+import '../../domain/entities/reading_spot.dart';
 import '../../domain/repositories/books_repository.dart';
-import '../../../listen/domain/speech.dart';
 import '../bloc/book_bloc.dart';
 import '../formatting.dart';
 import '../length_memory.dart';
@@ -17,24 +20,35 @@ import '../widgets.dart';
 import 'choose_length_sheet.dart';
 import 'reader_page.dart';
 
+const _rowDivider = Color(0x6B2A1F6E);
+
 class BookPage extends StatefulWidget {
-  const BookPage({super.key, required this.book, this.resume = false});
+  const BookPage({
+    super.key,
+    required this.book,
+    this.resume = false,
+    this.listen = false,
+  });
 
   final Book book;
 
   /// Goes straight back to where reading stopped, once the chapters load.
   final bool resume;
 
+  /// With [resume], starts the voice there as well.
+  final bool listen;
+
   static Route<void> route(
     BuildContext context,
     Book book, {
     bool resume = false,
+    bool listen = false,
   }) {
     final repository = context.read<BooksRepository>();
     return MaterialPageRoute(
       builder: (_) => BlocProvider(
         create: (_) => BookBloc(repository)..add(BookStarted(book.bookId)),
-        child: BookPage(book: book, resume: resume),
+        child: BookPage(book: book, resume: resume, listen: listen),
       ),
     );
   }
@@ -50,13 +64,58 @@ class _BookPageState extends State<BookPage> {
   void _resumeOnLoad(BuildContext context, BookState state) {
     if (state case BookLoaded(:final chapters) when _resume) {
       _resume = false;
+      final heard = context.read<ListenBloc>().state.heard;
       final spot = context.read<ReadingSpotsCubit>().state[widget.book.bookId];
-      final index = chapters.indexWhere(
-        (chapter) => chapter.chapterId == spot?.chapterId,
-      );
-      if (spot != null && index >= 0) {
-        unawaited(_open(chapters, index, option: spot.option, resume: true));
+      if (heard?.book.bookId == widget.book.bookId) {
+        _rejoin(chapters, heard!);
+      } else if (spot != null) {
+        _continue(chapters, spot, listen: widget.listen);
       }
+    }
+  }
+
+  void _continue(
+    List<ChapterSummary> chapters,
+    ReadingSpot spot, {
+    required bool listen,
+  }) {
+    final index = chapters.indexWhere(
+      (chapter) => chapter.chapterId == spot.chapterId,
+    );
+    if (index >= 0) {
+      unawaited(
+        _open(
+          chapters,
+          index,
+          option: spot.option,
+          resume: true,
+          listen: listen,
+        ),
+      );
+    }
+  }
+
+  void _rejoin(List<ChapterSummary> chapters, ListenSource heard) {
+    final index = chapters.indexWhere(
+      (chapter) => chapter.chapterId == heard.chapter.chapterId,
+    );
+    if (index >= 0) {
+      unawaited(_open(chapters, index, option: heard.option, resume: true));
+    }
+  }
+
+  void _openHeard(ListenSource heard) {
+    final state = context.read<BookBloc>().state;
+    if (state case BookLoaded(
+      :final chapters,
+    ) when heard.book.bookId == widget.book.bookId) {
+      _rejoin(chapters, heard);
+    } else {
+      unawaited(
+        Navigator.of(
+          context,
+        ).push(BookPage.route(context, heard.book, resume: true)),
+      );
     }
   }
 
@@ -70,7 +129,9 @@ class _BookPageState extends State<BookPage> {
   Widget build(BuildContext context) {
     final state = context.watch<BookBloc>().state;
     final book = widget.book;
-    final author = book.author;
+    final heard = context.watch<ListenBloc>().state.heard;
+    final hearing = heard?.book.bookId == book.bookId ? heard : null;
+    final spot = context.watch<ReadingSpotsCubit>().state[book.bookId];
     return BlocListener<BookBloc, BookState>(
       listener: _resumeOnLoad,
       child: Scaffold(
@@ -78,78 +139,70 @@ class _BookPageState extends State<BookPage> {
           scroll: _scroll,
           child: SafeArea(
             bottom: false,
-            child: Stack(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                CustomScrollView(
-                  controller: _scroll,
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(
-                        marginWidth + 12,
-                        lineHeight,
-                        18,
-                        lineHeight,
-                      ),
-                      sliver: SliverToBoxAdapter(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              book.title,
-                              style: readingStyle(
-                                size: 21,
-                                height: onGrid(21),
-                                weight: FontWeight.w600,
-                                color: Palette.ink,
+                Expanded(
+                  child: Stack(
+                    children: [
+                      CustomScrollView(
+                        controller: _scroll,
+                        slivers: [
+                          SliverToBoxAdapter(child: _Head(book: book)),
+                          switch (state) {
+                            BookLoading() => const SliverFillRemaining(
+                              child: Center(child: CircularProgressIndicator()),
+                            ),
+                            BookFailed(:final code) => SliverFillRemaining(
+                              child: Center(
+                                child: TextButton(
+                                  onPressed: () => context.read<BookBloc>().add(
+                                    BookStarted(book.bookId),
+                                  ),
+                                  child: Text('${errorMessage(code)} Thử lại'),
+                                ),
                               ),
                             ),
-                            Text(
-                              [
-                                ?author,
-                                '${book.chapterCount} chương',
-                              ].join(', '),
-                              style: readingStyle(
-                                size: 13,
-                                height: onGrid(13),
-                                color: Palette.muted,
-                              ),
+                            BookLoaded(:final chapters) => SliverMainAxisGroup(
+                              slivers: [
+                                if (spot != null && hearing == null)
+                                  SliverToBoxAdapter(
+                                    child: _Continue(
+                                      spot: spot,
+                                      onTap: () => _continue(
+                                        chapters,
+                                        spot,
+                                        listen: spot.listened,
+                                      ),
+                                    ),
+                                  ),
+                                SliverList.builder(
+                                  itemCount: chapters.length,
+                                  itemBuilder: (context, index) => _ChapterRow(
+                                    chapter: chapters[index],
+                                    hearing:
+                                        hearing?.chapter.chapterId ==
+                                        chapters[index].chapterId,
+                                    onTap: () => _open(chapters, index),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    switch (state) {
-                      BookLoading() => const SliverFillRemaining(
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                      BookFailed(:final code) => SliverFillRemaining(
-                        child: Center(
-                          child: TextButton(
-                            onPressed: () => context.read<BookBloc>().add(
-                              BookStarted(book.bookId),
-                            ),
-                            child: Text('${errorMessage(code)} Thử lại'),
+                          },
+                          const SliverPadding(
+                            padding: EdgeInsets.only(bottom: lineHeight * 2),
                           ),
-                        ),
+                        ],
                       ),
-                      BookLoaded(:final chapters) => SliverList.builder(
-                        itemCount: chapters.length,
-                        itemBuilder: (context, index) => _ChapterRow(
-                          chapter: chapters[index],
-                          onTap: () => _open(chapters, index),
-                        ),
+                      const Positioned(
+                        left: 2,
+                        top: 0,
+                        child: BackButton(color: Palette.ink),
                       ),
-                    },
-                    const SliverPadding(
-                      padding: EdgeInsets.only(bottom: lineHeight * 2),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Positioned(
-                  left: 2,
-                  top: 0,
-                  child: BackButton(color: Palette.ink),
-                ),
+                MiniPlayer(onOpen: _openHeard),
               ],
             ),
           ),
@@ -165,6 +218,7 @@ class _BookPageState extends State<BookPage> {
     int index, {
     LengthOption? option,
     bool resume = false,
+    bool listen = false,
   }) async {
     final chapter = chapters[index];
     final next = index + 1 < chapters.length ? chapters[index + 1] : null;
@@ -172,7 +226,6 @@ class _BookPageState extends State<BookPage> {
     final memory = context.read<LengthMemory>();
     final navigator = Navigator.of(context);
     final repository = context.read<BooksRepository>();
-    final speech = context.read<Speech>();
     final choice = option != null
         ? LengthChoice(option)
         : options.length == 1
@@ -191,13 +244,12 @@ class _BookPageState extends State<BookPage> {
     await navigator.push(
       ReaderPage.route(
         repository: repository,
-        speech: speech,
-        bookId: widget.book.bookId,
+        book: widget.book,
         resume: resume,
         chapter: chapter,
         options: options,
         option: choice.option,
-        listen: choice.listen,
+        listen: listen || choice.listen,
         next: next,
         onNext: next == null
             ? null
@@ -210,65 +262,159 @@ class _BookPageState extends State<BookPage> {
   }
 }
 
+class _Head extends StatelessWidget {
+  const _Head({required this.book});
+
+  final Book book;
+
+  @override
+  Widget build(BuildContext context) {
+    final author = book.author;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        marginWidth + 12,
+        lineHeight,
+        18,
+        lineHeight,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BookCover(book: book, width: 76),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  style: readingStyle(
+                    size: 18,
+                    height: 1.25,
+                    weight: FontWeight.w600,
+                    color: Palette.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  [?author, '${book.chapterCount} chương'].join(', '),
+                  style: readingStyle(size: 13, color: Palette.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Continue extends StatelessWidget {
+  const _Continue({required this.spot, required this.onTap});
+
+  final ReadingSpot spot;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(marginWidth + 12, 0, 18, lineHeight),
+    child: PrimaryButton(
+      label:
+          '${spot.listened ? 'Nghe' : 'Đọc'} tiếp ${spot.chapterLabel}, '
+          'còn ${durationLabel(spot.minutesLeft)}',
+      onPressed: onTap,
+    ),
+  );
+}
+
+/// One chapter as a strip the width of the page; a tap anywhere opens it.
 class _ChapterRow extends StatelessWidget {
-  const _ChapterRow({required this.chapter, required this.onTap});
+  const _ChapterRow({
+    required this.chapter,
+    required this.hearing,
+    required this.onTap,
+  });
 
   final ChapterSummary chapter;
+  final bool hearing;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = chapter.subtitle;
-    return InkWell(
-      onTap: onTap,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: marginWidth,
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8),
-              // The second line of the row carries the title, so the minutes sit beside it.
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const SizedBox(height: lineHeight),
-                  Text(
-                    "${chapter.minutes}'",
-                    style: handStyle(size: 22, height: onGrid(22)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 18, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    subtitle == null ? '' : chapter.label,
-                    style: readingStyle(
-                      size: 12.5,
-                      height: onGrid(12.5),
-                      color: Palette.muted,
+    final (:number, :title) = chapterHeading(chapter);
+    final titleStyle = readingStyle(
+      size: 15.5,
+      height: onGrid(15.5),
+      weight: FontWeight.w600,
+      color: Palette.ink,
+    );
+    final note = [?number, if (hearing) 'đang nghe'].join(', ');
+    return Container(
+      foregroundDecoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _rowDivider, width: 1.5)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          highlightColor: Palette.marker.withValues(alpha: 0.45),
+          splashColor: Palette.marker.withValues(alpha: 0.3),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: lineHeight),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: marginWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      "${chapter.minutes}'",
+                      textAlign: TextAlign.right,
+                      style: handStyle(size: 22, height: onGrid(22)),
                     ),
                   ),
-                  Text(
-                    displayTitle(subtitle ?? chapter.label),
-                    style: readingStyle(
-                      size: 15,
-                      height: onGrid(15),
-                      weight: FontWeight.w600,
-                      color: Palette.ink,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (note.isNotEmpty)
+                          Text(
+                            note,
+                            style: handStyle(
+                              size: 18,
+                              height: onGrid(18),
+                              color: hearing ? Palette.red : Palette.muted,
+                            ),
+                          ),
+                        Text(
+                          title,
+                          style: hearing
+                              ? titleStyle.copyWith(
+                                  backgroundColor: Palette.marker,
+                                )
+                              : titleStyle,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(
+                  width: 34,
+                  height: lineHeight,
+                  child: Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: Palette.ink,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

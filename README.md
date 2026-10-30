@@ -4,9 +4,9 @@
 
 An iPhone reading app. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the app reads aloud in a Vietnamese voice that runs on the device.
 
-| Library | Chapters | Choose length | Continue | Read | Listen |
-|---|---|---|---|---|---|
-| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Continue reading](docs/screenshots/resume.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) |
+| Library | Chapters | Choose length | Continue | Read | Listen | Keep listening |
+|---|---|---|---|---|---|---|
+| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Continue reading](docs/screenshots/resume.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) | ![Still listening](docs/screenshots/still-listening.png) |
 
 Screenshots come from the simulator with sample data. Regenerate them with `mobile/tool/capture_screenshots.sh`.
 
@@ -27,6 +27,7 @@ flowchart LR
         shorten(["AI shortens the chapter"])
         listen(["Listen offline"])
         pick(["Hold a sentence to listen from there"])
+        keepon(["Keep listening after leaving a book"])
         look(["Set text size, spacing, and night paper"])
         resume(["Continue where reading stopped"])
         download(["Download the voice once"])
@@ -39,6 +40,7 @@ flowchart LR
     reader --> length
     reader --> read
     reader --> listen
+    reader --> keepon
     reader --> pick
     reader --> look
     reader --> resume

@@ -46,6 +46,9 @@ Map<String, Object?> _encode(ReadingSpot spot) => {
   'length': spot.option?.length.name,
   'minutes': spot.option?.minutes,
   'block': spot.block,
+  'offset': spot.offset,
+  'quote': spot.quote,
+  'listened': spot.listened,
 };
 
 ReadingSpot? _parse(Object? value) {
@@ -57,6 +60,8 @@ ReadingSpot? _parse(Object? value) {
   }) {
     final length = ReadingLength.values.asNameMap()[value['length']];
     final minutes = value['minutes'];
+    final offset = value['offset'];
+    final quote = value['quote'];
     return ReadingSpot(
       chapterId: chapterId,
       chapterLabel: chapterLabel,
@@ -65,6 +70,9 @@ ReadingSpot? _parse(Object? value) {
           ? LengthOption(length, minutes)
           : null,
       block: block,
+      offset: offset is int ? offset : 0,
+      quote: quote is String ? quote : null,
+      listened: value['listened'] == true,
     );
   }
   return null;

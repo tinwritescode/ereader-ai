@@ -15,6 +15,7 @@ const _bookJson = {
   'title': 'The Battle for Investment Survival',
   'author': 'Gerald M. Loeb',
   'language': 'vi',
+  'hasCover': true,
   'chapterCount': 36,
   'minutes': 557,
 };
@@ -52,6 +53,10 @@ void main() {
     final books = await _repository(adapter).books();
 
     expect(books.single.bookId, 'book-1');
+    expect(
+      books.single.coverUrl,
+      'http://api.test/books/book-1/cover?userId=user-1',
+    );
     expect(
       adapter.requests.single.uri.toString(),
       'http://api.test/books?userId=user-1',

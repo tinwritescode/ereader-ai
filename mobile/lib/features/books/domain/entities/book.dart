@@ -6,6 +6,7 @@ class Book {
     required this.status,
     required this.chapterCount,
     required this.minutes,
+    this.coverUrl,
   });
 
   final String bookId;
@@ -14,4 +15,7 @@ class Book {
   final String status;
   final int chapterCount;
   final int minutes;
+
+  /// The cover the EPUB carries; null when it has none.
+  final String? coverUrl;
 }

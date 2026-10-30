@@ -1,3 +1,5 @@
+import '../domain/entities/chapter.dart';
+
 /// "45 phút", "1 giờ", "9 giờ 17 phút".
 String durationLabel(int minutes) {
   if (minutes < 60) return '$minutes phút';
@@ -12,6 +14,34 @@ String displayTitle(String text) {
   if (!hasLetters || text != text.toUpperCase()) return text;
   final lower = text.toLowerCase();
   return lower[0].toUpperCase() + lower.substring(1);
+}
+
+/// What a chapter is called, whichever way round the book stores it: some put
+/// "Chương Một" over a title, others "Quy luật 1" under "QUY LUẬT 1 ĐỨNG THẲNG".
+({String? number, String title}) chapterHeading(ChapterSummary chapter) {
+  final label = chapter.label.trim();
+  final subtitle = chapter.subtitle?.trim();
+  if (subtitle == null || subtitle.isEmpty) {
+    return (number: null, title: displayTitle(label));
+  }
+  final shortFirst = label.length <= subtitle.length;
+  final short = shortFirst ? label : subtitle;
+  final long = shortFirst ? subtitle : label;
+  if (!long.toLowerCase().startsWith(short.toLowerCase())) {
+    return (number: label, title: displayTitle(subtitle));
+  }
+  final rest = long.substring(short.length).replaceFirst(_titleJoint, '');
+  return rest.isEmpty
+      ? (number: null, title: displayTitle(long))
+      : (number: short, title: displayTitle(rest));
+}
+
+final _titleJoint = RegExp(r'^[\s:.,–—-]+');
+
+/// The shortest name of a chapter, for "Đọc tiếp Chương Hai".
+String chapterName(ChapterSummary chapter) {
+  final (:number, :title) = chapterHeading(chapter);
+  return number ?? title;
 }
 
 String errorMessage(String code) => switch (code) {

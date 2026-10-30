@@ -13,6 +13,7 @@ import 'package:ereader_mobile/features/books/domain/entities/reading_length.dar
 import 'package:ereader_mobile/features/books/domain/entities/reading_look.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_spot.dart';
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
+import 'package:ereader_mobile/features/listen/presentation/mini_player.dart';
 
 import 'features/books/fake_books_repository.dart';
 import 'features/books/fake_reading_look_store.dart';
@@ -66,7 +67,7 @@ void main() {
     await tester.tap(find.text('Thêm sách EPUB'));
     await tester.pumpAndSettle();
 
-    expect(find.text('2 chương, khoảng 12 phút đọc'), findsOneWidget);
+    expect(find.text('Gerald M. Loeb'), findsWidgets);
   });
 
   testWidgets('opens a book, chooses a shorter length, and reads it', (
@@ -74,7 +75,7 @@ void main() {
   ) async {
     final repository = await pumpApp(tester, shelf: [loeb]);
 
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     expect(
       find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -118,7 +119,7 @@ void main() {
     tester,
   ) async {
     await pumpApp(tester, shelf: [loeb]);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Chương Sáu'));
@@ -136,7 +137,7 @@ void main() {
         shelf: [loeb],
         shortenedError: const BooksException('DIGEST_FAILED'),
       );
-      await tester.tap(find.text('Gerald M. Loeb'));
+      await tester.tap(find.text('Gerald M. Loeb').last);
       await tester.pumpAndSettle();
       await tester.tap(
         find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -156,7 +157,7 @@ void main() {
 
   testWidgets('dragging the ruler picks the nearest length', (tester) async {
     await pumpApp(tester, shelf: [loeb]);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await tester.tap(
       find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -170,7 +171,7 @@ void main() {
   });
 
   Future<void> openOriginalChapter(WidgetTester tester) async {
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Chương Sáu'));
     await tester.pumpAndSettle();
@@ -282,7 +283,7 @@ void main() {
   ) async {
     final speech = FakeSpeech();
     await pumpApp(tester, shelf: [loeb], speech: speech);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await tester.tap(
       find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -376,7 +377,7 @@ void main() {
 
   testWidgets('the end of a chapter leads to the next one', (tester) async {
     await pumpApp(tester, shelf: [loeb]);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await tester.tap(
       find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -428,7 +429,8 @@ void main() {
       }),
     );
 
-    await tester.tap(find.text('Đọc tiếp Chương Một, còn 3 phút'));
+    expect(find.text('Chương Một, còn 3 phút'), findsOneWidget);
+    await tester.tap(find.text('Đọc tiếp'));
     await tester.pumpAndSettle();
 
     expect(find.text('Bản 4 phút của book-1-c0.'), findsOneWidget);
@@ -440,7 +442,7 @@ void main() {
   ) async {
     final spots = FakeReadingSpotStore();
     await pumpApp(tester, shelf: [loeb], spots: spots);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await openChapterOneOriginal(tester);
     expect(find.text('Lần trước bạn đọc đến'), findsNothing);
@@ -481,7 +483,7 @@ void main() {
       ),
     });
     await pumpApp(tester, shelf: [loeb], spots: spots);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await openChapterOneOriginal(tester);
 
@@ -501,7 +503,7 @@ void main() {
   ) async {
     final spots = FakeReadingSpotStore();
     await pumpApp(tester, shelf: [loeb], spots: spots);
-    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.tap(find.text('Gerald M. Loeb').last);
     await tester.pumpAndSettle();
     await tester.tap(
       find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
@@ -516,12 +518,159 @@ void main() {
     await tester.pumpAndSettle();
     goBack(tester);
     await tester.pumpAndSettle();
-    expect(find.text('Đọc tiếp Chương Sáu, còn 4 phút'), findsOneWidget);
+    expect(find.text('Tiếp theo trong sách'), findsOneWidget);
 
-    await tester.tap(find.text('Đọc tiếp Chương Sáu, còn 4 phút'));
+    await tester.tap(find.text('Đọc tiếp'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
     // The last chapter is read, so there is nothing left to continue.
     expect(spots.saved['book-1'], isNull);
+  });
+
+  Future<void> listenThenLeave(WidgetTester tester) async {
+    await openOriginalChapter(tester);
+    await showTools(tester);
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+    goBack(tester);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('leaving a book keeps the voice reading it', (tester) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await listenThenLeave(tester);
+
+    expect(speech.stops, 1);
+    expect(speech.played, [1]);
+    expect(find.byType(MiniPlayer), findsOneWidget);
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
+    expect(find.text('đang nghe'), findsOneWidget);
+
+    goBack(tester);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
+    expect(speech.stops, 1);
+
+    speech.finishSentence();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsNothing);
+  });
+
+  testWidgets('the bar stops the voice', (tester) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await listenThenLeave(tester);
+
+    await tester.tap(find.byTooltip('Tạm dừng'));
+    await tester.pumpAndSettle();
+    expect(speech.paused, isTrue);
+
+    await tester.tap(find.byTooltip('Tắt giọng đọc'));
+    await tester.pumpAndSettle();
+    expect(speech.stops, greaterThan(1));
+    expect(find.byTooltip('Tắt giọng đọc'), findsNothing);
+  });
+
+  testWidgets('tapping the bar returns to the voice, without restarting it', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await listenThenLeave(tester);
+    goBack(tester);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('Tôi thực sự tin rằng'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Lùi một câu'), findsOneWidget);
+    expect(find.byTooltip('Tắt giọng đọc'), findsNothing);
+    expect(speech.played, [1]);
+    expect(speech.stops, 1);
+  });
+
+  testWidgets('another chapter shows the bar and can take the voice over', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await listenThenLeave(tester);
+
+    await openChapterOneOriginal(tester);
+    expect(find.text('Lùi một câu'), findsNothing);
+    expect(find.byTooltip('Tắt giọng đọc'), findsOneWidget);
+
+    await showTools(tester);
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lùi một câu'), findsOneWidget);
+    expect(find.byTooltip('Tắt giọng đọc'), findsNothing);
+    expect(speech.played, [1, 2]);
+  });
+
+  testWidgets('the home screen offers to listen on from the last sentence', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(
+      tester,
+      shelf: [loeb],
+      speech: speech,
+      spots: FakeReadingSpotStore({
+        'book-1': const ReadingSpot(
+          chapterId: 'book-1-c0',
+          chapterLabel: 'Chương Một',
+          minutesLeft: 3,
+          option: LengthOption(ReadingLength.original, 8),
+          block: 20,
+          quote: 'Đoạn 20 của chương một.',
+          listened: true,
+        ),
+      }),
+    );
+    expect(find.text('Bạn đã nghe đến đoạn này'), findsOneWidget);
+    expect(find.text('Đoạn 20 của chương một.'), findsOneWidget);
+
+    await tester.tap(find.text('Nghe tiếp'));
+    await tester.pumpAndSettle();
+
+    expect(speech.synthesized.first.$1, 'Đoạn 20 của chương một.');
+    expect(find.text('Lùi một câu'), findsOneWidget);
+  });
+
+  testWidgets('listening keeps the spot on the sentence being heard', (
+    tester,
+  ) async {
+    final spots = FakeReadingSpotStore();
+    await pumpApp(tester, shelf: [loeb], spots: spots);
+    await listenThenLeave(tester);
+
+    final spot = spots.saved['book-1']!;
+    expect(spot.listened, isTrue);
+    expect(spot.chapterId, chapterSix.chapterId);
+    expect(spot.quote, contains('Tôi thực sự tin rằng'));
+  });
+
+  testWidgets('a book that continued shows it on its chapter page', (
+    tester,
+  ) async {
+    await pumpApp(
+      tester,
+      shelf: [loeb],
+      spots: FakeReadingSpotStore({
+        'book-1': const ReadingSpot(
+          chapterId: 'book-1-c1',
+          chapterLabel: 'Chương Sáu',
+          minutesLeft: 2,
+        ),
+      }),
+    );
+    await tester.tap(find.text('Gerald M. Loeb').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Đọc tiếp Chương Sáu, còn 2 phút'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
   });
 }

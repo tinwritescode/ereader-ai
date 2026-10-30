@@ -1,9 +1,19 @@
 import 'package:ereader_mobile/features/books/domain/entities/chapter.dart';
+import 'package:ereader_mobile/features/books/domain/entities/reading_length.dart';
+import 'package:ereader_mobile/features/listen/domain/listen_source.dart';
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
 import 'package:ereader_mobile/features/listen/presentation/listen_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../books/fake_books_repository.dart';
 import 'fake_speech.dart';
+
+const source = ListenSource(
+  book: loeb,
+  chapter: chapterOne,
+  option: LengthOption(ReadingLength.original, 8),
+  next: chapterSix,
+);
 
 void main() {
   const blocks = [
@@ -20,7 +30,8 @@ void main() {
 
   test('reads sentences in order, ahead of time, and ends', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     expect(playingText(bloc), 'Một.');
@@ -40,7 +51,8 @@ void main() {
 
   test('asks before downloading the voice, then starts by itself', () async {
     final speech = FakeSpeech(ready: false);
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
     expect(bloc.state.stage, isA<ListenNeedsVoice>());
     expect(speech.synthesized, isEmpty);
@@ -58,7 +70,7 @@ void main() {
       downloadError: const SpeechException('VOICE_DOWNLOAD_FAILED'),
     );
     final bloc = ListenBloc(speech)
-      ..add(const ListenRequested(blocks))
+      ..add(const ListenRequested(blocks, source: source))
       ..add(const ListenDownloadConfirmed());
     await settle();
 
@@ -75,7 +87,8 @@ void main() {
 
   test('pausing holds the next sentence until resumed', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     bloc.add(const ListenPauseToggled());
@@ -94,7 +107,8 @@ void main() {
 
   test('skipping moves by sentences and stays inside the chapter', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     bloc.add(const ListenSkipped(2));
@@ -109,7 +123,8 @@ void main() {
 
   test('a new voice restarts the sentence with that voice', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     bloc.add(const ListenVoiceChosen(DeviceVoice.ducAn));
@@ -128,7 +143,7 @@ void main() {
     final speech = FakeSpeech(ready: false);
     final bloc = ListenBloc(speech)
       ..add(const ListenVoiceChosen(vbee))
-      ..add(const ListenRequested(blocks));
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     expect(playingText(bloc), 'Một.');
@@ -148,7 +163,8 @@ void main() {
 
   test('closing silences the player', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     await bloc.close();
@@ -160,7 +176,8 @@ void main() {
     final speech = FakeSpeech(
       synthesisError: const SpeechException('VOICE_FAILED'),
     );
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     expect(bloc.state.stage, isA<ListenFailed>());
@@ -170,8 +187,9 @@ void main() {
 
   test('starts from the chosen sentence', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)
-      ..add(const ListenRequested(blocks, block: 0, offset: 11));
+    final bloc = ListenBloc(
+      speech,
+    )..add(const ListenRequested(blocks, source: source, block: 0, offset: 11));
     await settle();
 
     expect(playingText(bloc), 'Ba.');
@@ -180,10 +198,11 @@ void main() {
 
   test('choosing a sentence while reading jumps there', () async {
     final speech = FakeSpeech();
-    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
     await settle();
 
-    bloc.add(const ListenRequested(blocks, block: 1));
+    bloc.add(const ListenRequested(blocks, source: source, block: 1));
     await settle();
 
     expect(playingText(bloc), 'Năm.');
@@ -194,7 +213,7 @@ void main() {
   test('the chosen sentence survives the first download', () async {
     final speech = FakeSpeech(ready: false);
     final bloc = ListenBloc(speech)
-      ..add(const ListenRequested(blocks, block: 1));
+      ..add(const ListenRequested(blocks, source: source, block: 1));
     await settle();
 
     bloc.add(const ListenDownloadConfirmed());

@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
-import '../../../listen/domain/speech.dart';
+import '../../../listen/domain/listen_source.dart';
 import '../../../listen/domain/speech_plan.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/listen_panel.dart';
+import '../../../listen/presentation/mini_player.dart';
+import '../../domain/entities/book.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
 import '../../domain/entities/reading_look.dart';
@@ -67,7 +69,7 @@ typedef _Picked = ({SpokenSentence sentence, Offset at});
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
     super.key,
-    required this.bookId,
+    required this.book,
     required this.chapter,
     required this.options,
     this.listen = false,
@@ -76,7 +78,7 @@ class ReaderPage extends StatefulWidget {
     this.onNext,
   });
 
-  final String bookId;
+  final Book book;
   final ChapterSummary chapter;
   final List<LengthOption> options;
 
@@ -92,8 +94,7 @@ class ReaderPage extends StatefulWidget {
 
   static Route<void> route({
     required BooksRepository repository,
-    required Speech speech,
-    required String bookId,
+    required Book book,
     required ChapterSummary chapter,
     required List<LengthOption> options,
     required LengthOption option,
@@ -103,19 +104,12 @@ class ReaderPage extends StatefulWidget {
     VoidCallback? onNext,
   }) {
     return MaterialPageRoute(
-      builder: (_) => MultiBlocProvider(
-        providers: [
-          BlocProvider(
-            create: (_) => ReaderBloc(
-              repository: repository,
-              chapter: chapter,
-              option: option,
-            )..add(ReaderLengthChosen(option)),
-          ),
-          BlocProvider(create: (_) => ListenBloc(speech)),
-        ],
+      builder: (_) => BlocProvider(
+        create: (_) =>
+            ReaderBloc(repository: repository, chapter: chapter, option: option)
+              ..add(ReaderLengthChosen(option)),
         child: ReaderPage(
-          bookId: bookId,
+          book: book,
           chapter: chapter,
           options: options,
           listen: listen,
@@ -160,12 +154,24 @@ class _ReaderPageState extends State<ReaderPage> {
     super.dispose();
   }
 
+  ListenSource _source(LengthOption option) => ListenSource(
+    book: widget.book,
+    chapter: widget.chapter,
+    option: option,
+    next: widget.next,
+  );
+
+  /// The voice is on this very version of this chapter.
+  bool _heardHere(ListenState listen, LengthOption option) {
+    final heard = listen.heard;
+    return heard != null &&
+        heard.book.bookId == widget.book.bookId &&
+        heard.chapter.chapterId == widget.chapter.chapterId &&
+        heard.option == option;
+  }
+
   void _onText(BuildContext context, ReaderState state) {
     if (state.text case ReaderTextLoaded(:final text)) {
-      if (_listenOnLoad) {
-        _listenOnLoad = false;
-        context.read<ListenBloc>().add(ListenRequested(text.blocks));
-      }
       if (_placed) {
         _afterLayout(_remember);
       } else {
@@ -182,15 +188,34 @@ class _ReaderPageState extends State<ReaderPage> {
 
   /// Goes back to the saved spot in this version of the chapter, or asks first.
   void _place(List<TextBlock> blocks, LengthOption option) {
-    final spot = _spots.state[widget.bookId];
+    final listen = context.read<ListenBloc>();
+    if (_heardHere(listen.state, option)) {
+      if (listen.state.stage case ListenPlaying(:final sentence)) {
+        _afterLayout(() => _reveal(sentence));
+      }
+      return;
+    }
+    final spot = _spots.state[widget.book.bookId];
     final saved =
         spot != null &&
             spot.chapterId == widget.chapter.chapterId &&
             spot.option == option &&
-            spot.block > 0 &&
+            (spot.block > 0 || spot.offset > 0) &&
             spot.block < blocks.length
         ? spot
         : null;
+    if (_listenOnLoad) {
+      _listenOnLoad = false;
+      final from = widget.resume ? saved : null;
+      listen.add(
+        ListenRequested(
+          blocks,
+          source: _source(option),
+          block: from?.block ?? 0,
+          offset: from?.offset ?? 0,
+        ),
+      );
+    }
     if (saved == null) {
       _afterLayout(_remember);
     } else if (widget.resume) {
@@ -236,7 +261,10 @@ class _ReaderPageState extends State<ReaderPage> {
   void _remember() {
     if (_offer != null || !_scroll.hasClients) return;
     final state = context.read<ReaderBloc>().state;
-    if (state.text is! ReaderTextLoaded) return;
+    final text = state.text;
+    if (text is! ReaderTextLoaded) return;
+    // The voice keeps the spot on its sentence.
+    if (_heardHere(context.read<ListenBloc>().state, state.option)) return;
     final position = _scroll.position;
     final finished =
         position.maxScrollExtent <= 0 ||
@@ -244,14 +272,14 @@ class _ReaderPageState extends State<ReaderPage> {
     if (finished) {
       final next = widget.next;
       if (next == null) {
-        unawaited(_spots.clear(widget.bookId));
+        unawaited(_spots.clear(widget.book.bookId));
       } else {
         unawaited(
           _spots.record(
-            widget.bookId,
+            widget.book.bookId,
             ReadingSpot(
               chapterId: next.chapterId,
-              chapterLabel: next.label,
+              chapterLabel: chapterName(next),
               minutesLeft: next.minutes,
             ),
           ),
@@ -259,15 +287,17 @@ class _ReaderPageState extends State<ReaderPage> {
       }
       return;
     }
+    final block = _topBlock();
     unawaited(
       _spots.record(
-        widget.bookId,
+        widget.book.bookId,
         ReadingSpot(
           chapterId: widget.chapter.chapterId,
-          chapterLabel: widget.chapter.label,
+          chapterLabel: chapterName(widget.chapter),
           minutesLeft: (state.option.minutes * (1 - _read)).ceil(),
           option: state.option,
-          block: _topBlock(),
+          block: block,
+          quote: text.text.blocks[block].text,
         ),
       ),
     );
@@ -321,6 +351,7 @@ class _ReaderPageState extends State<ReaderPage> {
     context.read<ListenBloc>().add(
       ListenRequested(
         blocks,
+        source: _source(context.read<ReaderBloc>().state.option),
         block: picked.sentence.block,
         offset: picked.sentence.start,
       ),
@@ -344,7 +375,9 @@ class _ReaderPageState extends State<ReaderPage> {
 
   void _chooseVersion(LengthOption option) {
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    context.read<ListenBloc>().add(const ListenStopped());
+    final listen = context.read<ListenBloc>();
+    final shown = context.read<ReaderBloc>().state.option;
+    if (_heardHere(listen.state, shown)) listen.add(const ListenStopped());
     context.read<ReaderBloc>().add(ReaderLengthChosen(option));
   }
 
@@ -353,8 +386,9 @@ class _ReaderPageState extends State<ReaderPage> {
     final state = context.watch<ReaderBloc>().state;
     final look = context.watch<ReadingLookCubit>().state;
     final colors = _colorsOf(look.paper);
-    final listen = context.watch<ListenBloc>().state.stage;
-    final listening = listen is! ListenOff;
+    final voice = context.watch<ListenBloc>().state;
+    final listening = _heardHere(voice, state.option);
+    final listen = listening ? voice.stage : const ListenOff();
     final marked =
         (listen is ListenPlaying ? listen.sentence : null) ?? _picked?.sentence;
     final loaded = switch (state.text) {
@@ -378,8 +412,11 @@ class _ReaderPageState extends State<ReaderPage> {
             return now is ListenPlaying &&
                 (was is! ListenPlaying || was.index != now.index);
           },
-          listener: (_, listening) {
-            if (listening.stage case ListenPlaying(:final sentence)) {
+          listener: (context, listening) {
+            final option = context.read<ReaderBloc>().state.option;
+            if (listening.stage case ListenPlaying(
+              :final sentence,
+            ) when _heardHere(listening, option)) {
               _reveal(sentence);
             }
           },
@@ -495,7 +532,10 @@ class _ReaderPageState extends State<ReaderPage> {
                             builder: (_) => const LookSheet(),
                           ),
                           onListen: () => context.read<ListenBloc>().add(
-                            ListenRequested(loaded.blocks),
+                            ListenRequested(
+                              loaded.blocks,
+                              source: _source(state.option),
+                            ),
                           ),
                         ),
                       ),
@@ -526,8 +566,11 @@ class _ReaderPageState extends State<ReaderPage> {
             if (listening)
               ListenPanel(
                 blocks: loaded?.blocks ?? const [],
+                source: _source(state.option),
                 minutes: state.option.minutes,
-              ),
+              )
+            else
+              const MiniPlayer(),
           ],
         ),
       ),
@@ -598,19 +641,16 @@ class _Chapter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = chapter.subtitle;
+    final (:number, :title) = chapterHeading(chapter);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (subtitle != null) ...[
-          Text(
-            chapter.label,
-            style: readingStyle(size: 12.5, color: colors.muted),
-          ),
+        if (number != null) ...[
+          Text(number, style: readingStyle(size: 12.5, color: colors.muted)),
           const SizedBox(height: 4),
         ],
         Text(
-          displayTitle(subtitle ?? chapter.label),
+          title,
           style: readingStyle(
             size: 22,
             height: 1.3,
@@ -743,19 +783,22 @@ class _ChapterEnd extends StatelessWidget {
           child: Transform.rotate(
             angle: -0.035,
             alignment: Alignment.centerLeft,
-            child: Text('Xong ${chapter.label}', style: handStyle(size: 30)),
+            child: Text(
+              'Xong ${chapterName(chapter)}',
+              style: handStyle(size: 30),
+            ),
           ),
         ),
         const SizedBox(height: 6),
         Text(
           next == null
               ? 'Đây là chương cuối.'
-              : 'Tiếp theo là ${next.label}, dài ${durationLabel(next.minutes)}.',
+              : 'Tiếp theo là ${chapterName(next)}, dài ${durationLabel(next.minutes)}.',
           style: readingStyle(size: 14, color: colors.muted),
         ),
         const SizedBox(height: 18),
         if (next != null && onNext != null) ...[
-          PrimaryButton(label: 'Đọc ${next.label}', onPressed: onNext),
+          PrimaryButton(label: 'Đọc ${chapterName(next)}', onPressed: onNext),
           const SizedBox(height: 4),
           TextButton(
             onPressed: backToChapters,

@@ -4,9 +4,9 @@
 
 Ứng dụng đọc sách trên iPhone. Nhập file EPUB, chọn thời gian bạn có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app đọc to bằng giọng tiếng Việt chạy ngay trên máy.
 
-| Thư viện | Chương | Chọn độ dài | Đọc tiếp | Đọc | Nghe |
-|---|---|---|---|---|---|
-| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Đọc tiếp](docs/screenshots/resume.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) |
+| Thư viện | Chương | Chọn độ dài | Đọc tiếp | Đọc | Nghe | Vẫn nghe |
+|---|---|---|---|---|---|---|
+| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Đọc tiếp](docs/screenshots/resume.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) | ![Vẫn đang nghe](docs/screenshots/still-listening.png) |
 
 Ảnh chụp từ simulator với dữ liệu mẫu. Tạo lại bằng `mobile/tool/capture_screenshots.sh`.
 
@@ -27,6 +27,7 @@ flowchart LR
         shorten(["AI rút gọn chương"])
         listen(["Nghe đọc offline"])
         pick(["Chạm giữ câu để nghe từ đó"])
+        keepon(["Nghe tiếp sau khi thoát sách"])
         look(["Chỉnh cỡ chữ, giãn dòng, trang Đêm"])
         resume(["Đọc tiếp chỗ lần trước"])
         download(["Tải giọng đọc lần đầu"])
@@ -39,6 +40,7 @@ flowchart LR
     reader --> length
     reader --> read
     reader --> listen
+    reader --> keepon
     reader --> pick
     reader --> look
     reader --> resume

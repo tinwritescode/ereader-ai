@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/theme.dart';
 import '../../books/domain/entities/chapter.dart';
 import '../../books/presentation/formatting.dart';
+import '../domain/listen_source.dart';
 import '../domain/speech.dart';
 import 'listen_bloc.dart';
 
@@ -26,9 +27,15 @@ String _rateLabel(double rate) =>
 
 /// Everything about listening, in the ink panel that replaces the reader's footer.
 class ListenPanel extends StatelessWidget {
-  const ListenPanel({super.key, required this.blocks, required this.minutes});
+  const ListenPanel({
+    super.key,
+    required this.blocks,
+    required this.source,
+    required this.minutes,
+  });
 
   final List<TextBlock> blocks;
+  final ListenSource source;
 
   /// Reading time of the version being listened to, at normal speed.
   final int minutes;
@@ -69,7 +76,7 @@ class ListenPanel extends StatelessWidget {
           ListenFailed(:final code) => _Message(
             text: _failure(code),
             action: 'Thử lại',
-            onAction: () => bloc.add(ListenRequested(blocks)),
+            onAction: () => bloc.add(ListenRequested(blocks, source: source)),
             dismiss: 'Đóng',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),

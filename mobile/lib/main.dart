@@ -12,12 +12,14 @@ import 'features/books/domain/repositories/reading_look_store.dart';
 import 'features/books/domain/repositories/reading_spot_store.dart';
 import 'features/books/presentation/bloc/library_bloc.dart';
 import 'features/books/presentation/length_memory.dart';
+import 'features/books/presentation/listen_spots.dart';
 import 'features/books/presentation/pages/library_page.dart';
 import 'features/books/presentation/reading_look_cubit.dart';
 import 'features/books/presentation/reading_spots_cubit.dart';
 import 'features/listen/data/kokoro_speech.dart';
 import 'features/listen/data/vbee_voices.dart';
 import 'features/listen/domain/speech.dart';
+import 'features/listen/presentation/listen_bloc.dart';
 
 const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -72,12 +74,16 @@ class EReaderApp extends StatelessWidget {
           ),
           BlocProvider(create: (_) => ReadingLookCubit(looks)..load()),
           BlocProvider(create: (_) => ReadingSpotsCubit(spots)..load()),
+          // Lives above the pages: the voice goes on when a book is closed.
+          BlocProvider(create: (_) => ListenBloc(speech)),
         ],
-        child: MaterialApp(
-          title: 'eReader AI',
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(),
-          home: const LibraryPage(),
+        child: ListenSpots(
+          child: MaterialApp(
+            title: 'eReader AI',
+            debugShowCheckedModeBanner: false,
+            theme: buildTheme(),
+            home: const LibraryPage(),
+          ),
         ),
       ),
     );

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../books/domain/entities/chapter.dart';
+import '../domain/listen_source.dart';
 import '../domain/speech.dart';
 import '../domain/speech_plan.dart';
 
@@ -59,6 +60,7 @@ class ListenState {
     this.voice = DeviceVoice.diemTrinh,
     this.rate = 1,
     this.done = 0,
+    this.source,
   });
 
   final ListenStage stage;
@@ -68,16 +70,24 @@ class ListenState {
   /// Share of the chapter's sentences already read, from 0 to 1.
   final double done;
 
+  /// What was last asked for. See [heard] for what is being read now.
+  final ListenSource? source;
+
+  /// What the voice is on, whichever page is showing; null when it is off.
+  ListenSource? get heard => stage is ListenOff ? null : source;
+
   ListenState copyWith({
     ListenStage? stage,
     Voice? voice,
     double? rate,
     double? done,
+    ListenSource? source,
   }) => ListenState(
     stage: stage ?? this.stage,
     voice: voice ?? this.voice,
     rate: rate ?? this.rate,
     done: done ?? this.done,
+    source: source ?? this.source,
   );
 }
 
@@ -86,9 +96,15 @@ sealed class ListenEvent {
 }
 
 final class ListenRequested extends ListenEvent {
-  const ListenRequested(this.blocks, {this.block = 0, this.offset = 0});
+  const ListenRequested(
+    this.blocks, {
+    required this.source,
+    this.block = 0,
+    this.offset = 0,
+  });
 
   final List<TextBlock> blocks;
+  final ListenSource source;
 
   /// Where to start: a block, and a character inside it.
   final int block;
@@ -150,7 +166,9 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     on<ListenStopped>(_onStopped);
     on<_SentenceReached>(_onSentenceReached);
     on<_RunFailed>(_onRunFailed);
-    on<_RunEnded>((_, emit) => emit(state.copyWith(stage: const ListenOff())));
+    on<_RunEnded>(
+      (_, emit) => emit(state.copyWith(stage: const ListenOff(), done: 1)),
+    );
   }
 
   final Speech _speech;
@@ -176,6 +194,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     }
     if (_plan.isEmpty) return;
     _from = sentenceAt(_plan, event.block, event.offset);
+    emit(state.copyWith(source: event.source));
     if (state.stage is ListenDownloading) return;
     if (state.voice is CloudVoice || await _speech.modelReady()) {
       _generation++;
@@ -216,7 +235,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
 
   Future<void> _run(int generation, int from) async {
     try {
-      // The player outlives this bloc, so it may hold the last chapter's rate.
+      // The player may still hold the rate from before this run.
       await _speech.setRate(state.rate);
       for (var index = from; index < _plan.length; index++) {
         final samples = _synthesized(index);

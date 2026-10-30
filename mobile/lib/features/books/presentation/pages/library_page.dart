@@ -2,14 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../listen/presentation/listen_bloc.dart';
+import '../../../listen/presentation/mini_player.dart';
 import '../../domain/entities/book.dart';
+import '../../domain/entities/reading_spot.dart';
 import '../bloc/library_bloc.dart';
 import '../formatting.dart';
 import '../reading_spots_cubit.dart';
 import '../widgets.dart';
 import 'book_page.dart';
 
-const _pagePadding = EdgeInsets.only(left: marginWidth + 12, right: 18);
+const _pagePadding = EdgeInsets.only(
+  left: marginWidth + 12,
+  right: 18,
+  bottom: lineHeight,
+);
+const _shelfGap = 14.0;
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -31,6 +39,9 @@ class _LibraryPageState extends State<LibraryPage> {
   Widget build(BuildContext context) {
     final state = context.watch<LibraryBloc>().state;
     final upload = state.upload;
+    final listening = context.watch<ListenBloc>().state.heard != null;
+    final spots = context.watch<ReadingSpotsCubit>().state;
+    final latest = listening ? null : _latest(state.books, spots);
     final empty =
         !state.loading &&
         state.loadError == null &&
@@ -61,8 +72,9 @@ class _LibraryPageState extends State<LibraryPage> {
                           color: Palette.ink,
                         ),
                       ),
+                      if (latest case (final book, final spot))
+                        _ContinueCard(book: book, spot: spot),
                       if (upload is! NoUpload) _UploadEntry(upload: upload),
-                      for (final book in state.books) _BookEntry(book: book),
                       if (state.loading && state.books.isEmpty)
                         const Padding(
                           padding: EdgeInsets.all(32),
@@ -76,20 +88,23 @@ class _LibraryPageState extends State<LibraryPage> {
                         const _Note(
                           'Chưa có sách nào. Thêm một file EPUB để bắt đầu đọc.',
                         ),
+                      _Shelf(
+                        books: state.books,
+                        spots: spots,
+                        onAdd: upload is Uploading
+                            ? null
+                            : () => context.read<LibraryBloc>().add(
+                                const ImportRequested(),
+                              ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
-                child: PrimaryButton(
-                  label: 'Thêm sách EPUB',
-                  onPressed: upload is Uploading
-                      ? null
-                      : () => context.read<LibraryBloc>().add(
-                          const ImportRequested(),
-                        ),
-                ),
+              MiniPlayer(
+                onOpen: (heard) => Navigator.of(
+                  context,
+                ).push(BookPage.route(context, heard.book, resume: true)),
               ),
             ],
           ),
@@ -97,6 +112,15 @@ class _LibraryPageState extends State<LibraryPage> {
       ),
     );
   }
+}
+
+/// The book touched last that is still on the shelf, and where it stopped.
+(Book, ReadingSpot)? _latest(List<Book> books, Map<String, ReadingSpot> spots) {
+  for (final MapEntry(:key, :value) in spots.entries.toList().reversed) {
+    final book = books.where((book) => book.bookId == key).firstOrNull;
+    if (book != null) return (book, value);
+  }
+  return null;
 }
 
 class _Note extends StatelessWidget {
@@ -109,52 +133,221 @@ class _Note extends StatelessWidget {
       Text(text, style: readingStyle(size: 14.5, height: onGrid(14.5)));
 }
 
-class _BookEntry extends StatelessWidget {
-  const _BookEntry({required this.book});
+/// Brings the reader back with the very words they stopped on.
+class _ContinueCard extends StatelessWidget {
+  const _ContinueCard({required this.book, required this.spot});
 
   final Book book;
+  final ReadingSpot spot;
+
+  String get _lead {
+    if (spot.quote == null) return 'Tiếp theo trong sách';
+    return spot.listened
+        ? 'Bạn đã nghe đến đoạn này'
+        : 'Bạn đã đọc đến đoạn này';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final quote = spot.quote;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: lineHeight),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Palette.sheet,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Palette.ink, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(_lead, style: handStyle(size: 20)),
+            if (quote != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                quote.trim(),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: readingStyle(
+                  size: 15,
+                  height: 1.55,
+                ).copyWith(backgroundColor: Palette.marker),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              '${book.title}, ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: readingStyle(size: 12.5, color: Palette.muted),
+            ),
+            const SizedBox(height: 10),
+            PrimaryButton(
+              label: spot.listened ? 'Nghe tiếp' : 'Đọc tiếp',
+              onPressed: () => Navigator.of(context).push(
+                BookPage.route(
+                  context,
+                  book,
+                  resume: true,
+                  listen: spot.listened,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two books side by side, with a place for the next one at the end.
+class _Shelf extends StatelessWidget {
+  const _Shelf({required this.books, required this.spots, required this.onAdd});
+
+  final List<Book> books;
+  final Map<String, ReadingSpot> spots;
+  final VoidCallback? onAdd;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = (constraints.maxWidth - _shelfGap) / 2;
+      return Wrap(
+        spacing: _shelfGap,
+        runSpacing: lineHeight,
+        children: [
+          for (final book in books)
+            _ShelfBook(book: book, spot: spots[book.bookId], width: width),
+          _AddBook(width: width, onTap: onAdd),
+        ],
+      );
+    },
+  );
+}
+
+class _ShelfBook extends StatelessWidget {
+  const _ShelfBook({
+    required this.book,
+    required this.spot,
+    required this.width,
+  });
+
+  final Book book;
+  final ReadingSpot? spot;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     final author = book.author;
-    final spot = context.watch<ReadingSpotsCubit>().state[book.bookId];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: lineHeight),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          BookLabel(
-            fields: [
-              ('Sách', book.title),
-              if (author != null) ('Tác giả', author),
-            ],
-            onTap: () =>
-                Navigator.of(context).push(BookPage.route(context, book)),
-          ),
-          const SizedBox(height: 8),
-          if (spot == null)
-            _Note(
-              '${book.chapterCount} chương, khoảng ${durationLabel(book.minutes)} đọc',
-            )
-          else
-            InkWell(
-              onTap: () => Navigator.of(
-                context,
-              ).push(BookPage.route(context, book, resume: true)),
-              child: Text(
-                'Đọc tiếp ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}',
-                style: readingStyle(
-                  size: 14.5,
-                  height: onGrid(14.5),
-                  weight: FontWeight.w600,
-                  color: Palette.ink,
-                ),
+    final spot = this.spot;
+    return SizedBox(
+      width: width,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context).push(BookPage.route(context, book)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            BookCover(book: book, width: width - 4),
+            const SizedBox(height: 10),
+            Text(
+              book.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: readingStyle(
+                size: 14,
+                height: 1.4,
+                weight: FontWeight.w600,
+                color: Palette.ink,
               ),
             ),
-        ],
+            if (author != null)
+              Text(
+                author,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: readingStyle(size: 12.5, color: Palette.muted),
+              ),
+            if (spot != null)
+              Text(
+                '${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: handStyle(size: 17),
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _AddBook extends StatelessWidget {
+  const _AddBook({required this.width, required this.onTap});
+
+  final double width;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: width - 4,
+    height: (width - 4) * coverRatio,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: CustomPaint(
+        painter: _DashedOutline(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.add, color: Palette.ink),
+            const SizedBox(height: 4),
+            Text(
+              'Thêm sách EPUB',
+              textAlign: TextAlign.center,
+              style: readingStyle(
+                size: 13,
+                weight: FontWeight.w600,
+                color: Palette.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+class _DashedOutline extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const dash = 5.0;
+    final paint = Paint()
+      ..color = Palette.ink
+      ..strokeWidth = 1.5;
+    for (var x = 0.0; x < size.width; x += dash * 2) {
+      final end = Offset(x + dash, 0);
+      canvas.drawLine(Offset(x, 0), end, paint);
+      canvas.drawLine(
+        Offset(x, size.height),
+        end.translate(0, size.height),
+        paint,
+      );
+    }
+    for (var y = 0.0; y < size.height; y += dash * 2) {
+      final end = Offset(0, y + dash);
+      canvas.drawLine(Offset(0, y), end, paint);
+      canvas.drawLine(
+        Offset(size.width, y),
+        end.translate(size.width, 0),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedOutline oldDelegate) => false;
 }
 
 class _UploadEntry extends StatelessWidget {

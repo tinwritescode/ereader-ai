@@ -88,6 +88,32 @@ class BooksRepositoryImpl implements BooksRepository {
           _ => throw const BooksException('UNEXPECTED_RESPONSE'),
         };
       });
+
+  Book _toBook(Object? json) => switch (json) {
+    {
+      'bookId': final String bookId,
+      'title': final String title,
+      'author': final String? author,
+      'status': final String status,
+      'hasCover': final bool hasCover,
+      'chapterCount': final int chapterCount,
+      'minutes': final int minutes,
+    } =>
+      Book(
+        bookId: bookId,
+        title: title,
+        author: author,
+        status: status,
+        chapterCount: chapterCount,
+        minutes: minutes,
+        coverUrl: hasCover
+            ? Uri.parse(
+                '${_dio.options.baseUrl}/books/$bookId/cover',
+              ).replace(queryParameters: _scope).toString()
+            : null,
+      ),
+    _ => throw const BooksException('UNEXPECTED_RESPONSE'),
+  };
 }
 
 Future<T> _call<T>(Future<T> Function() request) async {
@@ -101,26 +127,6 @@ Future<T> _call<T>(Future<T> Function() request) async {
 List<Object?> _list(Object? json) => json is List<Object?>
     ? json
     : throw const BooksException('UNEXPECTED_RESPONSE');
-
-Book _toBook(Object? json) => switch (json) {
-  {
-    'bookId': final String bookId,
-    'title': final String title,
-    'author': final String? author,
-    'status': final String status,
-    'chapterCount': final int chapterCount,
-    'minutes': final int minutes,
-  } =>
-    Book(
-      bookId: bookId,
-      title: title,
-      author: author,
-      status: status,
-      chapterCount: chapterCount,
-      minutes: minutes,
-    ),
-  _ => throw const BooksException('UNEXPECTED_RESPONSE'),
-};
 
 ChapterSummary _toChapterSummary(Object? json) => switch (json) {
   {
