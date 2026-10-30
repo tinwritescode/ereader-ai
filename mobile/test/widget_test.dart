@@ -12,6 +12,7 @@ import 'package:ereader_mobile/app/theme.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_length.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_look.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_spot.dart';
+import 'package:ereader_mobile/features/listen/domain/speech.dart';
 
 import 'features/books/fake_books_repository.dart';
 import 'features/books/fake_reading_look_store.dart';
@@ -244,6 +245,36 @@ void main() {
       find.text('Giọng Đức An, chạy trên máy, không cần mạng'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a Vbee voice can be chosen from the player', (tester) async {
+    const vbee = CloudVoice(
+      'hn_female_ngochuyen_full_48k-fhg',
+      'HN - Ngọc Huyền',
+    );
+    final speech = FakeSpeech(cloud: [vbee]);
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+    await showTools(tester);
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Trên máy'), findsOneWidget);
+    expect(find.text('Vbee, cần mạng'), findsOneWidget);
+    await tester.ensureVisible(find.text('HN - Ngọc Huyền'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('HN - Ngọc Huyền'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Giọng HN - Ngọc Huyền của Vbee, cần mạng'),
+      findsOneWidget,
+    );
+    expect(speech.synthesized.last.$2, vbee);
   });
 
   testWidgets('listening from the length sheet starts by itself', (

@@ -6,9 +6,16 @@ import { DigestController } from './modules/ai-reading/presentation/digest.contr
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
 import { LLM_GATEWAY } from './shared/llm/llm-gateway';
 import { OpenAiCompatibleLlmGateway } from './shared/llm/openai-compatible.llm-gateway';
+import { SpeechModule } from './modules/speech/speech.module';
+import { VbeeTtsGateway, vbeeOptionsFromEnv } from './modules/speech/infrastructure/vbee.tts-gateway';
+
+const vbee = vbeeOptionsFromEnv(process.env);
 
 @Module({
-  imports: [BooksModule.register(booksOptionsFromEnv(process.env))],
+  imports: [
+    BooksModule.register(booksOptionsFromEnv(process.env)),
+    SpeechModule.register(vbee ? new VbeeTtsGateway(vbee) : null),
+  ],
   controllers: [DigestController],
   providers: [
     DigestService,

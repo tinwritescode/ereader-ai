@@ -1,7 +1,12 @@
 import 'dart:typed_data';
 
+/// A voice to read with: one on the device, or one from Vbee over the network.
+sealed class Voice {
+  String get label;
+}
+
 /// Voices shipped with the app, as `assets/speech/voices/<id>.bin`.
-enum Voice {
+enum DeviceVoice implements Voice {
   diemTrinh('diem_trinh', 'Diễm Trinh'),
   maiLinh('mai_linh', 'Mai Linh'),
   maiLoan('mai_loan', 'Mai Loan'),
@@ -17,10 +22,26 @@ enum Voice {
   tuanNgoc('tuan_ngoc', 'Tuấn Ngọc'),
   storyvert('storyvert', 'Storyvert');
 
-  const Voice(this.id, this.label);
+  const DeviceVoice(this.id, this.label);
 
   final String id;
+  @override
   final String label;
+}
+
+/// A Vbee voice, rendered on Vbee's servers through the backend.
+final class CloudVoice implements Voice {
+  const CloudVoice(this.code, this.label);
+
+  final String code;
+  @override
+  final String label;
+
+  @override
+  bool operator ==(Object other) => other is CloudVoice && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
 }
 
 class SpeechException implements Exception {
@@ -32,8 +53,9 @@ class SpeechException implements Exception {
   String toString() => 'SpeechException($code)';
 }
 
-/// Reads text aloud on the device. Throws [SpeechException].
+/// Reads text aloud. Throws [SpeechException].
 abstract interface class Speech {
+  /// Whether the device voices can read. Cloud voices never need the model.
   Future<bool> modelReady();
 
   /// Resumes a partial download. [onProgress] goes from 0 to 1.
@@ -42,6 +64,9 @@ abstract interface class Speech {
   });
 
   void cancelDownload();
+
+  /// The Vbee voices on offer; empty when the backend has none or is unreachable.
+  Future<List<CloudVoice>> cloudVoices();
 
   Future<Float32List> synthesize(String text, Voice voice);
 

@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
+import 'package:ereader_mobile/features/listen/data/vbee_voices.dart';
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -10,7 +12,8 @@ void main() {
   testWidgets('downloads the voice, speaks Vietnamese, and plays it', (
     tester,
   ) async {
-    final speech = KokoroSpeech();
+    // Device voices only: no backend is needed.
+    final speech = KokoroSpeech(vbee: VbeeVoices(Dio()));
     if (!await speech.modelReady()) {
       var last = 0.0;
       await speech.downloadModel(onProgress: (progress) => last = progress);
@@ -20,7 +23,7 @@ void main() {
 
     final samples = await speech.synthesize(
       'Năm 2024, ông ấy mua 1.500 cổ phiếu của OpenAI.',
-      Voice.diemTrinh,
+      DeviceVoice.diemTrinh,
     );
     // ignore: avoid_print
     print('SAMPLES:${samples.length}');

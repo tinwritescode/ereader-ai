@@ -16,6 +16,7 @@ import 'features/books/presentation/pages/library_page.dart';
 import 'features/books/presentation/reading_look_cubit.dart';
 import 'features/books/presentation/reading_spots_cubit.dart';
 import 'features/listen/data/kokoro_speech.dart';
+import 'features/listen/data/vbee_voices.dart';
 import 'features/listen/domain/speech.dart';
 
 const _apiBaseUrl = String.fromEnvironment(
@@ -26,13 +27,11 @@ const _apiBaseUrl = String.fromEnvironment(
 const _userId = String.fromEnvironment('USER_ID', defaultValue: 'demo-user');
 
 void main() {
+  final api = Dio(BaseOptions(baseUrl: _apiBaseUrl));
   runApp(
     EReaderApp(
-      repository: BooksRepositoryImpl(
-        Dio(BaseOptions(baseUrl: _apiBaseUrl)),
-        userId: _userId,
-      ),
-      speech: KokoroSpeech(),
+      repository: BooksRepositoryImpl(api, userId: _userId),
+      speech: KokoroSpeech(vbee: VbeeVoices(api)),
       looks: PrefsReadingLookStore(),
       spots: PrefsReadingSpotStore(),
       pickEpub: pickEpubFromDevice,

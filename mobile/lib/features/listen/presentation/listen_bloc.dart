@@ -56,7 +56,7 @@ final class ListenFailed extends ListenStage {
 class ListenState {
   const ListenState({
     this.stage = const ListenOff(),
-    this.voice = Voice.diemTrinh,
+    this.voice = DeviceVoice.diemTrinh,
     this.rate = 1,
     this.done = 0,
   });
@@ -177,7 +177,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     if (_plan.isEmpty) return;
     _from = sentenceAt(_plan, event.block, event.offset);
     if (state.stage is ListenDownloading) return;
-    if (await _speech.modelReady()) {
+    if (state.voice is CloudVoice || await _speech.modelReady()) {
       _generation++;
       await _speech.stop();
       _start(_from, emit);

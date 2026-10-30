@@ -17,6 +17,7 @@ flowchart LR
     reader(["Người đọc"])
     llm(["Dịch vụ LLM"])
     hf(["Hugging Face"])
+    vbee(["Vbee"])
 
     subgraph app["eReader AI"]
         import(["Nhập sách EPUB"])
@@ -30,6 +31,7 @@ flowchart LR
         resume(["Đọc tiếp chỗ lần trước"])
         download(["Tải giọng đọc lần đầu"])
         tune(["Đổi giọng và tốc độ"])
+        cloud(["Nghe bằng giọng Vbee"])
     end
 
     reader --> import
@@ -41,11 +43,13 @@ flowchart LR
     reader --> look
     reader --> resume
     reader --> tune
+    reader --> cloud
 
     read -. "gồm" .-> shorten
     listen -. "gồm, lần đầu" .-> download
     shorten --> llm
     download --> hf
+    cloud --> vbee
 ```
 
 ## Dữ liệu chạy ở đâu
@@ -61,6 +65,7 @@ flowchart LR
     subgraph server["Backend NestJS trên Railway"]
         api["API sách và chương"]
         digest["Rút gọn và cache"]
+        speech["Proxy giọng Vbee"]
         memory[("Bộ nhớ tạm")]
         api --> memory
         digest --> memory
@@ -68,14 +73,17 @@ flowchart LR
 
     llm["Dịch vụ LLM"]
     hf["Hugging Face"]
+    vbee["Vbee batch TTS"]
 
     ui -- "EPUB, yêu cầu chương" --> api
     ui -- "yêu cầu rút gọn" --> digest
     digest --> llm
     hf -- "model 326 MB, tải một lần" --> tts
+    ui -- "từng câu một" --> speech
+    speech -- "token chỉ nằm trên server" --> vbee
 ```
 
-Chỉ giọng đọc là offline. Nội dung chương vẫn lấy từ server, nên không có mạng thì không mở được chương.
+Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chương vẫn lấy từ server, nên không có mạng thì không mở được chương.
 
 ## Hiện có và dự kiến
 
@@ -87,6 +95,7 @@ Chỉ giọng đọc là offline. Nội dung chương vẫn lấy từ server, n
 | Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
+| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu, tạo trước vài câu | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
@@ -104,7 +113,7 @@ Cần Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # điền LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+cp .env.example .env   # điền LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN và VBEE_APP_ID không bắt buộc
 npm ci
 npm run start:dev
 ```
@@ -152,7 +161,7 @@ Integration test ghi đè app đã cài trên simulator, nên phải build lại
 
 ## Deploy
 
-Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` trong biến môi trường của Railway, không đưa vào repo.
+Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, trong biến môi trường của Railway, không đưa vào repo.
 
 Bản iPhone trỏ vào backend đã deploy:
 

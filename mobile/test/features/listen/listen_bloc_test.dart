@@ -112,11 +112,27 @@ void main() {
     final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
     await settle();
 
-    bloc.add(const ListenVoiceChosen(Voice.ducAn));
+    bloc.add(const ListenVoiceChosen(DeviceVoice.ducAn));
     await settle();
 
     expect(playingText(bloc), 'Một.');
-    expect(speech.synthesized, contains(('Một.', Voice.ducAn)));
+    expect(speech.synthesized, contains(('Một.', DeviceVoice.ducAn)));
+    await bloc.close();
+  });
+
+  test('a Vbee voice reads without the device model', () async {
+    const vbee = CloudVoice(
+      'hn_female_ngochuyen_full_48k-fhg',
+      'HN - Ngọc Huyền',
+    );
+    final speech = FakeSpeech(ready: false);
+    final bloc = ListenBloc(speech)
+      ..add(const ListenVoiceChosen(vbee))
+      ..add(const ListenRequested(blocks));
+    await settle();
+
+    expect(playingText(bloc), 'Một.');
+    expect(speech.synthesized.first, ('Một.', vbee));
     await bloc.close();
   });
 

@@ -5,11 +5,17 @@ import 'package:ereader_mobile/features/listen/domain/speech.dart';
 
 /// Records what was spoken. Each [play] waits for [finishSentence].
 class FakeSpeech implements Speech {
-  FakeSpeech({this.ready = true, this.downloadError, this.synthesisError});
+  FakeSpeech({
+    this.ready = true,
+    this.downloadError,
+    this.synthesisError,
+    this.cloud = const [],
+  });
 
   bool ready;
   final SpeechException? downloadError;
   final SpeechException? synthesisError;
+  final List<CloudVoice> cloud;
   final synthesized = <(String, Voice)>[];
   final played = <int>[];
   final rates = <double>[];
@@ -34,6 +40,9 @@ class FakeSpeech implements Speech {
 
   @override
   void cancelDownload() {}
+
+  @override
+  Future<List<CloudVoice>> cloudVoices() async => cloud;
 
   @override
   Future<Float32List> synthesize(String text, Voice voice) async {

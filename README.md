@@ -17,6 +17,7 @@ flowchart LR
     reader(["Reader"])
     llm(["LLM service"])
     hf(["Hugging Face"])
+    vbee(["Vbee"])
 
     subgraph app["eReader AI"]
         import(["Import an EPUB"])
@@ -30,6 +31,7 @@ flowchart LR
         resume(["Continue where reading stopped"])
         download(["Download the voice once"])
         tune(["Change voice and speed"])
+        cloud(["Listen with a Vbee voice"])
     end
 
     reader --> import
@@ -41,11 +43,13 @@ flowchart LR
     reader --> look
     reader --> resume
     reader --> tune
+    reader --> cloud
 
     read -. "includes" .-> shorten
     listen -. "includes, first time" .-> download
     shorten --> llm
     download --> hf
+    cloud --> vbee
 ```
 
 ## Where things run
@@ -61,6 +65,7 @@ flowchart LR
     subgraph server["NestJS backend on Railway"]
         api["Books and chapters API"]
         digest["Shortening and cache"]
+        speech["Vbee speech proxy"]
         memory[("In-memory storage")]
         api --> memory
         digest --> memory
@@ -68,14 +73,17 @@ flowchart LR
 
     llm["LLM service"]
     hf["Hugging Face"]
+    vbee["Vbee batch TTS"]
 
     ui -- "EPUB, chapter requests" --> api
     ui -- "shorten requests" --> digest
     digest --> llm
     hf -- "326 MB model, downloaded once" --> tts
+    ui -- "one sentence at a time" --> speech
+    speech -- "token stays on the server" --> vbee
 ```
 
-Only the voice is offline. Chapter text still comes from the server, so a chapter can't be opened without a connection.
+Only the device voices are offline; Vbee voices need a connection. Chapter text still comes from the server, so a chapter can't be opened without a connection.
 
 ## Today and planned
 
@@ -87,6 +95,7 @@ Only the voice is offline. Chapter text still comes from the server, so a chapte
 | Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
+| Vbee voices | Batch API, 2 to 10 seconds per sentence, read ahead | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
 | Platforms | iOS 16 and later | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.
@@ -104,7 +113,7 @@ Requires Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # fill in LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+cp .env.example .env   # fill in LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN and VBEE_APP_ID are optional
 npm ci
 npm run start:dev
 ```
@@ -152,7 +161,7 @@ Integration tests replace the app installed on the simulator, so rebuild the rea
 
 ## Deploy
 
-The backend runs on Railway from `backend/Dockerfile`. Set `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in Railway's environment variables, never in the repo.
+The backend runs on Railway from `backend/Dockerfile`. Set `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN` and `VBEE_APP_ID` in Railway's environment variables, never in the repo.
 
 To build for an iPhone against the deployed backend:
 

@@ -16,6 +16,7 @@ import '../domain/phonemizer.dart';
 import '../domain/speech.dart';
 import '../domain/spoken_numbers.dart';
 import '../domain/wav.dart';
+import 'vbee_voices.dart';
 
 const _modelUrl =
     'https://huggingface.co/contextboxai/Kokoro-Vietnamese/resolve/main/kokoro_vi.onnx';
@@ -25,16 +26,20 @@ const _modelSha256 =
 const _speedNormal = 1.0;
 const _heldSilenceSeconds = 5;
 
-/// Kokoro Vietnamese through ONNX Runtime. Only [downloadModel] uses the network.
+/// Kokoro Vietnamese through ONNX Runtime, plus Vbee voices from [_vbee].
+/// Device voices use the network only in [downloadModel].
 class KokoroSpeech implements Speech {
-  KokoroSpeech({Dio? dio}) : _dio = dio ?? Dio();
+  KokoroSpeech({required VbeeVoices vbee, Dio? dio})
+    : _vbee = vbee,
+      _dio = dio ?? Dio();
 
+  final VbeeVoices _vbee;
   final Dio _dio;
   final _player = AudioPlayer();
   // iOS suspends a backgrounded app the moment its audio stops, which would
   // otherwise happen between two sentences. This loops silence under them.
   final _silence = AudioPlayer(handleInterruptions: false);
-  final _voicePacks = <Voice, Float32List>{};
+  final _voicePacks = <DeviceVoice, Float32List>{};
   CancelToken? _download;
   OrtSession? _session;
   Phonemizer? _phonemizer;
@@ -136,7 +141,7 @@ class KokoroSpeech implements Speech {
     return _vocab = parsed;
   }
 
-  Future<Float32List> _loadVoice(Voice voice) async {
+  Future<Float32List> _loadVoice(DeviceVoice voice) async {
     if (_voicePacks[voice] case final pack?) return pack;
     final data = await rootBundle.load('assets/speech/voices/${voice.id}.bin');
     // Asset bytes may be unaligned for float32, so copy before viewing.
@@ -147,7 +152,18 @@ class KokoroSpeech implements Speech {
   }
 
   @override
-  Future<Float32List> synthesize(String text, Voice voice) async {
+  Future<List<CloudVoice>> cloudVoices() => _vbee.list();
+
+  @override
+  Future<Float32List> synthesize(String text, Voice voice) => switch (voice) {
+    DeviceVoice() => _synthesizeOnDevice(text, voice),
+    CloudVoice() => _vbee.speak(text, voice),
+  };
+
+  Future<Float32List> _synthesizeOnDevice(
+    String text,
+    DeviceVoice voice,
+  ) async {
     final phonemizer = await _loadPhonemizer();
     final vocab = await _loadVocab();
     final pack = await _loadVoice(voice);

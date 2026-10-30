@@ -11,7 +11,14 @@ String _failure(String code) => switch (code) {
   'VOICE_DOWNLOAD_FAILED' =>
     'Chưa tải được giọng đọc. Kiểm tra mạng rồi thử lại.',
   'VOICE_DOWNLOAD_CORRUPT' => 'File giọng đọc bị lỗi. Hãy tải lại.',
+  'CLOUD_VOICE_FAILED' =>
+    'Chưa gọi được giọng Vbee. Kiểm tra mạng, hoặc chọn giọng trên máy.',
   _ => 'Chưa đọc được đoạn này.',
+};
+
+String _voiceLine(Voice voice) => switch (voice) {
+  DeviceVoice(:final label) => 'Giọng $label, chạy trên máy, không cần mạng',
+  CloudVoice(:final label) => 'Giọng $label của Vbee, cần mạng',
 };
 
 String _rateLabel(double rate) =>
@@ -265,10 +272,7 @@ class _Player extends StatelessWidget {
                 onTap: () => _chooseVoice(context),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'Giọng ${state.voice.label}, chạy trên máy, không cần mạng',
-                    style: _quiet,
-                  ),
+                  child: Text(_voiceLine(state.voice), style: _quiet),
                 ),
               ),
             ),
@@ -284,32 +288,66 @@ class _Player extends StatelessWidget {
 
   Future<void> _chooseVoice(BuildContext context) async {
     final bloc = context.read<ListenBloc>();
+    final cloud = context.read<Speech>().cloudVoices();
     final voice = await showModalBottomSheet<Voice>(
       context: context,
       isScrollControlled: true,
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final voice in Voice.values)
-                ListTile(
-                  title: Text(
-                    voice.label,
-                    style: readingStyle(
-                      size: 16,
-                      color: voice == bloc.state.voice
-                          ? Palette.red
-                          : Palette.text,
-                    ),
-                  ),
-                  onTap: () => Navigator.of(context).pop(voice),
-                ),
-            ],
+          child: FutureBuilder<List<CloudVoice>>(
+            future: cloud,
+            builder: (context, snapshot) {
+              final cloudVoices = snapshot.data ?? const <CloudVoice>[];
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const _VoiceHeading('Trên máy'),
+                  for (final voice in DeviceVoice.values)
+                    _VoiceTile(voice: voice, chosen: bloc.state.voice),
+                  if (cloudVoices.isNotEmpty) ...[
+                    const _VoiceHeading('Vbee, cần mạng'),
+                    for (final voice in cloudVoices)
+                      _VoiceTile(voice: voice, chosen: bloc.state.voice),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),
     );
     if (voice != null) bloc.add(ListenVoiceChosen(voice));
   }
+}
+
+class _VoiceHeading extends StatelessWidget {
+  const _VoiceHeading(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    child: Text(text, style: readingStyle(size: 13, color: Palette.muted)),
+  );
+}
+
+class _VoiceTile extends StatelessWidget {
+  const _VoiceTile({required this.voice, required this.chosen});
+
+  final Voice voice;
+  final Voice chosen;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    title: Text(
+      voice.label,
+      style: readingStyle(
+        size: 16,
+        color: voice == chosen ? Palette.red : Palette.text,
+      ),
+    ),
+    onTap: () => Navigator.of(context).pop(voice),
+  );
 }
