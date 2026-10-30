@@ -46,6 +46,8 @@ abstract interface class Speech {
   Future<Float32List> synthesize(String text, Voice voice);
 
   /// Completes when the samples finish playing or [stop] is called.
+  /// Audio stays held between calls until [pause] or [stop], so a locked phone
+  /// does not suspend the app while the next sentence is being prepared.
   Future<void> play(Float32List samples);
   Future<void> pause();
   Future<void> resume();

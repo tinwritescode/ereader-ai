@@ -23,6 +23,7 @@ const _modelBytes = 325731953;
 const _modelSha256 =
     'da191277f58633649a9c0d2ae8012e80ef57ea8e2a56e30323c0f7df1ca29087';
 const _speedNormal = 1.0;
+const _heldSilenceSeconds = 5;
 
 /// Kokoro Vietnamese through ONNX Runtime. Only [downloadModel] uses the network.
 class KokoroSpeech implements Speech {
@@ -30,6 +31,9 @@ class KokoroSpeech implements Speech {
 
   final Dio _dio;
   final _player = AudioPlayer();
+  // iOS suspends a backgrounded app the moment its audio stops, which would
+  // otherwise happen between two sentences. This loops silence under them.
+  final _silence = AudioPlayer(handleInterruptions: false);
   final _voicePacks = <Voice, Float32List>{};
   CancelToken? _download;
   OrtSession? _session;
@@ -184,6 +188,7 @@ class KokoroSpeech implements Speech {
   @override
   Future<void> play(Float32List samples) async {
     await _configureSession();
+    await _holdAudio();
     final directory = await getTemporaryDirectory();
     // Two names in turn: the player may still hold the previous file open.
     final file = File('${directory.path}/speech-${_clip++ % 2}.wav');
@@ -191,7 +196,10 @@ class KokoroSpeech implements Speech {
     final clip = _clip;
     await _player.setFilePath(file.path);
     // Stopped while the file was loading.
-    if (clip != _clip) return;
+    if (clip != _clip) {
+      await _silence.pause();
+      return;
+    }
     final playing = _playing = Completer<void>();
     // Subscribed after loading: the stream replays the last clip's `completed`.
     final finished = _player.processingStateStream.listen((state) {
@@ -202,6 +210,18 @@ class KokoroSpeech implements Speech {
     unawaited(_player.play());
     await playing.future;
     await finished.cancel();
+  }
+
+  Future<void> _holdAudio() async {
+    if (_silence.audioSource == null) {
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/silence.wav');
+      final samples = Float32List(speechSampleRate * _heldSilenceSeconds);
+      await file.writeAsBytes(pcm16Wav(samples), flush: true);
+      await _silence.setFilePath(file.path);
+      await _silence.setLoopMode(LoopMode.one);
+    }
+    if (!_silence.playing) unawaited(_silence.play());
   }
 
   bool _sessionConfigured = false;
@@ -215,15 +235,22 @@ class KokoroSpeech implements Speech {
   }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    await _player.pause();
+    await _silence.pause();
+  }
 
   @override
-  Future<void> resume() async => unawaited(_player.play());
+  Future<void> resume() async {
+    await _holdAudio();
+    unawaited(_player.play());
+  }
 
   @override
   Future<void> stop() async {
     _clip++;
     await _player.stop();
+    await _silence.pause();
     final playing = _playing;
     if (playing != null && !playing.isCompleted) playing.complete();
   }

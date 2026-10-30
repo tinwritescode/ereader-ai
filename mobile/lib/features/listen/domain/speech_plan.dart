@@ -29,6 +29,18 @@ List<SpokenSentence> planSpeech(List<TextBlock> blocks) => [
       ..._withinLimit(index, block.text, match.start, match.end),
 ];
 
+/// Position in [plan] of the sentence holding character [offset] of [block].
+int sentenceAt(List<SpokenSentence> plan, int block, int offset) {
+  final inBlock = plan.indexed.where((entry) => entry.$2.block == block);
+  if (inBlock.isEmpty) return 0;
+  return inBlock
+      .lastWhere(
+        (entry) => entry.$2.start <= offset,
+        orElse: () => inBlock.first,
+      )
+      .$1;
+}
+
 Iterable<SpokenSentence> _withinLimit(
   int block,
   String text,

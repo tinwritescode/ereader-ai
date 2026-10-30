@@ -33,6 +33,8 @@ void main() {
 
     expect(bloc.state.stage, isA<ListenOff>());
     expect(speech.played, [1, 2, 3, 4, 5]);
+    // Stopping releases what keeps the app running behind a locked screen.
+    expect(speech.stops, greaterThan(0));
     await bloc.close();
   });
 
@@ -136,5 +138,53 @@ void main() {
     await bloc.close();
 
     expect(speech.stops, greaterThan(0));
+  });
+
+  test('a failed sentence releases the player too', () async {
+    final speech = FakeSpeech(
+      synthesisError: const SpeechException('VOICE_FAILED'),
+    );
+    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    await settle();
+
+    expect(bloc.state.stage, isA<ListenFailed>());
+    expect(speech.stops, greaterThan(0));
+    await bloc.close();
+  });
+
+  test('starts from the chosen sentence', () async {
+    final speech = FakeSpeech();
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, block: 0, offset: 11));
+    await settle();
+
+    expect(playingText(bloc), 'Ba.');
+    await bloc.close();
+  });
+
+  test('choosing a sentence while reading jumps there', () async {
+    final speech = FakeSpeech();
+    final bloc = ListenBloc(speech)..add(const ListenRequested(blocks));
+    await settle();
+
+    bloc.add(const ListenRequested(blocks, block: 1));
+    await settle();
+
+    expect(playingText(bloc), 'Năm.');
+    expect(speech.stops, greaterThan(0));
+    await bloc.close();
+  });
+
+  test('the chosen sentence survives the first download', () async {
+    final speech = FakeSpeech(ready: false);
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, block: 1));
+    await settle();
+
+    bloc.add(const ListenDownloadConfirmed());
+    await settle();
+
+    expect(playingText(bloc), 'Năm.');
+    await bloc.close();
   });
 }

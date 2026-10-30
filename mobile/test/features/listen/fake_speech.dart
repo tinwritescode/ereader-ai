@@ -5,10 +5,11 @@ import 'package:ereader_mobile/features/listen/domain/speech.dart';
 
 /// Records what was spoken. Each [play] waits for [finishSentence].
 class FakeSpeech implements Speech {
-  FakeSpeech({this.ready = true, this.downloadError});
+  FakeSpeech({this.ready = true, this.downloadError, this.synthesisError});
 
   bool ready;
   final SpeechException? downloadError;
+  final SpeechException? synthesisError;
   final synthesized = <(String, Voice)>[];
   final played = <int>[];
   final rates = <double>[];
@@ -36,6 +37,8 @@ class FakeSpeech implements Speech {
 
   @override
   Future<Float32List> synthesize(String text, Voice voice) async {
+    final error = synthesisError;
+    if (error != null) throw error;
     synthesized.add((text, voice));
     return Float32List.fromList([synthesized.length.toDouble()]);
   }

@@ -24,7 +24,7 @@ void main() {
   });
 
   test('cuts a sentence too long for one model call at commas or spaces', () {
-    final long = List.generate(200, (i) => 'chữ$i').join(i2);
+    final long = List.generate(200, (i) => 'chữ$i').join(' ');
     final plan = planSpeech([TextBlock(paragraph, long)]);
 
     expect(plan.length, greaterThan(1));
@@ -42,6 +42,25 @@ void main() {
   test('skips blocks with nothing to say', () {
     expect(planSpeech([const TextBlock(paragraph, '  ')]), isEmpty);
   });
-}
 
-const i2 = ' ';
+  group('sentenceAt', () {
+    final plan = planSpeech(const [
+      TextBlock(TextBlockKind.paragraph, 'Một. Hai.'),
+      TextBlock(TextBlockKind.paragraph, 'Ba.'),
+    ]);
+
+    test('finds the sentence under a character', () {
+      expect(sentenceAt(plan, 0, 0), 0);
+      expect(sentenceAt(plan, 0, 6), 1);
+      expect(sentenceAt(plan, 1, 1), 2);
+    });
+
+    test('a gap before the first sentence belongs to that sentence', () {
+      expect(sentenceAt(plan, 1, 0), 2);
+    });
+
+    test('a block with nothing to read falls back to the start', () {
+      expect(sentenceAt(plan, 9, 0), 0);
+    });
+  });
+}

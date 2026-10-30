@@ -86,9 +86,13 @@ sealed class ListenEvent {
 }
 
 final class ListenRequested extends ListenEvent {
-  const ListenRequested(this.blocks);
+  const ListenRequested(this.blocks, {this.block = 0, this.offset = 0});
 
   final List<TextBlock> blocks;
+
+  /// Where to start: a block, and a character inside it.
+  final int block;
+  final int offset;
 }
 
 final class ListenDownloadConfirmed extends ListenEvent {
@@ -150,12 +154,14 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   }
 
   final Speech _speech;
+  List<TextBlock> _blocks = const [];
   List<SpokenSentence> _plan = const [];
   var _audio = <int, Future<Float32List>>{};
   Future<void> _modelQueue = Future.value();
   // Each run owns one generation; a newer one makes an older run stop by itself.
   int _generation = 0;
   int _current = 0;
+  int _from = 0;
   bool _paused = false;
   Completer<void>? _unpaused;
 
@@ -163,10 +169,18 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     ListenRequested event,
     Emitter<ListenState> emit,
   ) async {
-    _plan = planSpeech(event.blocks);
+    if (!identical(event.blocks, _blocks)) {
+      _blocks = event.blocks;
+      _plan = planSpeech(_blocks);
+      _audio = {};
+    }
     if (_plan.isEmpty) return;
+    _from = sentenceAt(_plan, event.block, event.offset);
+    if (state.stage is ListenDownloading) return;
     if (await _speech.modelReady()) {
-      _start(0, emit);
+      _generation++;
+      await _speech.stop();
+      _start(_from, emit);
     } else {
       emit(state.copyWith(stage: const ListenNeedsVoice()));
     }
@@ -189,7 +203,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       emit(state.copyWith(stage: ListenFailed(error.code)));
       return;
     }
-    if (await _speech.modelReady()) _start(0, emit);
+    if (await _speech.modelReady()) _start(_from, emit);
   }
 
   void _start(int index, Emitter<ListenState> emit) {
@@ -219,9 +233,12 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
         if (generation != _generation) return;
         _audio.remove(index);
       }
+      await _speech.stop();
       add(const _RunEnded());
     } on SpeechException catch (error) {
-      if (generation == _generation) add(_RunFailed(error.code));
+      if (generation != _generation) return;
+      await _speech.stop();
+      add(_RunFailed(error.code));
     }
   }
 

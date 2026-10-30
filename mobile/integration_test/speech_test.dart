@@ -33,5 +33,6 @@ void main() {
 
     await speech.play(samples.sublist(0, 12000));
     await speech.play(samples.sublist(0, 12000));
+    await speech.stop();
   });
 }
