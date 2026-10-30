@@ -9,17 +9,26 @@ import {
   Post,
   Res,
   ServiceUnavailableException,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
+import { AccountService } from '../../accounts/application/account.service';
+import { Account } from '../../accounts/domain/plan';
+import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
 import { SpeechService } from '../application/speech.service';
 import { TTS_GATEWAY, TtsError, TtsGateway } from '../application/tts-gateway';
 import { SpeechRequestSchema } from '../domain/cloud-voice';
 
+// About what a Vietnamese voice reads in a second; plans count minutes before the audio exists.
+const SPOKEN_CHARS_PER_SECOND = 15;
+
 @Controller('speech')
+@UseGuards(AuthGuard)
 export class SpeechController {
   constructor(
     @Optional() @Inject(TTS_GATEWAY) private readonly tts: TtsGateway | null,
     private readonly speech: SpeechService,
+    private readonly accounts: AccountService,
   ) {}
 
   @Get('voices')
@@ -28,7 +37,7 @@ export class SpeechController {
   }
 
   @Post()
-  async speak(@Body() body: unknown, @Res() response: Response) {
+  async speak(@Body() body: unknown, @CurrentAccount() account: Account, @Res() response: Response) {
     const tts = this.tts;
     if (!tts) throw new ServiceUnavailableException({ code: 'SPEECH_UNAVAILABLE' });
     const parsed = SpeechRequestSchema.safeParse(body);
@@ -38,7 +47,9 @@ export class SpeechController {
     if (!voices.some((voice) => voice.code === voiceCode)) {
       throw new BadRequestException({ code: 'VOICE_UNKNOWN' });
     }
-    const audio = await this.upstream(() => this.speech.speak(tts, text, voiceCode));
+    const seconds = Math.ceil(text.length / SPOKEN_CHARS_PER_SECOND);
+    const charge = this.accounts.charge(account, 'vbeeSeconds', seconds);
+    const audio = await this.upstream(() => this.speech.speak(tts, text, voiceCode, charge));
     response.status(200).type('audio/wav').send(audio);
   }
 

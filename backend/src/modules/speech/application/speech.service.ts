@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import { UsageCharge } from '../../../shared/usage-charge';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
 import { SPEECH_CLIP_INDEX, SpeechClip, SpeechClipIndex } from './speech-clip-index';
 import { TtsGateway } from './tts-gateway';
@@ -17,12 +18,16 @@ export class SpeechService {
     @Inject(SPEECH_CLIP_INDEX) private readonly index: SpeechClipIndex,
   ) {}
 
-  async speak(tts: TtsGateway, text: string, voiceCode: string): Promise<Buffer> {
+  async speak(tts: TtsGateway, text: string, voiceCode: string, charge: UsageCharge): Promise<Buffer> {
     const key = createHash('sha256').update(`${CLIP_FORMAT}\n${voiceCode}\n${text}`).digest('hex');
     const kept = await this.kept(key);
     if (kept) return kept;
 
-    const audio = await tts.speak(text, voiceCode);
+    await charge.take();
+    const audio = await tts.speak(text, voiceCode).catch(async (error: unknown) => {
+      await charge.giveBack();
+      throw error;
+    });
     await this.keep({ key, voiceCode, text, objectKey: `speech/${voiceCode}/${key}.wav`, bytes: audio.length }, audio);
     return audio;
   }

@@ -4,6 +4,9 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { InMemoryAccountStore } from '../accounts/application/account-store';
+import { usageMonth } from '../accounts/domain/plan';
+import { testAccounts } from '../accounts/testing/fake-identity';
 import { DigestService } from '../ai-reading/application/digest.service';
 import { DigestController } from '../ai-reading/presentation/digest.controller';
 import { LLM_GATEWAY, LlmError } from '../../shared/llm/llm-gateway';
@@ -16,12 +19,15 @@ describe('Reading an imported book', () => {
   let app: INestApplication;
   let storageDir: string;
   let llm: ScriptedLlmGateway;
+  let accounts: InMemoryAccountStore;
 
   beforeEach(async () => {
     llm = new ScriptedLlmGateway(() => ({ paragraphs: ['Ý chính thứ nhất.', 'Ý chính thứ hai.'] }));
     storageDir = await mkdtemp(join(tmpdir(), 'reading-e2e-'));
+    const fakes = testAccounts();
+    accounts = fakes.store;
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
+      imports: [fakes.module, BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
       controllers: [DigestController],
       providers: [DigestService, { provide: LLM_GATEWAY, useValue: llm }],
     }).compile();
@@ -37,18 +43,18 @@ describe('Reading an imported book', () => {
   const http = () => request(app.getHttpServer());
 
   const importBook = async (bytes: Buffer, userId = 'user-1') => {
-    const response = await http().post('/books').field('userId', userId).attach('file', bytes, 'book.epub').expect(202);
+    const response = await http().post('/books').set('Authorization', `Bearer ${userId}`).attach('file', bytes, 'book.epub').expect(202);
     return response.body.bookId as string;
   };
 
   const chaptersOf = async (bookId: string, userId = 'user-1') =>
-    (await http().get(`/books/${bookId}/chapters`).query({ userId }).expect(200)).body.chapters;
+    (await http().get(`/books/${bookId}/chapters`).set('Authorization', `Bearer ${userId}`).expect(200)).body.chapters;
 
   it('lists only the books of the asking user', async () => {
     const bookId = await importBook(await buildEpub());
     await importBook(await buildEpub({ title: 'Other' }), 'user-2');
 
-    const response = await http().get('/books').query({ userId: 'user-1' }).expect(200);
+    const response = await http().get('/books').set('Authorization', 'Bearer user-1').expect(200);
 
     expect(response.body).toEqual([
       expect.objectContaining({ bookId, title: 'Synthetic Book', status: 'READY', chapterCount: 3, minutes: 9 }),
@@ -68,8 +74,8 @@ describe('Reading an imported book', () => {
   it('returns the body of one chapter as blocks, without its title headings', async () => {
     const [first, second] = await chaptersOf(await importBook(await buildEpub()));
 
-    const one = (await http().get(`/chapters/${first.chapterId}`).query({ userId: 'user-1' }).expect(200)).body;
-    const two = (await http().get(`/chapters/${second.chapterId}`).query({ userId: 'user-1' }).expect(200)).body;
+    const one = (await http().get(`/chapters/${first.chapterId}`).set('Authorization', 'Bearer user-1').expect(200)).body;
+    const two = (await http().get(`/chapters/${second.chapterId}`).set('Authorization', 'Bearer user-1').expect(200)).body;
 
     expect(one.blocks.map((block: { kind: string }) => block.kind)).toEqual(['paragraph', 'paragraph']);
     expect(one.blocks[1].text).toMatch(/một & hết$/);
@@ -81,7 +87,7 @@ describe('Reading an imported book', () => {
   it('hides a chapter from another user', async () => {
     const [first] = await chaptersOf(await importBook(await buildEpub()));
 
-    await http().get(`/chapters/${first.chapterId}`).query({ userId: 'user-2' }).expect(404);
+    await http().get(`/chapters/${first.chapterId}`).set('Authorization', 'Bearer user-2').expect(404);
   });
 
   it('falls back to one chapter per spine file when the EPUB has no navigation document', async () => {
@@ -91,7 +97,7 @@ describe('Reading an imported book', () => {
   });
 
   const digest = (chapterId: string) =>
-    http().post(`/chapters/${chapterId}/digest`).query({ userId: 'user-1' }).send({ targetLang: 'vi', targetMinutes: 3 });
+    http().post(`/chapters/${chapterId}/digest`).set('Authorization', 'Bearer user-1').send({ targetLang: 'vi', targetMinutes: 3 });
 
   it('shortens a chapter with the LLM, keeping the paragraph breaks it returns', async () => {
     const longest = (await chaptersOf(await importBook(await buildEpub())))[2];
@@ -141,6 +147,24 @@ describe('Reading an imported book', () => {
 
     llm.answer = answer;
     await digest(longest.chapterId).expect(201);
+  });
+
+  it('stops at the shortened chapters of the plan, and counts neither failures nor cached ones', async () => {
+    const chapters = await chaptersOf(await importBook(await buildEpub()));
+    const longest = chapters.reduce((a: { wordCount: number }, b: { wordCount: number }) => (b.wordCount > a.wordCount ? b : a));
+    const month = usageMonth(new Date());
+    const used = async () => (await accounts.usage('user-1', month)).digests;
+
+    await digest(longest.chapterId).expect(201);
+    await digest(longest.chapterId).expect(201);
+    expect(await used()).toBe(1);
+
+    await accounts.spend({ accountId: 'user-1', month, meter: 'digests', amount: 9, limit: 10 });
+    const other = chapters.find((chapter: { chapterId: string }) => chapter.chapterId !== longest.chapterId);
+    await digest(other.chapterId)
+      .expect(429)
+      .expect(({ body }) => expect(body.code).toBe('DIGEST_LIMIT'));
+    expect(await used()).toBe(10);
   });
 
   const fixture = process.env.EPUB_FIXTURE;

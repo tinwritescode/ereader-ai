@@ -1,6 +1,13 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
+import { z } from 'zod';
 import { FormatAgentService } from './modules/processing/application/format-agent.service';
+import { AccountsModule } from './modules/accounts/accounts.module';
+import { InMemoryAccountStore } from './modules/accounts/application/account-store';
+import { PostgresAccountStore } from './modules/accounts/infrastructure/postgres.account-store';
+import { WorkosIdentityGateway, workosOptionsFromEnv } from './modules/accounts/infrastructure/workos.identity-gateway';
+import { InMemoryBookStore } from './modules/books/application/book-store';
+import { PostgresBookStore } from './modules/books/infrastructure/postgres.book-store';
 import { BooksModule, booksOptionsFromEnv } from './modules/books/books.module';
 import { DigestService } from './modules/ai-reading/application/digest.service';
 import { DigestController } from './modules/ai-reading/presentation/digest.controller';
@@ -15,17 +22,23 @@ import { storageFromEnv } from './shared/storage/storage-config';
 
 const storage = storageFromEnv(process.env);
 const vbee = vbeeOptionsFromEnv(process.env);
-const databaseUrl = process.env.DATABASE_URL;
+const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
 
 @Module({
   imports: [
-    BooksModule.register(booksOptionsFromEnv(process.env, storage)),
+    AccountsModule.register({
+      store: pool ? new PostgresAccountStore(pool) : new InMemoryAccountStore(),
+      identity: new WorkosIdentityGateway(workosOptionsFromEnv(process.env)),
+      superAdminEmail: z.string().email().parse(process.env.SUPER_ADMIN_EMAIL),
+    }),
+    BooksModule.register({
+      ...booksOptionsFromEnv(process.env, storage),
+      store: pool ? new PostgresBookStore(pool) : new InMemoryBookStore(),
+    }),
     SpeechModule.register({
       tts: vbee ? new VbeeTtsGateway(vbee) : null,
       storage,
-      index: databaseUrl
-        ? new PostgresSpeechClipIndex(new Pool({ connectionString: databaseUrl }))
-        : new InMemorySpeechClipIndex(),
+      index: pool ? new PostgresSpeechClipIndex(pool) : new InMemorySpeechClipIndex(),
     }),
   ],
   controllers: [DigestController],

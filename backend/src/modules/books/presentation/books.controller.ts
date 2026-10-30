@@ -1,38 +1,29 @@
 import {
   ArgumentsHost,
   BadRequestException,
-  Body,
   Catch,
   Controller,
   ExceptionFilter,
   Get,
+  HttpException,
   HttpStatus,
   Param,
   PayloadTooLargeException,
   Post,
-  Query,
   Res,
   UnsupportedMediaTypeException,
   UploadedFile,
   UseFilters,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { z } from 'zod';
-import { BookService, BookSummary } from '../application/book.service';
+import { Account, PLANS } from '../../accounts/domain/plan';
+import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
+import { BookSummary } from '../application/book-store';
+import { BookService } from '../application/book.service';
 import { BookImportRejection, ChapterRecord } from '../domain/book';
-
-const UserScopeSchema = z.object({ userId: z.string().min(1) });
-
-/** Until auth lands, the caller names its user in the form body or query string. */
-export function parseUserId(input: unknown): string {
-  const parsed = UserScopeSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new BadRequestException({ code: 'USER_ID_REQUIRED' });
-  }
-  return parsed.data.userId;
-}
 
 /** Multer enforces the size limit before the handler runs; give its error the stable code. */
 @Catch(PayloadTooLargeException)
@@ -45,9 +36,11 @@ class FileTooLargeFilter implements ExceptionFilter {
 const rejections = {
   UNSUPPORTED_TYPE: () => new UnsupportedMediaTypeException({ code: 'UNSUPPORTED_TYPE' }),
   EPUB_INVALID: () => new BadRequestException({ code: 'EPUB_INVALID' }),
+  BOOK_LIMIT: () => new HttpException({ code: 'BOOK_LIMIT' }, HttpStatus.TOO_MANY_REQUESTS),
 } satisfies Record<BookImportRejection, () => Error>;
 
 @Controller('books')
+@UseGuards(AuthGuard)
 export class BooksController {
   constructor(private readonly books: BookService) {}
 
@@ -56,26 +49,31 @@ export class BooksController {
   @UseInterceptors(FileInterceptor('file'))
   async import(
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Body() body: unknown,
+    @CurrentAccount() account: Account,
     @Res({ passthrough: true }) response: Response,
   ) {
     if (!file) {
       throw new BadRequestException({ code: 'FILE_REQUIRED' });
     }
+    const limits = PLANS[account.plan];
+    if (file.size > limits.maxFileBytes) {
+      throw new HttpException({ code: 'PLAN_FILE_TOO_LARGE' }, HttpStatus.PAYLOAD_TOO_LARGE);
+    }
     const result = await this.books.importEpub({
-      userId: parseUserId(body),
+      userId: account.id,
       fileName: file.originalname,
       bytes: file.buffer,
+      maxBooks: limits.books,
     });
     switch (result.kind) {
       case 'rejected':
         throw rejections[result.code]();
       case 'created':
         response.status(HttpStatus.ACCEPTED);
-        return toBookResponse(this.books.summarize(result.book));
+        return toBookResponse(await this.books.summarize(result.book));
       case 'existing':
         response.status(HttpStatus.OK);
-        return toBookResponse(this.books.summarize(result.book));
+        return toBookResponse(await this.books.summarize(result.book));
       default: {
         const _exhaustive: never = result;
         return _exhaustive;
@@ -84,34 +82,40 @@ export class BooksController {
   }
 
   @Get()
-  list(@Query() query: unknown) {
-    return this.books.list(parseUserId(query)).map(toBookResponse);
+  async list(@CurrentAccount() account: Account) {
+    return (await this.books.list(account.id)).map(toBookResponse);
   }
 
   @Get(':id/status')
-  status(@Param('id') id: string, @Query('userId') userId: string) {
-    return this.books.status(userId, id);
-  }
-
-  @Get(':id/cover')
-  async cover(@Param('id') id: string, @Query() query: unknown, @Res() response: Response) {
-    const { bytes, mediaType } = await this.books.cover(parseUserId(query), id);
-    response.type(mediaType).send(bytes);
+  status(@Param('id') id: string, @CurrentAccount() account: Account) {
+    return this.books.status(account.id, id);
   }
 
   @Get(':id/chapters')
-  chapters(@Param('id') id: string, @Query() query: unknown) {
-    return { bookId: id, chapters: this.books.chapters(parseUserId(query), id).map(toChapterSummary) };
+  async chapters(@Param('id') id: string, @CurrentAccount() account: Account) {
+    return { bookId: id, chapters: (await this.books.chapters(account.id, id)).map(toChapterSummary) };
+  }
+}
+
+@Controller('books')
+export class CoversController {
+  constructor(private readonly books: BookService) {}
+
+  @Get(':id/cover')
+  async cover(@Param('id') id: string, @Res() response: Response) {
+    const { bytes, mediaType } = await this.books.cover(id);
+    response.type(mediaType).send(bytes);
   }
 }
 
 @Controller('chapters')
+@UseGuards(AuthGuard)
 export class ChaptersController {
   constructor(private readonly books: BookService) {}
 
   @Get(':id')
-  chapter(@Param('id') id: string, @Query() query: unknown) {
-    const { blocks, ...chapter } = this.books.chapter(parseUserId(query), id);
+  async chapter(@Param('id') id: string, @CurrentAccount() account: Account) {
+    const { blocks, ...chapter } = await this.books.chapter(account.id, id);
     return { ...toChapterSummary(chapter), bookId: chapter.bookId, blocks };
   }
 }

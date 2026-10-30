@@ -1,6 +1,9 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { InMemoryAccountStore } from '../accounts/application/account-store';
+import { usageMonth } from '../accounts/domain/plan';
+import { testAccounts } from '../accounts/testing/fake-identity';
 import { CloudVoice } from './domain/cloud-voice';
 import { TtsError, TtsGateway } from './application/tts-gateway';
 import { InMemorySpeechClipIndex } from './application/speech-clip-index';
@@ -44,10 +47,13 @@ describe('speech', () => {
   let app: INestApplication;
   let tts: FakeTts;
   let storage: FakeStorage;
+  let accounts: InMemoryAccountStore;
 
   const start = async (gateway: TtsGateway | null) => {
+    const fakes = testAccounts();
+    accounts = fakes.store;
     const moduleRef = await Test.createTestingModule({
-      imports: [SpeechModule.register({ tts: gateway, storage, index: new InMemorySpeechClipIndex() })],
+      imports: [fakes.module, SpeechModule.register({ tts: gateway, storage, index: new InMemorySpeechClipIndex() })],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
@@ -61,9 +67,39 @@ describe('speech', () => {
 
   afterEach(() => app.close());
 
+  it('turns away a request without an access token', async () => {
+    await request(app.getHttpServer())
+      .post('/speech')
+      .send({ text: 'Xin chào.', voiceCode: ngocHuyen.code })
+      .expect(401);
+  });
+
+  it('stops at the Vbee minutes of the plan, and counts neither failures nor kept sentences', async () => {
+    const say = (text: string) =>
+      request(app.getHttpServer())
+        .post('/speech')
+        .set('Authorization', 'Bearer user-1')
+        .send({ text, voiceCode: ngocHuyen.code });
+    const month = usageMonth(new Date());
+    await say('Xin chào.').expect(200);
+    await say('Xin chào.').expect(200);
+    expect((await accounts.usage('user-1', month)).vbeeSeconds).toBe(1);
+
+    tts.failure = new TtsError('UPSTREAM_ERROR');
+    await say('Câu này lỗi.').expect(502);
+    expect((await accounts.usage('user-1', month)).vbeeSeconds).toBe(1);
+    tts.failure = null;
+
+    await accounts.spend({ accountId: 'user-1', month, meter: 'vbeeSeconds', amount: 1_799, limit: 1_800 });
+    await say('Câu mới.')
+      .expect(429)
+      .expect(({ body }) => expect(body.code).toBe('VBEE_LIMIT'));
+  });
+
   it('lists the cloud voices', async () => {
     await request(app.getHttpServer())
       .get('/speech/voices')
+      .set('Authorization', 'Bearer user-1')
       .expect(200)
       .expect(({ body }) => expect(body).toEqual({ voices: [ngocHuyen] }));
   });
@@ -71,6 +107,7 @@ describe('speech', () => {
   it('reads a sentence aloud as WAV', async () => {
     const response = await request(app.getHttpServer())
       .post('/speech')
+      .set('Authorization', 'Bearer user-1')
       .send({ text: '  Xin chào bạn.  ', voiceCode: ngocHuyen.code })
       .buffer(true)
       .parse((res, done) => {
@@ -88,6 +125,7 @@ describe('speech', () => {
   const speak = (text: string) =>
     request(app.getHttpServer())
       .post('/speech')
+      .set('Authorization', 'Bearer user-1')
       .send({ text, voiceCode: ngocHuyen.code })
       .buffer(true)
       .parse((res, done) => {
@@ -118,6 +156,7 @@ describe('speech', () => {
   it('refuses a voice that is not offered', async () => {
     await request(app.getHttpServer())
       .post('/speech')
+      .set('Authorization', 'Bearer user-1')
       .send({ text: 'Xin chào.', voiceCode: 'someone_else' })
       .expect(400)
       .expect(({ body }) => expect(body.code).toBe('VOICE_UNKNOWN'));
@@ -128,6 +167,7 @@ describe('speech', () => {
     for (const text of ['   ', 'a'.repeat(301)]) {
       await request(app.getHttpServer())
         .post('/speech')
+      .set('Authorization', 'Bearer user-1')
         .send({ text, voiceCode: ngocHuyen.code })
         .expect(400)
         .expect(({ body }) => expect(body.code).toBe('SPEECH_TEXT_INVALID'));
@@ -138,6 +178,7 @@ describe('speech', () => {
     tts.failure = new TtsError('UPSTREAM_ERROR');
     await request(app.getHttpServer())
       .post('/speech')
+      .set('Authorization', 'Bearer user-1')
       .send({ text: 'Xin chào.', voiceCode: ngocHuyen.code })
       .expect(502)
       .expect(({ body }) => expect(body.code).toBe('SPEECH_FAILED'));
@@ -148,10 +189,12 @@ describe('speech', () => {
     await start(null);
     await request(app.getHttpServer())
       .get('/speech/voices')
+      .set('Authorization', 'Bearer user-1')
       .expect(200)
       .expect(({ body }) => expect(body).toEqual({ voices: [] }));
     await request(app.getHttpServer())
       .post('/speech')
+      .set('Authorization', 'Bearer user-1')
       .send({ text: 'Xin chào.', voiceCode: ngocHuyen.code })
       .expect(503)
       .expect(({ body }) => expect(body.code).toBe('SPEECH_UNAVAILABLE'));

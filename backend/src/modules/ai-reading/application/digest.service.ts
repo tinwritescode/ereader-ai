@@ -1,7 +1,8 @@
-import { BadGatewayException, Inject, Injectable } from '@nestjs/common';
+import { BadGatewayException, HttpException, Inject, Injectable } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { LLM_GATEWAY, LlmGateway } from '../../../shared/llm/llm-gateway';
 import { countWords } from '../../../shared/reading-time';
+import { UsageCharge } from '../../../shared/usage-charge';
 import { DigestRequest, DigestResult } from '../domain/digest';
 import { DigestPart, planDigest } from '../domain/digest-plan';
 import { DIGEST_PROMPT_VERSION, DigestOutputSchema, digestInstructions } from './digest-prompt';
@@ -21,18 +22,30 @@ export class DigestService {
 
   constructor(@Inject(LLM_GATEWAY) private readonly llm: LlmGateway) {}
 
-  async create(request: DigestRequest, paragraphs: readonly string[]): Promise<DigestResult> {
+  async create(request: DigestRequest, paragraphs: readonly string[], charge: UsageCharge): Promise<DigestResult> {
     const cacheKey = this.cacheKey(request, paragraphs);
     const existing = this.cache.get(cacheKey);
     if (existing) return { ...(await existing), cached: true };
 
-    const pending = this.shorten(request, paragraphs, cacheKey);
+    const pending = this.charged(charge, () => this.shorten(request, paragraphs, cacheKey));
     this.cache.set(cacheKey, pending);
     try {
       return { ...(await pending), cached: false };
-    } catch {
+    } catch (error) {
       this.cache.delete(cacheKey);
+      if (error instanceof HttpException) throw error;
       throw new BadGatewayException({ code: 'DIGEST_FAILED' });
+    }
+  }
+
+  // Only a real LLM run counts against the plan, and a failed one is handed back.
+  private async charged(charge: UsageCharge, run: () => Promise<Digest>): Promise<Digest> {
+    await charge.take();
+    try {
+      return await run();
+    } catch (error) {
+      await charge.giveBack();
+      throw error;
     }
   }
 

@@ -34,7 +34,7 @@ export type ChapterRecord = {
   blocks: Block[];
 };
 
-export type BookImportRejection = 'UNSUPPORTED_TYPE' | 'EPUB_INVALID';
+export type BookImportRejection = 'UNSUPPORTED_TYPE' | 'EPUB_INVALID' | 'BOOK_LIMIT';
 
 export type BookImportResult =
   | { kind: 'created'; book: BookRecord }

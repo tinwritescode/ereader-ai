@@ -4,27 +4,24 @@ import { extname } from 'node:path';
 import { countWords, readingMinutes } from '../../../shared/reading-time';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
 import { BookCover, BookImportResult, BookRecord, ChapterRecord } from '../domain/book';
+import { BOOK_STORE, BookStore, BookSummary } from './book-store';
 import { EpubChapter, EpubCover, readEpub } from './epub-reader';
 
 export type ImportBookCommand = {
   userId: string;
   fileName: string;
   bytes: Buffer;
-};
-
-export type BookSummary = BookRecord & {
-  chapterCount: number;
-  minutes: number;
+  maxBooks: number;
 };
 
 @Injectable()
 export class BookService {
-  private readonly books = new Map<string, BookRecord>();
-  private readonly chaptersByBook = new Map<string, ChapterRecord[]>();
+  constructor(
+    @Inject(STORAGE_GATEWAY) private readonly storage: StorageGateway,
+    @Inject(BOOK_STORE) private readonly store: BookStore,
+  ) {}
 
-  constructor(@Inject(STORAGE_GATEWAY) private readonly storage: StorageGateway) {}
-
-  async importEpub({ userId, fileName, bytes }: ImportBookCommand): Promise<BookImportResult> {
+  async importEpub({ userId, fileName, bytes, maxBooks }: ImportBookCommand): Promise<BookImportResult> {
     if (extname(fileName).toLowerCase() !== '.epub') {
       return { kind: 'rejected', code: 'UNSUPPORTED_TYPE' };
     }
@@ -33,20 +30,17 @@ export class BookService {
       return { kind: 'rejected', code: 'EPUB_INVALID' };
     }
     const sourceChecksum = createHash('sha256').update(bytes).digest('hex');
-    const sourceKey = `sources/${sourceChecksum}.epub`;
-    // Content-addressed key: a retried or concurrent upload rewrites the same object.
-    await this.storage.put({ key: sourceKey, bytes });
-
-    // Content-addressed like the source, and stored first so nothing awaits between the lookup and the insert.
-    const { metadata, chapters, cover } = epub.book;
-    const storedCover = await this.storeCover(sourceChecksum, cover);
-
-    // No await between this lookup and the insert, so duplicates cannot race past it.
-    const existing = this.findBySource(userId, sourceChecksum);
+    const existing = await this.store.findBySource(userId, sourceChecksum);
     if (existing) {
       return { kind: 'existing', book: existing };
     }
-    // Chapters are split during import for now; the BullMQ normalize job replaces this step later.
+    if ((await this.store.count(userId)) >= maxBooks) {
+      return { kind: 'rejected', code: 'BOOK_LIMIT' };
+    }
+    const sourceKey = `sources/${sourceChecksum}.epub`;
+    // Content-addressed keys: a retried or concurrent upload rewrites the same objects.
+    await this.storage.put({ key: sourceKey, bytes });
+    const { metadata, chapters, cover } = epub.book;
     const book: BookRecord = {
       id: randomUUID(),
       userId,
@@ -56,36 +50,34 @@ export class BookService {
       status: 'READY',
       sourceChecksum,
       sourceKey,
-      cover: storedCover,
+      cover: await this.storeCover(sourceChecksum, cover),
     };
-    this.books.set(book.id, book);
-    this.chaptersByBook.set(book.id, chapters.map((chapter, index) => toChapterRecord(book.id, index, chapter)));
-    return { kind: 'created', book };
+    // Chapters are split during import for now; the BullMQ normalize job replaces this step later.
+    const stored = await this.store.add(book, chapters.map((chapter, index) => toChapterRecord(book.id, index, chapter)));
+    return { kind: stored.created ? 'created' : 'existing', book: stored.book };
   }
 
-  list(userId: string): BookSummary[] {
-    return [...this.books.values()].filter((book) => book.userId === userId).map((book) => this.summarize(book));
+  list(userId: string): Promise<BookSummary[]> {
+    return this.store.list(userId);
   }
 
-  summarize(book: BookRecord): BookSummary {
-    const chapters = this.chaptersByBook.get(book.id) ?? [];
-    return {
-      ...book,
-      chapterCount: chapters.length,
-      minutes: chapters.reduce((total, chapter) => total + chapter.minutes, 0),
-    };
+  async summarize(book: BookRecord): Promise<BookSummary> {
+    const summary = await this.store.summary(book.id);
+    if (!summary) throw new NotFoundException('BOOK_NOT_FOUND');
+    return summary;
   }
 
-  status(userId: string, id: string): BookRecord {
-    const book = this.books.get(id);
+  async status(userId: string, id: string): Promise<BookRecord> {
+    const book = await this.store.find(id);
     if (!book || book.userId !== userId) {
       throw new NotFoundException('BOOK_NOT_FOUND');
     }
     return book;
   }
 
-  async cover(userId: string, id: string): Promise<EpubCover> {
-    const { cover } = this.status(userId, id);
+  /** Open to anyone holding the book's random id: image widgets cannot send a token. */
+  async cover(id: string): Promise<EpubCover> {
+    const cover = (await this.store.find(id))?.cover;
     const bytes = cover && (await this.storage.get(cover.key));
     if (!cover || !bytes) {
       throw new NotFoundException('COVER_NOT_FOUND');
@@ -93,13 +85,14 @@ export class BookService {
     return { bytes, mediaType: cover.mediaType };
   }
 
-  chapters(userId: string, bookId: string): ChapterRecord[] {
-    return this.chaptersByBook.get(this.status(userId, bookId).id) ?? [];
+  async chapters(userId: string, bookId: string): Promise<ChapterRecord[]> {
+    return this.store.chapters((await this.status(userId, bookId)).id);
   }
 
-  chapter(userId: string, chapterId: string): ChapterRecord {
-    const chapter = [...this.chaptersByBook.values()].flat().find((candidate) => candidate.id === chapterId);
-    if (!chapter || this.books.get(chapter.bookId)?.userId !== userId) {
+  async chapter(userId: string, chapterId: string): Promise<ChapterRecord> {
+    const chapter = await this.store.chapter(chapterId);
+    const book = chapter && (await this.store.find(chapter.bookId));
+    if (!chapter || book?.userId !== userId) {
       throw new NotFoundException('CHAPTER_NOT_FOUND');
     }
     return chapter;
@@ -110,12 +103,6 @@ export class BookService {
     const key = `covers/${sourceChecksum}`;
     await this.storage.put({ key, bytes: cover.bytes });
     return { key, mediaType: cover.mediaType };
-  }
-
-  private findBySource(userId: string, sourceChecksum: string): BookRecord | undefined {
-    return [...this.books.values()].find(
-      (book) => book.userId === userId && book.sourceChecksum === sourceChecksum,
-    );
   }
 }
 

@@ -4,11 +4,12 @@ import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { testAccounts } from '../accounts/testing/fake-identity';
 import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
 import { BooksModule } from './books.module';
 import { buildEpub, COVER_PNG } from './testing/epub-fixture';
 
-const MAX_UPLOAD_BYTES = 64 * 1024;
+const MAX_UPLOAD_BYTES = 21 * 1024 * 1024;
 
 describe('POST /books (EPUB import)', () => {
   let app: INestApplication;
@@ -17,7 +18,7 @@ describe('POST /books (EPUB import)', () => {
   beforeEach(async () => {
     storageDir = await mkdtemp(join(tmpdir(), 'books-e2e-'));
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: MAX_UPLOAD_BYTES, storage: new LocalDiskStorageGateway(storageDir) })],
+      imports: [testAccounts().module, BooksModule.register({ maxUploadBytes: MAX_UPLOAD_BYTES, storage: new LocalDiskStorageGateway(storageDir) })],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
@@ -30,7 +31,7 @@ describe('POST /books (EPUB import)', () => {
 
   const upload = (bytes: Buffer, fileName = 'book.epub', userId: string | null = 'user-1') => {
     const req = request(app.getHttpServer()).post('/books').attach('file', bytes, fileName);
-    return userId === null ? req : req.field('userId', userId);
+    return userId === null ? req : req.set('Authorization', `Bearer ${userId}`);
   };
 
   it('accepts an EPUB, reads its metadata, and stores the source', async () => {
@@ -52,7 +53,7 @@ describe('POST /books (EPUB import)', () => {
 
     await request(app.getHttpServer())
       .get(`/books/${response.body.bookId}/status`)
-      .query({ userId: 'user-1' })
+      .set('Authorization', 'Bearer user-1')
       .expect(200)
       .expect(({ body }) => expect(body.status).toBe('READY'));
   });
@@ -63,25 +64,19 @@ describe('POST /books (EPUB import)', () => {
 
     const response = await request(app.getHttpServer())
       .get(`/books/${created.body.bookId}/cover`)
-      .query({ userId: 'user-1' })
+      .set('Authorization', 'Bearer user-1')
       .expect(200);
 
     expect(response.headers['content-type']).toContain('image/png');
     expect(response.body).toEqual(COVER_PNG);
   });
 
-  it('has no cover to serve for a book without one, or for another user', async () => {
+  it('has no cover to serve for a book without one', async () => {
     const plain = await upload(await buildEpub()).expect(202);
     expect(plain.body.hasCover).toBe(false);
     await request(app.getHttpServer())
       .get(`/books/${plain.body.bookId}/cover`)
-      .query({ userId: 'user-1' })
-      .expect(404);
-
-    const covered = await upload(await buildEpub({ cover: 'epub3' })).expect(202);
-    await request(app.getHttpServer())
-      .get(`/books/${covered.body.bookId}/cover`)
-      .query({ userId: 'user-2' })
+      .set('Authorization', 'Bearer user-1')
       .expect(404);
   });
 
@@ -130,15 +125,32 @@ describe('POST /books (EPUB import)', () => {
   it('rejects a request without a file', async () => {
     await request(app.getHttpServer())
       .post('/books')
-      .field('userId', 'user-1')
+      .set('Authorization', 'Bearer user-1')
       .expect(400)
       .expect({ code: 'FILE_REQUIRED' });
   });
 
-  it('rejects a request without a userId', async () => {
+  it('turns away a request without a valid access token', async () => {
     await upload(await buildEpub(), 'book.epub', null)
-      .expect(400)
-      .expect({ code: 'USER_ID_REQUIRED' });
+      .expect(401)
+      .expect(({ body }) => expect(body.code).toBe('SIGN_IN_REQUIRED'));
+    await upload(await buildEpub(), 'book.epub', 'expired').expect(401);
+    await request(app.getHttpServer()).get('/books').expect(401);
+  });
+
+  it('stops at the book limit of the plan, but still answers with a book already kept', async () => {
+    const books = await Promise.all(['Một', 'Hai', 'Ba'].map((title) => buildEpub({ title })));
+    for (const bytes of books) await upload(bytes).expect(202);
+    await upload(await buildEpub({ title: 'Bốn' }))
+      .expect(429)
+      .expect(({ body }) => expect(body.code).toBe('BOOK_LIMIT'));
+    await upload(books[0]).expect(200);
+  });
+
+  it('holds a free account to its smaller file size', async () => {
+    await upload(Buffer.alloc(20 * 1024 * 1024 + 1))
+      .expect(413)
+      .expect(({ body }) => expect(body.code).toBe('PLAN_FILE_TOO_LARGE'));
   });
 
   const fixture = process.env.EPUB_FIXTURE;
@@ -146,7 +158,7 @@ describe('POST /books (EPUB import)', () => {
     if (!fixture) return;
     await app.close();
     const moduleRef = await Test.createTestingModule({
-      imports: [BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
+      imports: [testAccounts().module, BooksModule.register({ maxUploadBytes: 100 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) })],
     }).compile();
     app = moduleRef.createNestApplication();
     await app.init();
