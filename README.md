@@ -1,30 +1,32 @@
 # eReader AI
 
-Ứng dụng đọc sách trên iPhone. Nhập file EPUB, chọn thời gian ngài có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app đọc to bằng giọng tiếng Việt chạy ngay trên máy.
+**English** | [Tiếng Việt](README.vi.md)
 
-| Thư viện | Chương | Chọn độ dài | Nghe |
+An iPhone reading app. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the app reads aloud in a Vietnamese voice that runs on the device.
+
+| Library | Chapters | Choose length | Listen |
 |---|---|---|---|
-| ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Trình phát](docs/screenshots/player.png) |
+| ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Player](docs/screenshots/player.png) |
 
-Ảnh chụp từ simulator với dữ liệu mẫu. Tạo lại bằng `mobile/tool/capture_screenshots.sh`.
+Screenshots come from the simulator with sample data. Regenerate them with `mobile/tool/capture_screenshots.sh`.
 
-## Use case
+## Use cases
 
 ```mermaid
 flowchart LR
-    reader(["Người đọc"])
-    llm(["Dịch vụ LLM"])
+    reader(["Reader"])
+    llm(["LLM service"])
     hf(["Hugging Face"])
 
     subgraph app["eReader AI"]
-        import(["Nhập sách EPUB"])
-        browse(["Xem thư viện và chương"])
-        length(["Chọn độ dài đọc"])
-        read(["Đọc bản gốc hoặc bản rút gọn"])
-        shorten(["AI rút gọn chương"])
-        listen(["Nghe đọc offline"])
-        download(["Tải giọng đọc lần đầu"])
-        tune(["Đổi giọng và tốc độ"])
+        import(["Import an EPUB"])
+        browse(["Browse library and chapters"])
+        length(["Choose a reading length"])
+        read(["Read the original or a shorter version"])
+        shorten(["AI shortens the chapter"])
+        listen(["Listen offline"])
+        download(["Download the voice once"])
+        tune(["Change voice and speed"])
     end
 
     reader --> import
@@ -34,86 +36,86 @@ flowchart LR
     reader --> listen
     reader --> tune
 
-    read -. "gồm" .-> shorten
-    listen -. "gồm, lần đầu" .-> download
+    read -. "includes" .-> shorten
+    listen -. "includes, first time" .-> download
     shorten --> llm
     download --> hf
 ```
 
-## Dữ liệu chạy ở đâu
+## Where things run
 
 ```mermaid
 flowchart LR
     subgraph phone["iPhone"]
-        ui["App Flutter"]
-        tts["Kokoro ONNX, 14 giọng"]
+        ui["Flutter app"]
+        tts["Kokoro ONNX, 14 voices"]
         ui --> tts
     end
 
-    subgraph server["Backend NestJS trên Railway"]
-        api["API sách và chương"]
-        digest["Rút gọn và cache"]
-        memory[("Bộ nhớ tạm")]
+    subgraph server["NestJS backend on Railway"]
+        api["Books and chapters API"]
+        digest["Shortening and cache"]
+        memory[("In-memory storage")]
         api --> memory
         digest --> memory
     end
 
-    llm["Dịch vụ LLM"]
+    llm["LLM service"]
     hf["Hugging Face"]
 
-    ui -- "EPUB, yêu cầu chương" --> api
-    ui -- "yêu cầu rút gọn" --> digest
+    ui -- "EPUB, chapter requests" --> api
+    ui -- "shorten requests" --> digest
     digest --> llm
-    hf -- "model 326 MB, tải một lần" --> tts
+    hf -- "326 MB model, downloaded once" --> tts
 ```
 
-Chỉ giọng đọc là offline. Nội dung chương vẫn lấy từ server, nên không có mạng thì không mở được chương.
+Only the voice is offline. Chapter text still comes from the server, so a chapter can't be opened without a connection.
 
-## Hiện có và dự kiến
+## Today and planned
 
-| | Hiện có | Dự kiến |
+| | Today | Planned |
 |---|---|---|
-| Lưu sách | Bộ nhớ tạm, mất khi backend restart | PostgreSQL và S3 |
-| Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
-| Người dùng | Một `demo-user`, chưa có đăng nhập | Đăng nhập và hạn mức token |
-| Tiến độ đọc | Chưa lưu | Lưu vị trí và đọc tiếp |
-| Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
-| Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
+| Book storage | In memory, lost when the backend restarts | PostgreSQL and S3 |
+| EPUB processing | Inside the backend process | Redis and BullMQ queue |
+| Users | One `demo-user`, no sign-in | Sign-in and token budgets |
+| Reading progress | Not saved | Save position and resume |
+| Voice and speed | Reset each time a chapter opens | Remember the choice |
+| Platforms | iOS 16 and later | Android not tested yet |
 
-Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
+The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.
 
-## Cấu trúc
+## Layout
 
-- `backend/`: NestJS 11, TypeScript. Module `books`, `processing`, `ai-reading`.
-- `mobile/`: Flutter 3.41, `flutter_bloc`. Feature `books`, `digest`, `listen`.
-- `mobile/tool/build_speech_assets.py`: tạo bảng phiên âm và voice pack trong `mobile/assets/speech/`.
-- `design/`: mockup HTML. Bản đang dùng là `reader-flow-v2.html`.
+- `backend/`: NestJS 11, TypeScript. Modules `books`, `processing`, `ai-reading`.
+- `mobile/`: Flutter 3.41, `flutter_bloc`. Features `books`, `digest`, `listen`.
+- `mobile/tool/build_speech_assets.py`: builds the phoneme table and voice packs in `mobile/assets/speech/`.
+- `design/`: HTML mockups. The current one is `reader-flow-v2.html`.
 
-## Chạy backend
+## Run the backend
 
-Cần Node 24.
+Requires Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # điền LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
+cp .env.example .env   # fill in LLM_BASE_URL, LLM_API_KEY, LLM_MODEL
 npm ci
 npm run start:dev
 ```
 
-Backend nghe ở cổng 3000, đổi bằng biến `PORT`.
+The backend listens on port 3000. Change it with `PORT`.
 
-| Phương thức | Đường dẫn | Việc |
+| Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/books` | Nhập EPUB |
-| `GET` | `/books` | Danh sách sách |
-| `GET` | `/books/:id/status` | Trạng thái xử lý |
-| `GET` | `/books/:id/chapters` | Danh sách chương |
-| `GET` | `/chapters/:id` | Nội dung gốc |
-| `POST` | `/chapters/:id/digest` | Bản rút gọn |
+| `POST` | `/books` | Import an EPUB |
+| `GET` | `/books` | List books |
+| `GET` | `/books/:id/status` | Processing status |
+| `GET` | `/books/:id/chapters` | List chapters |
+| `GET` | `/chapters/:id` | Original text |
+| `POST` | `/chapters/:id/digest` | Shorter version |
 
-## Chạy app
+## Run the app
 
-Cần Flutter 3.41.4 và Xcode.
+Requires Flutter 3.41.4 and Xcode.
 
 ```bash
 cd mobile
@@ -121,31 +123,31 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
-Không truyền `API_BASE_URL` thì app gọi `http://localhost:3000`. Lần đầu bấm Nghe, app hỏi rồi tải model 326 MB vào máy.
+Without `API_BASE_URL`, the app calls `http://localhost:3000`. The first time you tap Nghe (Listen), the app asks before downloading the 326 MB model to the device.
 
-## Kiểm thử
+## Test
 
 ```bash
 cd backend && npm run build && npm test
 cd mobile && flutter analyze && flutter test --concurrency=1
 ```
 
-GitHub Actions chạy các lệnh trên ở mỗi push lên `main` và mỗi pull request.
+GitHub Actions runs these on every push to `main` and every pull request.
 
-Test với model thật cần simulator:
+Testing with the real model needs a simulator:
 
 ```bash
 cd mobile
 flutter test integration_test/speech_test.dart -d <simulator-id>
 ```
 
-Integration test ghi đè app đã cài trên simulator, nên phải build lại app thật sau khi chạy.
+Integration tests replace the app installed on the simulator, so rebuild the real app afterwards.
 
 ## Deploy
 
-Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` trong biến môi trường của Railway, không đưa vào repo.
+The backend runs on Railway from `backend/Dockerfile`. Set `LLM_BASE_URL`, `LLM_API_KEY`, and `LLM_MODEL` in Railway's environment variables, never in the repo.
 
-Bản iPhone trỏ vào backend đã deploy:
+To build for an iPhone against the deployed backend:
 
 ```bash
 cd mobile
@@ -153,7 +155,7 @@ flutter build ios --release --dart-define=API_BASE_URL=<backend-url>
 xcrun devicectl device install app --device <device-id> build/ios/iphoneos/Runner.app
 ```
 
-## Nguồn tài nguyên
+## Credits
 
-- Model giọng đọc: [Kokoro-Vietnamese](https://github.com/iamdinhthuan/Kokoro-Vietnamese), giấy phép Apache-2.0. Tải từ Hugging Face khi chạy, không nằm trong repo.
-- ONNX Runtime qua `flutter_onnxruntime`, giấy phép MIT.
+- Voice model: [Kokoro-Vietnamese](https://github.com/iamdinhthuan/Kokoro-Vietnamese), Apache-2.0. Downloaded at runtime, not stored in this repo.
+- ONNX Runtime through `flutter_onnxruntime`, MIT.

@@ -1,6 +1,6 @@
 # eReader AI — Tài liệu kiến trúc
 
-> Đây là thiết kế đích, chưa phải mô tả code hiện tại. Xem phần "Hiện có và dự kiến" trong [README](README.md).
+> Đây là thiết kế đích, chưa phải mô tả code hiện tại. Xem phần "Hiện có và dự kiến" trong [README](README.vi.md).
 
 > Trạng thái: **greenfield / architecture baseline**  
 > Mobile: Flutter + `flutter_bloc`  
