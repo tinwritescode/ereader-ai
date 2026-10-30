@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>eReader AI — reading flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400;7..72,500;7..72,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F1F3EF;
+    --sheet: #FBFCFA;
+    --ink: #1D2B3A;
+    --muted: #66737F;
+    --rule: #D5DBD4;
+    --marker: #F4D35E;
+    --marker-soft: #FBEFB8;
+    --ui: "Be Vietnam Pro", system-ui, sans-serif;
+    --read: "Literata", Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: #DCE1DA;
+    color: var(--ink);
+    font: 15px/1.45 var(--ui);
+    padding: 48px 32px 64px;
+  }
+  .intro { max-width: 70ch; margin: 0 auto 40px; }
+  .intro h1 { font: 600 28px/1.2 var(--read); margin-bottom: 10px; }
+  .intro p { color: var(--muted); }
+
+  .flow {
+    display: flex; gap: 36px; justify-content: center; flex-wrap: wrap;
+  }
+  figure { width: 320px; }
+  figcaption { margin-top: 14px; font-size: 13.5px; color: var(--muted); }
+  figcaption b { color: var(--ink); font-weight: 600; display: block; margin-bottom: 2px; }
+
+  .phone {
+    position: relative;
+    width: 320px; height: 680px;
+    border-radius: 44px;
+    background: var(--paper);
+    border: 9px solid var(--ink);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .status { height: 38px; flex: none; display: flex; justify-content: space-between; align-items: center; padding: 6px 26px 0; font-size: 12px; font-weight: 600; }
+  .screen { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .pad { padding: 0 20px; }
+
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+
+  /* The one signature device: reading time drawn as a ruler, the condensed part laid over it in highlighter. */
+  .ribbon { position: relative; height: 8px; background: var(--rule); border-radius: 1px; }
+  .ribbon > i { position: absolute; inset: 0 auto 0 0; background: var(--marker); border-radius: 1px; }
+  .ribbon.full > i { background: var(--ink); }
+
+  /* 1. Library */
+  .title-xl { font: 600 30px/1.1 var(--read); letter-spacing: -0.01em; padding: 14px 20px 18px; }
+  .shelf { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 0 20px; }
+  .book { display: grid; grid-template-columns: 62px 1fr; gap: 14px; padding: 12px; background: var(--sheet); border-radius: 14px; text-align: left; width: 100%; }
+  .cover {
+    height: 88px; border-radius: 3px 6px 6px 3px; background: var(--ink); color: var(--paper);
+    padding: 8px 7px; font: 600 8.5px/1.2 var(--read); position: relative; overflow: hidden; overflow-wrap: anywhere; padding-left: 10px;
+  }
+  .cover::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 1px; background: rgba(241,243,239,.25); }
+  .cover.alt { background: #4E6A5C; }
+  .book h3 { font: 600 15px/1.25 var(--read); margin-bottom: 3px; }
+  .book p { font-size: 12.5px; color: var(--muted); }
+  .book .ribbon { margin-top: 10px; height: 4px; }
+  .uploading .ribbon > i { width: 64%; background: var(--ink); }
+  .bar { padding: 14px 20px 22px; }
+  .primary {
+    width: 100%; height: 52px; border-radius: 26px; background: var(--ink); color: var(--paper);
+    font-weight: 600; font-size: 15.5px; display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .primary svg { width: 18px; height: 18px; }
+
+  /* 2. Book */
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 4px 14px; height: 44px; }
+  .nav svg { width: 22px; height: 22px; }
+  .book-head { padding: 6px 20px 16px; border-bottom: 1px solid var(--rule); }
+  .book-head h2 { font: 600 22px/1.2 var(--read); margin-bottom: 6px; }
+  .book-head p { color: var(--muted); font-size: 13px; }
+  .chapters { list-style: none; padding: 0; overflow: hidden; }
+  .chapters li button { width: 100%; text-align: left; padding: 13px 20px; border-bottom: 1px solid var(--rule); display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: baseline; }
+  .chapters .n { font-size: 12px; color: var(--muted); grid-column: 1 / -1; }
+  .chapters .t { font: 500 14.5px/1.3 var(--read); }
+  .chapters .m { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .chapters .ribbon { grid-column: 1 / -1; height: 4px; margin-top: 6px; }
+  .chapters .has-digest .m { color: var(--ink); font-weight: 600; }
+  .chapters .is-open { background: var(--sheet); }
+
+  /* 3. Choose length sheet */
+  .dim { position: absolute; inset: 0; background: rgba(29,43,58,.38); }
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0; background: var(--sheet);
+    border-radius: 22px 22px 0 0; padding: 10px 20px 22px;
+  }
+  .grip { width: 36px; height: 4px; border-radius: 2px; background: var(--rule); margin: 0 auto 14px; }
+  .sheet h3 { font: 600 19px/1.25 var(--read); margin-bottom: 4px; }
+  .sheet .lede { color: var(--muted); font-size: 13.5px; margin-bottom: 16px; }
+  .options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .opt { text-align: left; width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--rule); display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .opt[aria-checked="true"] { border-color: var(--ink); }
+  .opt .label { font-weight: 600; font-size: 14.5px; }
+  .opt .min { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .opt .hint { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+  .opt .ribbon { grid-column: 1 / -1; margin-top: 8px; }
+  .lang { display: flex; justify-content: space-between; padding: 12px 2px; border-top: 1px solid var(--rule); font-size: 13.5px; margin-bottom: 12px; }
+  .lang span:last-child { font-weight: 600; }
+  .fine { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  /* 4. Reader */
+  .reader-top { padding: 0 14px 10px; }
+  .switch { display: grid; grid-template-columns: 1fr 1fr; background: var(--rule); border-radius: 10px; padding: 3px; font-size: 13px; font-weight: 600; }
+  .switch button { height: 32px; border-radius: 8px; color: var(--muted); }
+  .switch [aria-pressed="true"] { background: var(--sheet); color: var(--ink); }
+  .progress { display: flex; align-items: center; gap: 10px; padding: 12px 6px 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .progress .ribbon { flex: 1; height: 4px; }
+  .page { flex: 1; overflow: hidden; padding: 6px 24px 0; }
+  .page .chap { font-size: 12.5px; color: var(--muted); margin-bottom: 4px; }
+  .page h2 { font: 600 21px/1.25 var(--read); margin-bottom: 14px; }
+  .page p { font: 400 16px/1.7 var(--read); margin-bottom: 12px; hyphens: auto; }
+  .note { font-size: 12px; color: var(--muted); padding: 10px 24px 18px; border-top: 1px solid var(--rule); }
+
+  .question { max-width: 70ch; margin: 48px auto 0; padding-top: 28px; border-top: 1px solid #C3CBC2; }
+  .question h2 { font: 600 20px/1.3 var(--read); margin-bottom: 10px; }
+  .question p, .question li { color: #3E4C59; margin-bottom: 8px; }
+  .question ul { padding-left: 20px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .sheet { animation: rise .45s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes rise { from { transform: translateY(40%); opacity: 0; } }
+  }
+</style>
+</head>
+<body>
+
+<header class="intro">
+  <h1>Import, read, choose your time</h1>
+  <p>Four screens, one per step. Book data is real: chapter lengths come from the uploaded EPUB at 200 words per minute. The yellow bar means one thing everywhere: the part of the chapter you will actually read.</p>
+</header>
+
+<div class="flow">
+
+  <!-- 1. Library -->
+  <figure>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G</span></div>
+      <div class="screen">
+        <h1 class="title-xl">Thư viện</h1>
+        <div class="shelf">
+          <button class="book">
+            <div class="cover">The Battle for Investment Survival</div>
+            <div>
+              <h3>The Battle for Investment Survival</h3>
+              <p>Gerald M. Loeb</p>
+              <p>khoảng 5 giờ đọc</p>
+              <p>Đang đọc chương 1</p>
+            </div>
+          </button>
+          <div class="book uploading" role="status">
+            <div class="cover alt">Người giàu có nhất thành Babylon</div>
+            <div>
+              <h3>nguoi-giau-babylon.epub</h3>
+              <p>Đang tải lên, 64%</p>
+              <div class="ribbon"><i></i></div>
+            </div>
+          </div>
+        </div>
+        <div class="bar">
+          <button class="primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Thêm sách EPUB
+          </button>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>1. Library</b>One action at the bottom, within thumb reach. The upload shows in the list right away, so progress, the server's chapter-splitting step and any error all appear on the book itself.</figcaption>
+  </figure>
+
+  <!-- 2. Book -->
+  <figure>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G</span></div>
+      <div class="screen">
+        <div class="nav">
+          <button aria-label="Quay lại"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        </div>
+        <div class="book-head">
+          <h2>The Battle for Investment Survival</h2>
+          <p>Gerald M. Loeb, 33 chương</p>
+        </div>
+        <ul class="chapters">
+          <li class="has-digest"><button class="is-open">
+            <span class="n">Chương Một</span>
+            <span class="t">Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</span><span class="m">8 / 15 phút</span>
+            <div class="ribbon"><i style="width:53%"></i></div>
+          </button></li>
+          <li><button>
+            <span class="n">Chương Ba</span>
+            <span class="t">Có khoản đầu tư nào là lý tưởng không?</span><span class="m">7 phút</span>
+            <div class="ribbon" style="width:47%"></div>
+          </button></li>
+          <li><button>
+            <span class="n">Chương Bốn</span>
+            <span class="t">Những cạm bẫy dành cho người thiếu kinh nghiệm</span><span class="m">10 phút</span>
+            <div class="ribbon" style="width:67%"></div>
+          </button></li>
+          <li><button>
+            <span class="n">Chương Năm</span>
+            <span class="t">Cách đầu tư để tăng trưởng vốn</span><span class="m">11 phút</span>
+            <div class="ribbon" style="width:73%"></div>
+          </button></li>
+          <li><button>
+            <span class="n">Chương Sáu</span>
+            <span class="t">Đầu cơ đối lập với đầu tư</span><span class="m">5 phút</span>
+            <div class="ribbon" style="width:33%"></div>
+          </button></li>
+        </ul>
+      </div>
+    </div>
+    <figcaption><b>2. Book</b>Each chapter shows its length as a bar, so a long chapter stands out before it's opened. A chapter that already has a shorter version shows both times: 8 of 15 minutes.</figcaption>
+  </figure>
+
+  <!-- 3. Choose length -->
+  <figure>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G</span></div>
+      <div class="screen">
+        <div class="nav"></div>
+        <div class="book-head"><h2>The Battle for Investment Survival</h2></div>
+        <div class="dim"></div>
+        <div class="sheet" role="dialog" aria-label="Chọn thời lượng đọc">
+          <div class="grip"></div>
+          <h3>Chương Một dài 15 phút</h3>
+          <p class="lede">Bạn muốn đọc trong bao lâu?</p>
+          <div class="options" role="radiogroup">
+            <button class="opt" role="radio" aria-checked="false">
+              <span class="label">Bản gốc</span><span class="min">15 phút</span>
+              <span class="hint">Đọc nguyên văn, không qua AI</span>
+              <div class="ribbon full"><i style="width:100%"></i></div>
+            </button>
+            <button class="opt" role="radio" aria-checked="true">
+              <span class="label">Rút gọn</span><span class="min">8 phút</span>
+              <span class="hint">Giữ mọi luận điểm, bỏ ví dụ lặp lại</span>
+              <div class="ribbon"><i style="width:53%"></i></div>
+            </button>
+            <button class="opt" role="radio" aria-checked="false">
+              <span class="label">Ý chính</span><span class="min">4 phút</span>
+              <span class="hint">Chỉ những điều tác giả muốn bạn nhớ</span>
+              <div class="ribbon"><i style="width:27%"></i></div>
+            </button>
+          </div>
+          <div class="lang"><span>Ngôn ngữ</span><span>Tiếng Việt</span></div>
+          <button class="primary">Đọc bản 8 phút</button>
+          <p class="fine">Bạn có thể quay lại bản gốc bất cứ lúc nào.</p>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>3. Choose length</b>Tapping a chapter asks one question. The choices scale with the chapter (full, about half, about a quarter) instead of a fixed 10/20/30, so a 5-minute chapter never offers to "shorten" itself to 10.</figcaption>
+  </figure>
+
+  <!-- 4. Reader -->
+  <figure>
+    <div class="phone">
+      <div class="status"><span>9:41</span><span>5G</span></div>
+      <div class="screen">
+        <div class="nav">
+          <button aria-label="Quay lại"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <button aria-label="Cỡ chữ" style="font:600 15px var(--read)">Aa</button>
+        </div>
+        <div class="reader-top">
+          <div class="switch">
+            <button aria-pressed="false">Bản gốc, 15 phút</button>
+            <button aria-pressed="true">Rút gọn, 8 phút</button>
+          </div>
+          <div class="progress"><div class="ribbon"><i style="width:25%"></i></div><span>còn 6 phút</span></div>
+        </div>
+        <article class="page">
+          <p class="chap">Chương Một</p>
+          <h2>Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</h2>
+          <p>Không có gì khó hơn việc kiếm lợi nhuận một cách nhất quán ở Phố Wall. Trường lớp và sách vở chỉ cho bạn nền tảng lý thuyết; phần còn lại phải đến từ kinh nghiệm thực tế.</p>
+          <p>Người ngoài cuộc thường tìm lợi nhuận nhanh và dễ, ít suy nghĩ về nó hơn mọi việc khác, và không phân biệt được may mắn với hiểu biết. Kiến thức giải thích vì sao một người có lãi; thiếu kiến thức giải thích vì sao người khác thua lỗ.</p>
+        </article>
+        <p class="note">Bản rút gọn do AI tạo từ nội dung gốc.</p>
+      </div>
+    </div>
+    <figcaption><b>4. Read</b>The switch at the top flips between the original and the shorter version at the same spot. The bar shows minutes left for the version being read, not pages.</figcaption>
+  </figure>
+
+</div>
+
+<section class="question">
+  <h2>How to suggest shortening a chapter</h2>
+  <p>The mockup offers it in two places, both quiet:</p>
+  <ul>
+    <li>The bar on every chapter row makes long chapters obvious, which is the cue for itself.</li>
+    <li>Tapping any chapter opens the length sheet. The app remembers the last choice (for example "about half") and preselects it next time, so a reader who always shortens can do it in one tap.</li>
+  </ul>
+  <p>The options are relative to the chapter: full, about 50%, about 25%, with a 2-minute floor. Chapters under 5 minutes skip the sheet and open the original directly.</p>
+</section>
+
+</body>
+</html>

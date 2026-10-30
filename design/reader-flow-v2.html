@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Patrick+Hand&display=swap&subset=vietnamese" rel="stylesheet">
+<style>
+:root{--paper:#F6F5FC;--line:#D3D0EC;--ink:#2A1F6E;--text:#1E1A3A;--soft:#6A6690;--red:#D8344F;--rose:#F3C3CC;--marker:#FBE36B;--white:#FFFFFF}
+*{box-sizing:border-box;margin:0}
+.wall{display:flex;flex-wrap:wrap;gap:26px 20px;justify-content:center}
+figure{width:224px}
+figcaption{font:13px/1.45 var(--font-sans);color:var(--foreground);margin-top:10px}
+.ph{zoom:.68;position:relative;width:330px;height:690px;border-radius:38px;overflow:hidden;background:var(--paper);color:var(--text);font-family:Literata,serif;border:1px solid var(--line)}
+.ruled{background-image:repeating-linear-gradient(to bottom,transparent 0 27px,var(--line) 27px 28px);background-position:0 12px}
+.ruled::before{content:"";position:absolute;top:0;bottom:0;left:54px;width:1.5px;background:var(--red);opacity:.75}
+.hand{font-family:"Patrick Hand",cursive}
+.status{height:52px}
+.h1{font-size:26px;line-height:56px;font-weight:600;color:var(--ink);padding-left:66px}
+.back{position:absolute;left:0;top:50px;width:54px;text-align:center;font-size:26px;line-height:44px;color:var(--ink)}
+.label{position:relative;margin:0 18px 0 66px;background:var(--white);border:2px solid var(--ink);border-radius:14px;padding:4px;box-shadow:2px 3px 0 var(--line)}
+.label>div{border:1px solid var(--ink);border-radius:9px;padding:8px 12px 10px}
+.fld{font-size:11.5px;color:var(--soft);display:flex;gap:6px;align-items:baseline;border-bottom:1px dotted var(--soft);padding-top:5px}
+.fld b{font:400 19px/24px "Patrick Hand",cursive;color:var(--ink)}
+.next{padding:0 18px 0 66px;font-size:14.5px;line-height:28px;color:var(--text)}
+.row{display:grid;grid-template-columns:54px 1fr;min-height:56px}
+.row .mn{font:22px/28px "Patrick Hand",cursive;color:var(--red);text-align:right;padding-right:10px}
+.row .mn.done{color:var(--ink)}
+.row .t{padding:0 16px 0 12px;font-size:15px;line-height:28px;font-weight:600;color:var(--ink)}
+.row .c{font-size:12.5px;line-height:28px;color:var(--soft);font-weight:400;display:block}
+.btn{position:absolute;left:18px;right:18px;bottom:26px;height:52px;border-radius:14px;background:var(--ink);color:#fff;font:600 16px/52px Literata,serif;text-align:center}
+.shade{position:absolute;inset:0;background:rgba(30,26,58,.42)}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--white);border-radius:24px 24px 0 0;padding:22px 20px 26px}
+.sheet h2{font-size:21px;line-height:28px;color:var(--ink)}
+.sheet p{font-size:14px;line-height:22px;color:var(--soft)}
+.ruler{position:relative;height:78px;margin:26px 0 8px;background:rgba(251,227,107,.55);border:1px solid #D9BE3C;border-radius:6px}
+.ticks{position:absolute;inset:0 14px;background-image:repeating-linear-gradient(to right,var(--text) 0 1px,transparent 1px 12.5%);background-size:100% 16px;background-repeat:no-repeat;border-right:1px solid var(--text);height:16px}
+.nm{position:absolute;top:20px;width:60px;margin-left:-30px;text-align:center;font:20px/22px "Patrick Hand",cursive;color:var(--text)}
+.nm small{display:block;font:11.5px/14px Literata,serif;color:var(--text)}
+.pin{position:absolute;top:-13px;width:0;height:0;margin-left:-8px;border:8px solid transparent;border-top:12px solid var(--red);border-bottom:0}
+.nm.on{color:var(--red);font-size:24px}
+.pick h3{font-size:16px;line-height:24px;color:var(--ink);margin-top:12px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.b{height:50px;border-radius:14px;text-align:center;font:600 15px/50px Literata,serif}
+.b.pri{background:var(--ink);color:#fff}.b.sec{border:1.5px solid var(--ink);color:var(--ink);line-height:47px}
+.bar{position:absolute;left:18px;top:62px;bottom:0;width:3px;background:var(--rose);border-radius:2px}
+.bar i{display:block;width:100%;background:var(--red);border-radius:2px}
+.top{position:absolute;top:50px;left:36px;right:16px;display:flex;justify-content:space-between;align-items:center;height:44px;color:var(--ink)}
+.top span:first-child{font-size:26px}
+.vs{display:flex;gap:16px;font:19px/28px "Patrick Hand",cursive;color:var(--soft)}
+.vs b{font-weight:400;color:var(--red);border-bottom:2px solid var(--red)}
+.body{position:absolute;top:102px;left:36px;right:22px;bottom:92px;overflow:hidden}
+.body small{font-size:12.5px;line-height:22px;color:var(--soft);display:block}
+.body h2{font-size:22px;line-height:29px;color:var(--ink);margin-bottom:12px}
+.body p{font-size:17px;line-height:29px;margin-bottom:12px}
+mark{background:var(--marker);color:inherit;padding:2px 0;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.foot{position:absolute;left:0;right:0;bottom:0;height:90px;background:var(--paper);border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px 12px 36px}
+.foot .l{font-size:12.5px;line-height:18px;color:var(--soft)}
+.foot .hand{font-size:20px;color:var(--red);display:block;line-height:22px}
+.listen{height:46px;padding:0 18px;border-radius:14px;background:var(--ink);color:#fff;font:600 15px/46px Literata,serif}
+.player{position:absolute;left:0;right:0;bottom:0;height:176px;background:var(--ink);color:#fff;border-radius:24px 24px 0 0;padding:16px 22px}
+.track{height:3px;background:rgba(255,255,255,.28);border-radius:2px}.track i{display:block;width:38%;height:3px;background:var(--marker);border-radius:2px}
+.times{display:flex;justify-content:space-between;font:16px/24px "Patrick Hand",cursive;margin-top:4px}
+.ctl{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:15px}
+.play{width:56px;height:56px;border-radius:50%;background:var(--marker);color:var(--ink);text-align:center;font:22px/56px Literata,serif}
+.v{font-size:12.5px;line-height:20px;text-align:center;opacity:.85;margin-top:6px}
+</style></head><body>
+<div class="wall">
+
+<figure><div class="ph ruled"><div class="status"></div>
+<div class="h1">Thư viện</div>
+<div class="label"><div>
+<div class="fld">Sách <b>The Battle for Investment Survival</b></div>
+<div class="fld">Tác giả <b>Gerald M. Loeb</b></div></div></div>
+<div style="height:14px"></div>
+<div class="next">Đọc tiếp Chương Hai, còn 4 phút</div>
+<div style="height:28px"></div>
+<div class="label"><div>
+<div class="fld">Sách <b>Cái Dũng Của Thánh Nhân</b></div>
+<div class="fld">Tác giả <b>Nguyễn Duy Cần</b></div></div></div>
+<div style="height:14px"></div>
+<div class="next">Chưa đọc</div>
+<div class="btn">Thêm sách EPUB</div></div>
+<figcaption>Mỗi cuốn là một nhãn vở, tên sách viết tay, nên không còn bìa nhỏ bị ngắt chữ. Dòng dưới nhãn đưa thẳng tới chỗ đang đọc.</figcaption></figure>
+
+<figure><div class="ph ruled"><div class="status"></div><div class="back">‹</div>
+<div style="height:44px"></div>
+<div class="h1" style="font-size:21px;line-height:28px;padding-right:18px;padding-bottom:28px">The Battle for Investment Survival</div>
+<div class="row"><div class="mn done">✓</div><div class="t"><span class="c">Lời giới thiệu</span></div></div>
+<div class="row"><div class="mn done">✓</div><div class="t"><span class="c">Chương Một</span>Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</div></div>
+<div class="row" style="margin-top:28px"><div class="mn">6'</div><div class="t"><span class="c">Chương Hai</span>Thái độ đầu cơ là cốt yếu</div></div>
+<div class="row"><div class="mn">7'</div><div class="t"><span class="c">Chương Ba</span>Có khoản đầu tư nào lý tưởng không?</div></div>
+<div class="row" style="margin-top:28px"><div class="mn">10'</div><div class="t"><span class="c">Chương Bốn</span>Những cạm bẫy dành cho người thiếu kinh nghiệm</div></div>
+</div>
+<figcaption>Số phút ghi ở lề bằng bút đỏ như điểm trong vở. Chương đã đọc được đánh dấu tích. Bỏ thanh xám dưới mỗi dòng.</figcaption></figure>
+
+<figure><div class="ph ruled"><div class="status"></div><div class="shade"></div>
+<div class="sheet pick"><h2>Chương Một dài 8 phút</h2><p>Kéo thước tới thời gian bạn có.</p>
+<div class="ruler"><div class="ticks"></div>
+<div class="pin" style="left:50%"></div>
+<div class="nm" style="left:27%">2<small>Ý chính</small></div>
+<div class="nm on" style="left:50%">4<small>Rút gọn</small></div>
+<div class="nm" style="left:88%">8<small>Bản gốc</small></div></div>
+<h3>Rút gọn còn 4 phút</h3><p>Giữ mọi luận điểm, bỏ ví dụ lặp lại.</p>
+<div class="two"><div class="b sec">Nghe</div><div class="b pri">Đọc</div></div></div></div>
+<figcaption>Ba thẻ lựa chọn thành một cây thước kẻ: thời gian đo được bằng tay. Chọn xong thì đọc hoặc nghe.</figcaption></figure>
+
+<figure><div class="ph"><div class="bar"><i style="height:22%"></i></div>
+<div class="top"><span>‹</span><div class="vs"><span>gốc</span><b>4'</b><span>2'</span></div></div>
+<div class="body"><small>Chương Một</small><h2>Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu</h2>
+<p>Tôi tin không gì khó hơn kiếm lợi nhuận nhất quán và công bằng ở Phố Wall. Trường lớp, sách vở chỉ tạo nền tảng lý thuyết.</p>
+<p>Người ngoài cuộc thường tìm lợi nhuận nhanh, thu nhập cao hoặc nơi trú ẩn an toàn. Họ nghĩ về việc này ít hơn các hoạt động khác.</p></div>
+<div class="foot"><div class="l"><span class="hand">còn 3 phút</span>AI viết lại từ bản gốc</div><div class="listen">Nghe</div></div></div>
+<figcaption>Đường lề đỏ là thanh tiến độ, chạy dọc theo trang. Đổi bản ngay trên đầu trang, nhẹ hơn nút phân đoạn hiện tại.</figcaption></figure>
+
+<figure><div class="ph"><div class="bar"><i style="height:38%"></i></div>
+<div class="top"><span>‹</span><div class="vs"><span>gốc</span><b>4'</b><span>2'</span></div></div>
+<div class="body" style="bottom:176px"><p>Tôi tin không gì khó hơn kiếm lợi nhuận nhất quán và công bằng ở Phố Wall. Trường lớp, sách vở chỉ tạo nền tảng lý thuyết.</p>
+<p><mark>Người ngoài cuộc thường tìm lợi nhuận nhanh, thu nhập cao hoặc nơi trú ẩn an toàn.</mark> Họ nghĩ về việc này ít hơn các hoạt động khác, bất cẩn khi chọn người tư vấn.</p>
+<p>Kinh nghiệm thực tế giải thích lợi nhuận; thiếu kiến thức giải thích thua lỗ.</p></div>
+<div class="player"><div class="track"><i></i></div><div class="times"><span>1:32</span><span>còn 2:28</span></div>
+<div class="ctl"><span>Lùi 15 giây</span><div class="play">❚❚</div><span>Tốc độ 1.0</span></div>
+<div class="v">Giọng Diễm Trinh, chạy trên máy, không cần mạng</div></div></div>
+<figcaption>Nghe sách: câu đang đọc được tô bút dạ vàng và trang tự cuộn theo. Trình phát màu mực tím, tách hẳn khỏi trang giấy.</figcaption></figure>
+
+</div></body></html>

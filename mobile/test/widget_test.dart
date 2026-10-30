@@ -1,0 +1,251 @@
+import 'package:ereader_mobile/features/books/domain/entities/epub_source.dart';
+import 'dart:async';
+
+import 'package:ereader_mobile/features/books/domain/entities/book.dart';
+import 'package:ereader_mobile/features/books/domain/repositories/books_repository.dart';
+import 'package:ereader_mobile/features/books/presentation/time_ruler.dart';
+import 'package:ereader_mobile/main.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'features/books/fake_books_repository.dart';
+import 'features/listen/fake_speech.dart';
+
+void main() {
+  Future<FakeBooksRepository> pumpApp(
+    WidgetTester tester, {
+    List<Book>? shelf,
+    BooksException? shortenedError,
+    FakeSpeech? speech,
+  }) async {
+    tester.view.physicalSize = const Size(1170, 2532);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final repository = FakeBooksRepository(
+      shelf: shelf,
+      shortenedError: shortenedError,
+    );
+    await tester.pumpWidget(
+      EReaderApp(
+        repository: repository,
+        speech: speech ?? FakeSpeech(),
+        pickEpub: () async =>
+            const EpubSource(path: '/tmp/loeb.epub', fileName: 'loeb.epub'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    return repository;
+  }
+
+  testWidgets('an empty library invites the first import', (tester) async {
+    await pumpApp(tester);
+
+    expect(
+      find.text('Chưa có sách nào. Thêm một file EPUB để bắt đầu đọc.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Thêm sách EPUB'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('2 chương, khoảng 12 phút đọc'), findsOneWidget);
+  });
+
+  testWidgets('opens a book, chooses a shorter length, and reads it', (
+    tester,
+  ) async {
+    final repository = await pumpApp(tester, shelf: [loeb]);
+
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+      findsOneWidget,
+    );
+    expect(find.text("8'"), findsOneWidget);
+
+    await tester.tap(
+      find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Chương Một dài 8 phút'), findsOneWidget);
+
+    await tester.tap(find.text('Ý chính'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ý chính còn 2 phút'), findsOneWidget);
+    final gate = repository.shortenedGate = Completer<void>();
+    await tester.tap(find.text('Đọc bản 2 phút'));
+    // Sheet closes, then the reader opens; the AI answer is still pending.
+    for (var frame = 0; frame < 10; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      find.text('AI đang rút gọn chương, thường mất 15–30 giây.'),
+      findsOneWidget,
+    );
+
+    gate.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Bản 2 phút của book-1-c0.'), findsOneWidget);
+    expect(find.text('AI viết lại từ bản gốc'), findsOneWidget);
+    expect(repository.shortenedRequests.single.minutes, 2);
+
+    await tester.tap(find.text('gốc'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
+  });
+
+  testWidgets('a chapter under 5 minutes opens the original without asking', (
+    tester,
+  ) async {
+    await pumpApp(tester, shelf: [loeb]);
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Chương Sáu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kéo thước tới thời gian bạn có.'), findsNothing);
+    expect(find.textContaining('Tôi thực sự tin rằng'), findsOneWidget);
+  });
+
+  testWidgets(
+    'says so when the AI cannot shorten a chapter, and offers a retry',
+    (tester) async {
+      await pumpApp(
+        tester,
+        shelf: [loeb],
+        shortenedError: const BooksException('DIGEST_FAILED'),
+      );
+      await tester.tap(find.text('Gerald M. Loeb'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ý chính'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đọc bản 2 phút'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('AI chưa rút gọn được chương này. Thử lại'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('dragging the ruler picks the nearest length', (tester) async {
+    await pumpApp(tester, shelf: [loeb]);
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(TimeRuler), const Offset(400, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Đọc bản gốc'), findsOneWidget);
+  });
+
+  Future<void> openOriginalChapter(WidgetTester tester) async {
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Chương Sáu'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('listening shows the player and can be turned off', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+
+    expect(speech.played, [1]);
+    expect(find.text('Lùi một câu'), findsOneWidget);
+    // The player sits under the page, never over its top bar.
+    expect(
+      tester.getTopLeft(find.text('Lùi một câu')).dy,
+      greaterThan(tester.getBottomLeft(find.textContaining('Tôi thực sự')).dy),
+    );
+    expect(
+      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Tắt'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nghe'), findsOneWidget);
+    expect(speech.stops, greaterThan(0));
+  });
+
+  testWidgets('the first listen asks before downloading the voice', (
+    tester,
+  ) async {
+    final speech = FakeSpeech(ready: false);
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Tải giọng đọc (326 MB), một lần. Sau đó nghe không cần mạng.'),
+      findsOneWidget,
+    );
+    expect(speech.played, isEmpty);
+
+    await tester.tap(find.text('Tải giọng đọc'));
+    await tester.pumpAndSettle();
+    expect(speech.played, [1]);
+  });
+
+  testWidgets('another voice can be chosen from the player', (tester) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đức An'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Giọng Đức An, chạy trên máy, không cần mạng'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('listening from the length sheet starts by itself', (
+    tester,
+  ) async {
+    final speech = FakeSpeech();
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await tester.tap(find.text('Gerald M. Loeb'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.text('Nó đòi hỏi kiến thức, kinh nghiệm và năng khiếu'),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Nghe bản này'));
+    await tester.pumpAndSettle();
+
+    expect(speech.played, [1]);
+    expect(find.text('Lùi một câu'), findsOneWidget);
+
+    await tester.tap(find.text('gốc'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nghe'), findsOneWidget);
+    expect(speech.stops, greaterThan(0));
+  });
+}

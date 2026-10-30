@@ -1,0 +1,17 @@
+# Node / NestJS
+backend/node_modules/
+backend/dist/
+backend/.env*
+backend/.data/
+
+# Flutter / Dart
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/pubspec.lock
+
+# Local files
+.DS_Store
+*.log
