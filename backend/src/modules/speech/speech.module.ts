@@ -24,6 +24,7 @@ export class SpeechModule {
   static register({ tts, storage, index, chapterVoices = new InMemoryChapterVoiceStore(), slots = new AccountSlots() }: SpeechModuleOptions): DynamicModule {
     return {
       module: SpeechModule,
+      exports: [SpeechService],
       controllers: [SpeechController, ChapterVoiceController],
       providers: [
         SpeechService,

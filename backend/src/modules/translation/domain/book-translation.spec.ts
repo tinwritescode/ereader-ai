@@ -1,5 +1,6 @@
 import { Block } from '../../books/domain/book';
-import { BookTranslationTask, partsOf, percentDone, putFirst, translationOrder } from './book-translation';
+import { chapterLine } from '../../../shared/tasks/chapter-line';
+import { BookTranslationTask, partsOf, percentDone, putFirst } from './book-translation';
 
 const chapter = (chapterId: string, words = 100) => ({ chapterId, label: chapterId, words });
 
@@ -18,11 +19,11 @@ const task = (over: Partial<BookTranslationTask> = {}): BookTranslationTask => (
   ...over,
 });
 
-describe('translationOrder', () => {
+describe('chapterLine', () => {
   const chapters = ['c1', 'c2', 'c3', 'c4'].map((id) => chapter(id));
 
   it('starts at the chapter being read, then goes back for the earlier ones', () => {
-    expect(translationOrder({ chapters, startAt: 'c3', translated: [] }).map(({ chapterId }) => chapterId)).toEqual([
+    expect(chapterLine({ chapters, startAt: 'c3', skip: [] }).map(({ chapterId }) => chapterId)).toEqual([
       'c3',
       'c4',
       'c1',
@@ -32,9 +33,9 @@ describe('translationOrder', () => {
 
   it('starts at the beginning without a known chapter, and skips what is already translated', () => {
     expect(
-      translationOrder({ chapters, startAt: 'missing', translated: ['c2', 'c4'] }).map(({ chapterId }) => chapterId),
+      chapterLine({ chapters, startAt: 'missing', skip: ['c2', 'c4'] }).map(({ chapterId }) => chapterId),
     ).toEqual(['c1', 'c3']);
-    expect(translationOrder({ chapters, startAt: null, translated: [] })[0].chapterId).toBe('c1');
+    expect(chapterLine({ chapters, startAt: null, skip: [] })[0].chapterId).toBe('c1');
   });
 });
 

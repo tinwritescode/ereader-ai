@@ -135,27 +135,28 @@ export class ChapterVoiceService implements OnApplicationBootstrap {
     const tts = this.tts;
     if (!account || !tts) return { kind: 'stopped', code: 'SPEECH_FAILED' };
 
-    let next = 0;
-    let failure: ChapterVoiceState | null = null;
-    const worker = async () => {
-      while (!run.cancelled && failure === null && next < task.sentences.length) {
-        const text = task.sentences[next];
-        next += 1;
-        try {
-          await this.speech.speak(tts, text, task.voiceCode, this.accounts.charge(account, 'vbeeSeconds', spokenSeconds(text)));
+    try {
+      await this.speech.speakAll({
+        tts,
+        sentences: task.sentences,
+        voiceCode: task.voiceCode,
+        charge: (text) => this.accounts.charge(account, 'vbeeSeconds', spokenSeconds(text)),
+        atOnce: SENTENCES_AT_ONCE,
+        stopped: () => run.cancelled,
+        onSpoken: async () => {
           run.done += 1;
           await this.store.setDone(task.id, run.done);
-        } catch (error) {
-          failure = stoppedBy(error);
-        }
-      }
-    };
-    await Promise.all(Array.from({ length: SENTENCES_AT_ONCE }, worker));
-    return failure ?? { kind: 'done' };
+        },
+      });
+      return { kind: 'done' };
+    } catch (error) {
+      return stoppedBy(error);
+    }
   }
 }
 
-function stoppedBy(error: unknown): ChapterVoiceState {
+/** Why reading aloud stopped, for a task to show. */
+export function stoppedBy(error: unknown): Extract<ChapterVoiceState, { kind: 'stopped' }> {
   const overLimit = error instanceof HttpException && error.getStatus() === HttpStatus.TOO_MANY_REQUESTS;
   return { kind: 'stopped', code: overLimit ? 'VBEE_LIMIT' : 'SPEECH_FAILED' };
 }

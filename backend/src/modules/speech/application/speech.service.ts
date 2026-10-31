@@ -32,6 +32,35 @@ export class SpeechService {
     return audio;
   }
 
+  /** Reads [sentences] a few at a time until [stopped]; rejects with the first failure, and starts no more after it. */
+  async speakAll({ tts, sentences, voiceCode, charge, atOnce, stopped, onSpoken }: {
+    tts: TtsGateway;
+    sentences: readonly string[];
+    voiceCode: string;
+    charge: (text: string) => UsageCharge;
+    atOnce: number;
+    stopped: () => boolean;
+    onSpoken: () => Promise<void>;
+  }): Promise<void> {
+    let next = 0;
+    let failed = false;
+    const worker = async () => {
+      while (!failed && !stopped() && next < sentences.length) {
+        const text = sentences[next];
+        next += 1;
+        try {
+          await this.speak(tts, text, voiceCode, charge(text));
+          await onSpoken();
+        } catch (error) {
+          failed = true;
+          throw error;
+        }
+      }
+    };
+    const results = await Promise.allSettled(Array.from({ length: atOnce }, worker));
+    for (const result of results) if (result.status === 'rejected') throw result.reason;
+  }
+
   // Storage only saves credits: when it fails, reading goes on through Vbee.
   private async kept(key: string): Promise<Buffer | null> {
     try {

@@ -15,7 +15,7 @@ import { InMemorySpeechClipIndex } from './modules/speech/application/speech-cli
 import { PostgresChapterVoiceStore } from './modules/speech/infrastructure/postgres.chapter-voice-store';
 import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgres.speech-clip-index';
 import { RoutedTtsGateway } from './modules/speech/application/routed-tts-gateway';
-import { TtsGateway } from './modules/speech/application/tts-gateway';
+import { TTS_GATEWAY, TtsGateway } from './modules/speech/application/tts-gateway';
 import { VieneuTtsGateway, vieneuOptionsFromEnv } from './modules/speech/infrastructure/vieneu.tts-gateway';
 import { VbeeTtsGateway, vbeeOptionsFromEnv } from './modules/speech/infrastructure/vbee.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
@@ -24,6 +24,10 @@ import { LLM_GATEWAY } from './shared/llm/llm-gateway';
 import { OpenAiCompatibleLlmGateway } from './shared/llm/openai-compatible.llm-gateway';
 import { storageFromEnv } from './shared/storage/storage-config';
 import { AccountSlots } from './shared/tasks/account-slots';
+import { BOOK_VOICE_STORE, InMemoryBookVoiceStore } from './modules/book-voice/application/book-voice-store';
+import { BookVoiceService } from './modules/book-voice/application/book-voice.service';
+import { PostgresBookVoiceStore } from './modules/book-voice/infrastructure/postgres.book-voice-store';
+import { BookVoiceController } from './modules/book-voice/presentation/book-voice.controller';
 import { BookTranslationService } from './modules/translation/application/book-translation.service';
 import {
   BOOK_TRANSLATION_STORE,
@@ -49,6 +53,7 @@ const ttsProviders: TtsGateway[] = [
   ...(vieneu ? [new VieneuTtsGateway(vieneu)] : []),
   ...(vbee ? [new VbeeTtsGateway(vbee)] : []),
 ];
+const tts = ttsProviders.length > 0 ? new RoutedTtsGateway(ttsProviders) : null;
 
 @Module({
   imports: [
@@ -62,18 +67,21 @@ const ttsProviders: TtsGateway[] = [
       store: pool ? new PostgresBookStore(pool) : new InMemoryBookStore(),
     }),
     SpeechModule.register({
-      tts: ttsProviders.length > 0 ? new RoutedTtsGateway(ttsProviders) : null,
+      tts,
       storage,
       index: pool ? new PostgresSpeechClipIndex(pool) : new InMemorySpeechClipIndex(),
       ...(pool ? { chapterVoices: new PostgresChapterVoiceStore(pool) } : {}),
       slots,
     }),
   ],
-  controllers: [DigestController, BookTranslationController],
+  controllers: [DigestController, BookTranslationController, BookVoiceController],
   providers: [
     DigestService,
     FormatAgentService,
     BookTranslationService,
+    BookVoiceService,
+    { provide: TTS_GATEWAY, useValue: tts },
+    { provide: BOOK_VOICE_STORE, useValue: pool ? new PostgresBookVoiceStore(pool) : new InMemoryBookVoiceStore() },
     { provide: AccountSlots, useValue: slots },
     { provide: BOOK_TRANSLATION_STORE, useValue: pool ? new PostgresBookTranslationStore(pool) : new InMemoryBookTranslationStore() },
     { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },

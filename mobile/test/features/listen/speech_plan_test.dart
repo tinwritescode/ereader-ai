@@ -1,9 +1,39 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:ereader_mobile/features/books/domain/entities/chapter.dart';
 import 'package:ereader_mobile/features/listen/domain/speech_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const paragraph = TextBlockKind.paragraph;
+
+  test('cuts text exactly as the server does', () {
+    final golden = switch (jsonDecode(
+      File(
+        '../backend/src/modules/speech/domain/speech-plan.golden.json',
+      ).readAsStringSync(),
+    )) {
+      {
+        'blocks': final List<Object?> blocks,
+        'sentences': final List<Object?> sentences,
+      } =>
+        (blocks: blocks.whereType<String>(), sentences: sentences),
+      _ => throw StateError('bad golden file'),
+    };
+    final plan = planSpeech([
+      for (final text in golden.blocks) TextBlock(paragraph, text),
+    ]);
+    expect([
+      for (final sentence in plan)
+        {
+          'block': sentence.block,
+          'start': sentence.start,
+          'end': sentence.end,
+          'text': sentence.text,
+        },
+    ], golden.sentences);
+  });
 
   test('splits blocks into sentences that remember where they came from', () {
     final plan = planSpeech([

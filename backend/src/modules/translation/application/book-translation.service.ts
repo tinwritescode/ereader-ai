@@ -13,16 +13,16 @@ import { LLM_GATEWAY, LlmError, LlmGateway } from '../../../shared/llm/llm-gatew
 import { mapInBatches } from '../../../shared/map-in-batches';
 import { countWords } from '../../../shared/reading-time';
 import { AccountSlots } from '../../../shared/tasks/account-slots';
+import { ChapterInLine, chapterLine } from '../../../shared/tasks/chapter-line';
+import { TaskEdits } from '../../../shared/tasks/task-edits';
 import { AccountService } from '../../accounts/application/account.service';
 import { Account, PLANS } from '../../accounts/domain/plan';
 import { BookService } from '../../books/application/book.service';
 import { Block } from '../../books/domain/book';
 import {
   BookTranslationTask,
-  ChapterInLine,
   partsOf,
   putFirst,
-  translationOrder,
 } from '../domain/book-translation';
 import { TRANSLATION_PROMPT_VERSION, TranslationOutputSchema, translationInstructions } from './translation-prompt';
 import { BOOK_TRANSLATION_STORE, BookTranslationStore, CHAPTER_TRANSLATIONS, ChapterTranslations } from './translation-stores';
@@ -43,8 +43,7 @@ type TaskRef = Pick<BookTranslationTask, 'id' | 'accountId'>;
 export class BookTranslationService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BookTranslationService.name);
   private readonly runs = new Map<string, Run>();
-  // Every change to a task goes through here, one at a time per task, so no write is lost.
-  private readonly edits = new Map<string, Promise<unknown>>();
+  private readonly edits: TaskEdits<BookTranslationTask>;
 
   constructor(
     @Inject(BOOK_TRANSLATION_STORE) private readonly store: BookTranslationStore,
@@ -53,7 +52,9 @@ export class BookTranslationService implements OnApplicationBootstrap {
     private readonly books: BookService,
     private readonly accounts: AccountService,
     private readonly slots: AccountSlots,
-  ) {}
+  ) {
+    this.edits = new TaskEdits(store);
+  }
 
   async onApplicationBootstrap(): Promise<void> {
     for (const task of await this.store.unfinished()) {
@@ -77,7 +78,7 @@ export class BookTranslationService implements OnApplicationBootstrap {
       label,
       words: wordCount,
     }));
-    const remaining = translationOrder({ chapters, startAt, translated: await this.translations.translatedOf(bookId) });
+    const remaining = chapterLine({ chapters, startAt, skip: await this.translations.translatedOf(bookId) });
     if (remaining.length === 0) throw new ConflictException({ code: 'ALREADY_TRANSLATED' });
 
     await this.accounts.charge(account, 'bookTranslations', 1).take();
@@ -129,21 +130,21 @@ export class BookTranslationService implements OnApplicationBootstrap {
     const run = this.runs.get(id);
     if (run) run.cancelled = true;
     this.slots.withdraw(id);
-    await this.serially(id, () => this.store.remove(id));
+    await this.edits.serially(id, () => this.store.remove(id));
   }
 
   /** Goes on from where a stopped task left off, at no further charge. */
   async resume(account: Account, id: string): Promise<BookTranslationTask> {
     const task = await this.owned(account, id);
     if (task.state.kind !== 'stopped') return task;
-    const queued = await this.edit(task, (current) => ({ ...current, state: { kind: 'queued' }, finishedAt: null }));
+    const queued = await this.edits.edit(task, (current) => ({ ...current, state: { kind: 'queued' }, finishedAt: null }));
     if (!queued) throw new NotFoundException({ code: 'TASK_NOT_FOUND' });
     this.enqueue(queued, new Date());
     return queued;
   }
 
   async putFirst(account: Account, id: string, chapterId: string): Promise<BookTranslationTask> {
-    const task = await this.edit(await this.owned(account, id), (current) => putFirst(current, chapterId));
+    const task = await this.edits.edit(await this.owned(account, id), (current) => putFirst(current, chapterId));
     if (!task) throw new NotFoundException({ code: 'TASK_NOT_FOUND' });
     return task;
   }
@@ -158,40 +159,16 @@ export class BookTranslationService implements OnApplicationBootstrap {
     this.slots.enqueue({ id: task.id, accountId: task.accountId, queuedAt, run: () => this.work(task) });
   }
 
-  private serially<T>(id: string, change: () => Promise<T>): Promise<T> {
-    const next = (this.edits.get(id) ?? Promise.resolve()).then(change);
-    const settled = next.catch(() => undefined);
-    this.edits.set(id, settled);
-    void settled.then(() => {
-      if (this.edits.get(id) === settled) this.edits.delete(id);
-    });
-    return next;
-  }
-
-  /** Applies [change] to the stored task; null once the task is gone. */
-  private edit(
-    { id, accountId }: TaskRef,
-    change: (task: BookTranslationTask) => BookTranslationTask,
-  ): Promise<BookTranslationTask | null> {
-    return this.serially(id, async () => {
-      const task = (await this.store.ofAccount(accountId)).find((candidate) => candidate.id === id);
-      if (!task) return null;
-      const changed = change(task);
-      await this.store.save(changed);
-      return changed;
-    });
-  }
-
   private async work(queued: BookTranslationTask): Promise<void> {
     const run: Run = { cancelled: false };
     this.runs.set(queued.id, run);
     try {
-      let task = await this.edit(queued, (current) => ({ ...current, state: { kind: 'running' } }));
+      let task = await this.edits.edit(queued, (current) => ({ ...current, state: { kind: 'running' } }));
       while (task && !run.cancelled && task.remaining.length > 0) {
         const [head] = task.remaining;
         await this.translateChapter(task, head, run);
         if (run.cancelled) return;
-        task = await this.edit(task, (current) => ({
+        task = await this.edits.edit(task, (current) => ({
           ...current,
           remaining: current.remaining.filter(({ chapterId }) => chapterId !== head.chapterId),
           translated: [...current.translated, head],
@@ -199,7 +176,7 @@ export class BookTranslationService implements OnApplicationBootstrap {
         }));
       }
       if (task && !run.cancelled) {
-        await this.edit(task, (current) => ({ ...current, state: { kind: 'done' }, finishedAt: new Date() }));
+        await this.edits.edit(task, (current) => ({ ...current, state: { kind: 'done' }, finishedAt: new Date() }));
       }
     } catch {
       if (!run.cancelled) await this.stop(queued);
@@ -212,7 +189,7 @@ export class BookTranslationService implements OnApplicationBootstrap {
   private async stop(task: TaskRef): Promise<void> {
     try {
       const held = { charged: false };
-      await this.edit(task, (current) => {
+      await this.edits.edit(task, (current) => {
         held.charged = current.charged;
         return { ...current, state: { kind: 'stopped', code: 'TRANSLATE_FAILED' }, current: null, charged: false, finishedAt: new Date() };
       });
@@ -227,11 +204,11 @@ export class BookTranslationService implements OnApplicationBootstrap {
     if (await this.translations.find(head.chapterId)) return;
     const chapter = await this.books.chapter(task.accountId, head.chapterId);
     const parts = partsOf(chapter.blocks, PART_WORDS);
-    await this.edit(task, (current) => ({ ...current, current: { done: 0, parts: Math.max(parts.length, 1) } }));
+    await this.edits.edit(task, (current) => ({ ...current, current: { done: 0, parts: Math.max(parts.length, 1) } }));
     const translated = await mapInBatches(parts, PARTS_AT_ONCE, async (part, index) => {
       if (run.cancelled) return part;
       const blocks = await this.translatePart({ part, index, partCount: parts.length });
-      await this.edit(task, (current) => ({
+      await this.edits.edit(task, (current) => ({
         ...current,
         current: current.current && { ...current.current, done: current.current.done + 1 },
       }));

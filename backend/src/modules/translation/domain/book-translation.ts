@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { countWords } from '../../../shared/reading-time';
+import { ChapterInLine, shareDone } from '../../../shared/tasks/chapter-line';
 import { Block } from '../../books/domain/book';
 
 export const BookTranslationRequestSchema = z.object({
@@ -8,8 +9,6 @@ export const BookTranslationRequestSchema = z.object({
 });
 
 export const PutFirstRequestSchema = z.object({ chapterId: z.string().min(1) });
-
-export type ChapterInLine = { chapterId: string; label: string; words: number };
 
 export type BookTranslationState =
   | { kind: 'queued' }
@@ -40,16 +39,6 @@ export function isFinished({ state }: Pick<BookTranslationTask, 'state'>): boole
   return state.kind === 'done' || state.kind === 'stopped';
 }
 
-/** From the chapter being read to the end, then the chapters before it; leaves out what is already translated. */
-export function translationOrder({ chapters, startAt, translated }: {
-  chapters: readonly ChapterInLine[];
-  startAt: string | null;
-  translated: readonly string[];
-}): ChapterInLine[] {
-  const start = Math.max(0, chapters.findIndex(({ chapterId }) => chapterId === startAt));
-  return [...chapters.slice(start), ...chapters.slice(0, start)].filter(({ chapterId }) => !translated.includes(chapterId));
-}
-
 /** Moves a waiting chapter to the front of the line, behind the one already being translated. */
 export function putFirst(task: BookTranslationTask, chapterId: string): BookTranslationTask {
   const wanted = task.remaining.find((chapter) => chapter.chapterId === chapterId);
@@ -62,12 +51,7 @@ export function putFirst(task: BookTranslationTask, chapterId: string): BookTran
 
 /** Share of the task's words translated, 0 to 100. */
 export function percentDone({ remaining, translated, current }: BookTranslationTask): number {
-  const words = (chapters: readonly ChapterInLine[]) => chapters.reduce((total, chapter) => total + chapter.words, 0);
-  const total = words(remaining) + words(translated);
-  if (total === 0) return 100;
-  const head = remaining[0];
-  const underWay = head && current ? (head.words * current.done) / current.parts : 0;
-  return Math.round((100 * (words(translated) + underWay)) / total);
+  return shareDone({ remaining, finished: translated, current });
 }
 
 /** Runs of consecutive blocks for one model call each; a block longer than the budget goes alone, whole. */
