@@ -122,7 +122,7 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
 | Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
-| Giọng VieNeu | VieNeu-TTS trên Replicate, có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn đi kèm backend. Khi tài khoản dưới $5 credit, Replicate chỉ cho 6 câu mỗi phút, quá chậm để nghe. Tính chung vào số phút hằng tháng với Vbee | |
+| Giọng VieNeu | VieNeu-TTS trên Cloud Run GPU của Google (`voice/`), có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn trong `voice/clips`. Service tự tắt khi rảnh, nên câu đầu sau khi nghỉ chờ khoảng một phút. Tính chung vào số phút hằng tháng với Vbee | |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
@@ -188,7 +188,7 @@ Integration test ghi đè app đã cài trên simulator, nên phải build lại
 
 ## Deploy
 
-Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, `REPLICATE_API_TOKEN`, trong biến môi trường của Railway, không đưa vào repo.
+Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, `VIENEU_URL`, `VIENEU_API_KEY`, trong biến môi trường của Railway, không đưa vào repo.
 
 Bản iPhone trỏ vào backend đã deploy:
 
