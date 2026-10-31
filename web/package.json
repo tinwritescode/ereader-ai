@@ -9,7 +9,10 @@
     "dev": "vite dev --port 3000",
     "build": "vite build",
     "start": "node .output/server/index.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsrs --noEmit --fast",
+    "lint": "oxlint --deny-warnings",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "check:boundaries": "node scripts/check-boundaries.ts",
     "test": "vitest run",
     "e2e": "playwright test"
@@ -40,7 +43,9 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxc-parser": "^0.156.0",
-    "typescript": "^7.0.2",
+    "oxfmt": "^0.75.0",
+    "oxlint": "^1.90.0",
+    "tsrs": "^0.20.1-ts7.1.0-beta",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
   }

@@ -1,0 +1,21 @@
+{
+  "plugins": ["typescript", "unicorn", "oxc", "react", "react-perf", "import", "jsx-a11y", "vitest"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "ignorePatterns": ["public", ".output", "src/routeTree.gen.ts"],
+  "rules": {
+    // JSX compiles to the automatic runtime; nothing imports React for it.
+    "react/react-in-jsx-scope": "off",
+    // The rule assumes the React Compiler, which this build does not use.
+    "react/incompatible-library": "off",
+    // Render props are called, not mounted; a real nested component still fails.
+    "react/no-unstable-nested-components": ["warn", { "allowAsProps": true }],
+    // The design's radios and regions are styled buttons and divs, kept whole by their roles.
+    "jsx-a11y/prefer-tag-over-role": "off",
+    // Table cells take their text from FlexRender, which the rule cannot see through.
+    "jsx-a11y/control-has-associated-label": ["error", { "ignoreElements": ["audio", "canvas", "embed", "input", "textarea", "tr", "video", "td", "th"] }],
+    // The side-effect import that keeps a module out of the browser bundle.
+    "import/no-unassigned-import": ["warn", { "allow": ["**/server-only"] }],
+    // The unused name that proves a switch is exhaustive.
+    "no-underscore-dangle": ["warn", { "allow": ["_exhaustive"] }]
+  }
+}

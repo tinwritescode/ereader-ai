@@ -1,0 +1,6 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 120,
+  "ignorePatterns": ["public", "src/routeTree.gen.ts", "package-lock.json"]
+}
