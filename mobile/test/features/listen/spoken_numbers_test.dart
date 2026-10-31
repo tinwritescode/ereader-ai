@@ -22,4 +22,16 @@ void main() {
   test('leaves text without numbers alone', () {
     expect(spellNumbers('Phố Wall'), 'Phố Wall');
   });
+
+  test('reads a decimal comma as phẩy', () {
+    expect(spellNumbers('tăng 3,5%'), 'tăng ba phẩy năm phần trăm');
+  });
+
+  test('reads a date and a time the long way', () {
+    expect(
+      spellNumbers('vào 12/4/1975 lúc 9:05'),
+      'vào ngày mười hai tháng tư năm một nghìn chín trăm bảy mươi lăm '
+      'lúc chín giờ năm phút',
+    );
+  });
 }

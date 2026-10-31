@@ -3,15 +3,32 @@ const _digits = [
 ];
 const _groups = ['', ' nghìn', ' triệu', ' tỷ'];
 
+final _date = RegExp(r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b');
+final _time = RegExp(r'\b(\d{1,2}):(\d{2})\b');
+final _decimal = RegExp(r'\b(\d+),(\d{1,2})\b(?![.,]\d)(%)?');
+final _gluedDigit = RegExp(r'(\p{L})(\d)', unicode: true);
 final _number = RegExp(r'(\$)?(\d{1,3}(?:[.,]\d{3})+|\d+)(%)?');
 
 /// The voice model cannot read digits, so numbers become words before phonemes.
-String spellNumbers(String text) => text.replaceAllMapped(_number, (match) {
-  final digits = match[2]!.replaceAll(RegExp('[.,]'), '');
-  final prefix = match[1] != null ? ' đô la' : '';
-  final suffix = match[3] != null ? ' phần trăm' : '';
-  return '${_spell(digits)}$prefix$suffix';
-});
+String spellNumbers(String text) => text
+    .replaceAllMapped(_gluedDigit, (match) => '${match[1]} ${match[2]}')
+    .replaceAllMapped(_date, (match) {
+      final month = int.parse(match[2]!) == 4 ? 'tư' : _spell(match[2]!);
+      return 'ngày ${_spell(match[1]!)} tháng $month năm ${_spell(match[3]!)}';
+    })
+    .replaceAllMapped(_time, (match) {
+      return '${_spell(match[1]!)} giờ ${_spell(match[2]!)} phút';
+    })
+    .replaceAllMapped(_decimal, (match) {
+      final decimals = match[2]!.split('').map(_spell).join(' ');
+      return '${match[1]} phẩy $decimals${match[3] != null ? ' phần trăm' : ''}';
+    })
+    .replaceAllMapped(_number, (match) {
+      final digits = match[2]!.replaceAll(RegExp('[.,]'), '');
+      final prefix = match[1] != null ? ' đô la' : '';
+      final suffix = match[3] != null ? ' phần trăm' : '';
+      return '${_spell(digits)}$prefix$suffix';
+    });
 
 String _spell(String digits) {
   final value = BigInt.parse(digits);
