@@ -32,6 +32,12 @@ List<SpokenSentence> planSpeech(List<TextBlock> blocks) => [
       ..._withinLimit(index, block.text, match.start, match.end),
 ];
 
+/// About how long [sentences] take to read, in whole minutes.
+int spokenMinutes(List<String> sentences) {
+  final characters = sentences.fold(0, (sum, text) => sum + text.length);
+  return (characters / _spokenCharactersPerSecond / 60).ceil();
+}
+
 /// How many sentences after [from] it takes to fill [seconds] of speech.
 int sentencesWithin(List<SpokenSentence> plan, int from, double seconds) {
   var characters = seconds * _spokenCharactersPerSecond;

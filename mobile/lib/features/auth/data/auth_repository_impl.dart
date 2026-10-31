@@ -205,11 +205,13 @@ PlanLimits _toLimits(Object? json) => switch (json) {
     'books': final int books,
     'monthlyDigests': final int monthlyDigests,
     'monthlyVbeeMinutes': final int monthlyVbeeMinutes,
+    'chapterVoice': final bool chapterVoice,
   } =>
     PlanLimits(
       books: books,
       monthlyDigests: monthlyDigests,
       monthlyVbeeMinutes: monthlyVbeeMinutes,
+      chapterVoice: chapterVoice,
     ),
   _ => throw const AuthException('UNEXPECTED_RESPONSE'),
 };

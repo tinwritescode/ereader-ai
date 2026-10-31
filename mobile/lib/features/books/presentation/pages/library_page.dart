@@ -8,6 +8,9 @@ import '../../../auth/presentation/auth_cubit.dart';
 import '../../../auth/presentation/plans_page.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/mini_player.dart';
+import '../../../tasks/domain/chapter_task.dart';
+import '../../../tasks/presentation/task_notices.dart';
+import '../../../tasks/presentation/tasks_cubit.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/entities/reading_spot.dart';
 import '../bloc/library_bloc.dart';
@@ -72,23 +75,34 @@ class _LibraryPageState extends State<LibraryPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Thư viện',
-                            style: readingStyle(
-                              size: 26,
-                              height: onGrid(26) * 2,
-                              weight: FontWeight.w600,
-                              color: Palette.ink,
+                          Flexible(
+                            child: Text(
+                              'Thư viện',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: readingStyle(
+                                size: 26,
+                                height: onGrid(26) * 2,
+                                weight: FontWeight.w600,
+                                color: Palette.ink,
+                              ),
                             ),
                           ),
-                          IconButton(
-                            tooltip: 'Tài khoản',
-                            icon: const Icon(
-                              Icons.person_outline,
-                              color: Palette.ink,
-                            ),
-                            onPressed: () =>
-                                Navigator.of(context).push(AccountPage.route()),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const _TasksEntry(),
+                              IconButton(
+                                tooltip: 'Tài khoản',
+                                icon: const Icon(
+                                  Icons.person_outline,
+                                  color: Palette.ink,
+                                ),
+                                onPressed: () => Navigator.of(
+                                  context,
+                                ).push(AccountPage.route()),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -142,6 +156,51 @@ class _LibraryPageState extends State<LibraryPage> {
     if (book != null) return (book, value);
   }
   return null;
+}
+
+/// The way to the task page, with how many tasks are under way.
+class _TasksEntry extends StatelessWidget {
+  const _TasksEntry();
+
+  @override
+  Widget build(BuildContext context) {
+    final active = context.watch<TasksCubit>().state.active;
+    return InkWell(
+      onTap: () => openTasks(context),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (active > 0) ...[
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Palette.marker,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '$active',
+                  style: handStyle(size: 20, color: Palette.ink),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              'Tác vụ',
+              style: readingStyle(
+                size: 14,
+                weight: FontWeight.w600,
+                color: Palette.ink,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _Note extends StatelessWidget {
@@ -272,6 +331,16 @@ class _ShelfBook extends StatelessWidget {
   Widget build(BuildContext context) {
     final author = book.author;
     final spot = this.spot;
+    final working = context
+        .watch<TasksCubit>()
+        .state
+        .tasks
+        .where(
+          (task) =>
+              task.bookId == book.bookId &&
+              task.state == ChapterTaskState.running,
+        )
+        .firstOrNull;
     return SizedBox(
       width: width,
       child: GestureDetector(
@@ -300,7 +369,14 @@ class _ShelfBook extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: readingStyle(size: 12.5, color: Palette.muted),
               ),
-            if (spot != null)
+            if (working != null)
+              Text(
+                'tạo giọng đọc ${working.percent}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: handStyle(size: 17),
+              )
+            else if (spot != null)
               Text(
                 '${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}',
                 maxLines: 1,

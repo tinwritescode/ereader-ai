@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../app/theme.dart';
 import '../../books/presentation/formatting.dart';
+import '../../tasks/presentation/chapter_voice_sheet.dart';
 import '../domain/speech.dart';
 import 'listen_bloc.dart';
 
@@ -25,8 +26,11 @@ import 'listen_bloc.dart';
 };
 
 /// Shared with the mini player: the two say the same thing during the wait.
-String preparingLine(int ready, int needed) =>
-    needed == 0 ? 'Đang chuẩn bị giọng đọc' : 'Đã có $ready trên $needed câu';
+String preparingLine(int ready, int needed, {bool slow = false}) => slow
+    ? 'Máy đọc đang khởi động'
+    : needed == 0
+    ? 'Đang chuẩn bị giọng đọc'
+    : 'Đã có $ready trên $needed câu';
 
 String _rateLabel(double rate) =>
     rate == rate.roundToDouble() ? rate.toStringAsFixed(1) : rate.toString();
@@ -71,9 +75,10 @@ class ListenPanel extends StatelessWidget {
             dismiss: 'Tắt',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
-          ListenPreparing(:final ready, :final needed) => _Waiting(
+          ListenPreparing(:final ready, :final needed, :final slow) => _Waiting(
             ready: ready,
             needed: needed,
+            slow: slow,
             voice: state.voice,
           ),
           ListenFailed(code: 'VBEE_LIMIT') => _Message(
@@ -287,11 +292,13 @@ class _Waiting extends StatelessWidget {
   const _Waiting({
     required this.ready,
     required this.needed,
+    required this.slow,
     required this.voice,
   });
 
   final int ready;
   final int needed;
+  final bool slow;
   final Voice voice;
 
   @override
@@ -306,10 +313,12 @@ class _Waiting extends StatelessWidget {
           child: _Tally(ready: ready, needed: needed),
         ),
         const SizedBox(height: 2),
-        Text(preparingLine(ready, needed), style: _written),
+        Text(preparingLine(ready, needed, slow: slow), style: _written),
         const SizedBox(height: 2),
         Text(
-          'Đủ $needed câu là ${voice.label} đọc, để nghe liền mạch.',
+          slow
+              ? 'Lượt đầu sau khi nghỉ mất khoảng một phút, các câu sau đọc ngay.'
+              : 'Đủ $needed câu là ${voice.label} đọc, để nghe liền mạch.',
           style: _quiet,
         ),
         const SizedBox(height: 6),
@@ -415,12 +424,21 @@ class _Player extends StatelessWidget {
             ),
           ],
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: _PanelButton(
-            label: 'Tắt',
-            onTap: () => bloc.add(const ListenStopped()),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            if (mayPrepareChapter(context))
+              _PanelButton(
+                label: 'Tạo sẵn cả chương',
+                onTap: () => chooseChapterVoice(context),
+              )
+            else
+              const SizedBox.shrink(),
+            _PanelButton(
+              label: 'Tắt',
+              onTap: () => bloc.add(const ListenStopped()),
+            ),
+          ],
         ),
       ],
     );

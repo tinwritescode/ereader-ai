@@ -14,7 +14,11 @@ String _line(ListenStage stage) => switch (stage) {
   ListenNeedsVoice() => 'Cần tải giọng đọc',
   ListenDownloading(:final progress) =>
     'Đang tải giọng đọc, ${(progress * 100).floor()}%',
-  ListenPreparing(:final ready, :final needed) => preparingLine(ready, needed),
+  ListenPreparing(:final ready, :final needed, :final slow) => preparingLine(
+    ready,
+    needed,
+    slow: slow,
+  ),
   ListenOff() => preparingLine(0, 0),
 };
 

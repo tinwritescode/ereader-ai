@@ -26,6 +26,11 @@ import 'features/listen/data/kokoro_speech.dart';
 import 'features/listen/data/vbee_voices.dart';
 import 'features/listen/domain/speech.dart';
 import 'features/listen/presentation/listen_bloc.dart';
+import 'features/tasks/data/prefs_task_notice_store.dart';
+import 'features/tasks/data/tasks_repository_impl.dart';
+import 'features/tasks/domain/chapter_task.dart';
+import 'features/tasks/presentation/task_notices.dart';
+import 'features/tasks/presentation/tasks_cubit.dart';
 
 const _apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -57,6 +62,8 @@ void main() {
       listenChoices: PrefsListenChoiceStore(),
       spots: PrefsReadingSpotStore(),
       pickEpub: pickEpubFromDevice,
+      tasks: TasksRepositoryImpl(api),
+      taskNotices: PrefsTaskNoticeStore(),
     ),
   );
 }
@@ -71,6 +78,8 @@ class EReaderApp extends StatelessWidget {
     required this.listenChoices,
     required this.spots,
     required this.pickEpub,
+    required this.tasks,
+    required this.taskNotices,
   });
 
   final AuthRepository auth;
@@ -80,6 +89,8 @@ class EReaderApp extends StatelessWidget {
   final ListenChoiceStore listenChoices;
   final ReadingSpotStore spots;
   final PickEpub pickEpub;
+  final TasksRepository tasks;
+  final TaskNoticeStore taskNotices;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +108,7 @@ class EReaderApp extends StatelessWidget {
             create: (_) =>
                 LibraryBloc(repository: repository, pickEpub: pickEpub),
           ),
+          BlocProvider(create: (_) => TasksCubit(tasks, taskNotices)),
           BlocProvider(create: (_) => ReadingLookCubit(looks)..load()),
           BlocProvider(create: (_) => ReadingSpotsCubit(spots)..load()),
           // Lives above the pages: the voice goes on when a book is closed.
@@ -109,6 +121,8 @@ class EReaderApp extends StatelessWidget {
             title: 'eReader AI',
             debugShowCheckedModeBanner: false,
             theme: buildTheme(),
+            navigatorKey: appNavigator,
+            builder: (_, child) => TaskNotices(child: child!),
             home: const AuthGate(),
           ),
         ),

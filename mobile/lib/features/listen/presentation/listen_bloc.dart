@@ -19,6 +19,8 @@ const _cloudReadAheadSeconds = 60.0;
 const _cloudRequests = 4;
 // Sentences a cloud voice has ready before it speaks, at the start and whenever it runs dry.
 const _cloudStartSentences = 5;
+// A wait this long with nothing back means the voice service is starting from zero.
+const _slowStart = Duration(seconds: 8);
 
 sealed class ListenStage {
   const ListenStage();
@@ -39,11 +41,14 @@ final class ListenDownloading extends ListenStage {
 }
 
 final class ListenPreparing extends ListenStage {
-  const ListenPreparing({this.ready = 0, this.needed = 0});
+  const ListenPreparing({this.ready = 0, this.needed = 0, this.slow = false});
 
   /// Sentences ready of those wanted before speaking; [needed] is 0 when nothing is counted.
   final int ready;
   final int needed;
+
+  /// Nothing has come back for a while: the voice's machine is starting.
+  final bool slow;
 }
 
 final class ListenPlaying extends ListenStage {
@@ -163,12 +168,14 @@ final class _Buffering extends ListenEvent {
     required this.index,
     required this.ready,
     required this.needed,
+    this.slow = false,
   });
 
   final int generation;
   final int index;
   final int ready;
   final int needed;
+  final bool slow;
 }
 
 final class _RunFailed extends ListenEvent {
@@ -182,9 +189,13 @@ final class _RunEnded extends ListenEvent {
 }
 
 class ListenBloc extends Bloc<ListenEvent, ListenState> {
-  ListenBloc(this._speech, {ListenChoiceStore? choices})
-    : _choices = choices,
-      super(const ListenState()) {
+  ListenBloc(
+    this._speech, {
+    ListenChoiceStore? choices,
+    Duration slowStart = _slowStart,
+  }) : _choices = choices,
+       _slowAfter = slowStart,
+       super(const ListenState()) {
     on<ListenRequested>(_onRequested);
     on<ListenDownloadConfirmed>(_onDownloadConfirmed);
     on<ListenPauseToggled>(_onPauseToggled);
@@ -202,6 +213,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
 
   final Speech _speech;
   final ListenChoiceStore? _choices;
+  final Duration _slowAfter;
   // Set once the opening voice is decided, or the listener has picked one.
   var _voiceSettled = false;
   List<TextBlock> _blocks = const [];
@@ -219,6 +231,9 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   int _from = 0;
   bool _paused = false;
   Completer<void>? _unpaused;
+
+  /// The sentences of the chapter being read, as the voice asks for them.
+  List<String> get sentences => [for (final s in _plan) s.text];
 
   Future<void> _onRequested(
     ListenRequested event,
@@ -333,15 +348,32 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       ),
     );
     report(0);
-    for (final sentence in wanted) {
-      try {
-        await _synthesized(sentence);
-      } on SpeechException {
-        if (sentence == index) rethrow;
-        return;
+    final slow = Timer(
+      _slowAfter,
+      () => add(
+        _Buffering(
+          generation: generation,
+          index: index,
+          ready: 0,
+          needed: needed,
+          slow: true,
+        ),
+      ),
+    );
+    try {
+      for (final sentence in wanted) {
+        try {
+          await _synthesized(sentence);
+        } on SpeechException {
+          if (sentence == index) rethrow;
+          return;
+        }
+        slow.cancel();
+        if (generation != _generation) return;
+        report(sentence - index + 1);
       }
-      if (generation != _generation) return;
-      report(sentence - index + 1);
+    } finally {
+      slow.cancel();
     }
   }
 
@@ -431,7 +463,11 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     _current = event.index;
     emit(
       state.copyWith(
-        stage: ListenPreparing(ready: event.ready, needed: event.needed),
+        stage: ListenPreparing(
+          ready: event.ready,
+          needed: event.needed,
+          slow: event.slow,
+        ),
       ),
     );
   }

@@ -8,16 +8,19 @@ const testPlans = {
     books: 3,
     monthlyDigests: 10,
     monthlyVbeeMinutes: 30,
+    chapterVoice: false,
   ),
   PlanName.plus: PlanLimits(
     books: 30,
     monthlyDigests: 100,
     monthlyVbeeMinutes: 300,
+    chapterVoice: false,
   ),
   PlanName.max: PlanLimits(
     books: 200,
     monthlyDigests: 500,
     monthlyVbeeMinutes: 1500,
+    chapterVoice: true,
   ),
 };
 

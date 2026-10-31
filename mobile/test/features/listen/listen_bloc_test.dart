@@ -289,6 +289,26 @@ void main() {
       await bloc.close();
     });
 
+    test('says the reader is waking when the first sentence is slow', () async {
+      final first = Completer<void>();
+      final speech = FakeSpeech(ready: false, slowText: {'Một.': first});
+      final bloc =
+          ListenBloc(speech, slowStart: const Duration(milliseconds: 5))
+            ..add(const ListenVoiceChosen(vieNeu))
+            ..add(ListenRequested(seven, source: source));
+      await settle();
+      expect((bloc.state.stage as ListenPreparing).slow, isFalse);
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect((bloc.state.stage as ListenPreparing).slow, isTrue);
+
+      first.complete();
+      await settle();
+      await settle();
+      expect(playingText(bloc), 'Một.');
+      await bloc.close();
+    });
+
     test('a short chapter waits only for what it has', () async {
       final bloc = await listen(FakeSpeech(ready: false), blocks.sublist(1));
       await settle();

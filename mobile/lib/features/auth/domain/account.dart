@@ -13,11 +13,15 @@ class PlanLimits {
     required this.books,
     required this.monthlyDigests,
     required this.monthlyVbeeMinutes,
+    required this.chapterVoice,
   });
 
   final int books;
   final int monthlyDigests;
   final int monthlyVbeeMinutes;
+
+  /// May prepare a whole chapter's audio ahead of listening.
+  final bool chapterVoice;
 }
 
 class Account {
