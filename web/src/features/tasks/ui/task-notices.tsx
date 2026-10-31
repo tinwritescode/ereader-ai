@@ -10,7 +10,7 @@ import { tasksQuery } from '../data/tasks'
 
 const seenFinishes = createStored({ key: 'tasks.seen', schema: z.array(z.string()), fallback: [] })
 
-/** The red count beside "Tác vụ". */
+/** The marker circle beside "Tác vụ". */
 export function TasksCount() {
   const { data = [] } = useQuery(tasksQuery())
   const active = data.filter(isActive).length

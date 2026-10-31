@@ -13,6 +13,7 @@ import { LINE_SPACINGS, TEXT_SIZES } from '../domain/look'
 import { minutesLeft, nextChapterSpot } from '../domain/spot'
 import type { ReadingSpot } from '../domain/spot'
 import { LookSheet } from './look-sheet'
+import { usePickedSpot } from './sentence-pick'
 import { clearSpot, readingLook, readingSpots, recordSpot } from './stores'
 import { useChapterText } from './use-chapter-text'
 
@@ -53,24 +54,10 @@ function savedSpotFor({
   return (spot.block > 0 || spot.offset > 0) && spot.block < blocks.length ? spot : null
 }
 
-function Block({
-  block,
-  index,
-  marked,
-  onPick,
-}: {
-  block: TextBlock
-  index: number
-  marked: ReaderVoice['marked']
-  onPick?: (block: number) => void
-}) {
+function Block({ block, index, marked }: { block: TextBlock; index: number; marked: ReaderVoice['marked'] }) {
   const Tag = block.kind === 'heading' ? 'h2' : 'p'
   if (marked?.block !== index) {
-    return (
-      <Tag data-block={index} onClick={onPick && (() => onPick(index))}>
-        {block.text}
-      </Tag>
-    )
+    return <Tag data-block={index}>{block.text}</Tag>
   }
   return (
     <Tag data-block={index}>
@@ -130,7 +117,6 @@ export function ReaderPage({
   const navigate = useNavigate()
   const look = readingLook.useValue()
   const [showLook, setShowLook] = useState(false)
-  const [picked, setPicked] = useState<number | null>(null)
   const option = useMemo<LengthOption>(
     () => ({ length: search.length, minutes: search.minutes }),
     [search.length, search.minutes],
@@ -146,6 +132,7 @@ export function ReaderPage({
   const options = chapter ? lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) }) : []
   const blocks = text.kind === 'loaded' ? text.blocks : null
   const key = `${chapterId}:${option.length}:${option.minutes}`
+  const { picked, clear: clearPicked } = usePickedSpot(Boolean(bar) && !voice.heardHere(option))
 
   const goTo = useCallback((block: number) => {
     document.querySelector(`[data-block="${block}"]`)?.scrollIntoView({ block: 'start' })
@@ -239,7 +226,9 @@ export function ReaderPage({
   return (
     <div className={`reader ${look.paper === 'night' ? 'night' : ''}`} style={style}>
       <div className="top">
-        <Link to="/books/$bookId" params={{ bookId: book.bookId }}>{`‹ ${book.title}, ${chapterName(chapter)}`}</Link>
+        <Link to="/books/$bookId" params={{ bookId: book.bookId }}>
+          ‹ Mục lục
+        </Link>
         <div className="vs" role="group" aria-label="Bản đọc">
           {options.map((entry) => (
             <button
@@ -260,7 +249,7 @@ export function ReaderPage({
         <div className="pg-column">
           <div className="margin-line" aria-hidden="true">
             <i style={{ height: `${read * 100}%` }} />
-            <u>{`còn ${left}'`}</u>
+            <u>{`${left}'`}</u>
           </div>
           {offer && (
             <div className="offer">
@@ -288,7 +277,6 @@ export function ReaderPage({
             text={text}
             voice={voice}
             onOriginal={original ? () => choose(original) : undefined}
-            onPick={bar && !voice.heardHere(option) ? setPicked : undefined}
             translationNotice={translationNotice?.({
               chapterId,
               onOriginal: () => (original ? choose(original) : undefined),
@@ -319,23 +307,20 @@ export function ReaderPage({
           )}
         </div>
       </div>
-      {picked !== null && blocks && (
-        <div
-          className="offer"
-          style={{ position: 'fixed', top: 'auto', bottom: 76, left: '50%', transform: 'translateX(-50%)' }}
-        >
-          <Button
-            quiet
+      {picked && blocks && (
+        <div className="pick" style={{ left: picked.x, top: picked.y }}>
+          <button
+            type="button"
             onClick={() => {
-              voice.start({ blocks, option, block: picked, offset: 0 })
-              setPicked(null)
+              voice.start({ blocks, option, block: picked.block, offset: picked.offset })
+              clearPicked()
             }}
           >
             Nghe từ câu này
-          </Button>
-          <Button quiet onClick={() => setPicked(null)}>
-            Đóng
-          </Button>
+          </button>
+          <button type="button" className="pick-close" aria-label="Đóng" onClick={clearPicked}>
+            ×
+          </button>
         </div>
       )}
       {showLook && <LookSheet onClose={() => setShowLook(false)} />}
@@ -361,13 +346,11 @@ function ReaderBody({
   text,
   voice,
   onOriginal,
-  onPick,
   translationNotice,
 }: {
   text: ReturnType<typeof useChapterText>
   voice: ReaderVoice
   onOriginal: (() => void) | undefined
-  onPick: ((block: number) => void) | undefined
   translationNotice: ReactNode
 }) {
   const [limitClosed, setLimitClosed] = useState(false)
@@ -405,7 +388,7 @@ function ReaderBody({
       return (
         <div className="text">
           {text.blocks.map((block, index) => (
-            <Block key={index} block={block} index={index} marked={voice.marked} onPick={onPick} />
+            <Block key={index} block={block} index={index} marked={voice.marked} />
           ))}
         </div>
       )

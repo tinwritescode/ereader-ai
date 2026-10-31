@@ -75,7 +75,7 @@ export function LibraryPage({
         {books.map((book) => (
           <Link key={book.bookId} className="book-tile" to="/books/$bookId" params={{ bookId: book.bookId }}>
             <BookCover book={book} />
-            <span className="sr-only">{book.title}</span>
+            <b className="tile-title">{book.title}</b>
             <div className="cap">
               {book.author}
               <div>{captionOf(book)}</div>
@@ -84,7 +84,9 @@ export function LibraryPage({
         ))}
         <div>
           <button type="button" className="add-book" onClick={() => input.current?.click()}>
-            Kéo file EPUB vào đây, hoặc bấm để chọn
+            <i aria-hidden="true">+</i>
+            Thêm sách EPUB
+            <small>hoặc kéo file vào đây</small>
           </button>
           <input
             ref={input}

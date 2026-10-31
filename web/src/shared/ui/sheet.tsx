@@ -1,20 +1,8 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-const sheetTop = (top: number): CSSProperties & { '--sheet-top': string } => ({ '--sheet-top': `${top}px` })
-
-/** A popover beside what opened it on a wide page, a sheet from the bottom on a phone. */
-export function Sheet({
-  title,
-  top,
-  onClose,
-  children,
-}: {
-  title: string
-  top?: number
-  onClose: () => void
-  children: ReactNode
-}) {
+/** A sheet from the right of a wide window, from the bottom of a narrow one. */
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const node = dialog.current
@@ -28,7 +16,6 @@ export function Sheet({
       ref={dialog}
       className="sheet"
       aria-label={title}
-      style={top === undefined ? undefined : sheetTop(top)}
       onCancel={(event) => {
         event.preventDefault()
         onClose()

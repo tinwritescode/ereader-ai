@@ -83,7 +83,7 @@ test.describe('fit and access', () => {
     await signIn(page)
     // WebKit's Tab skips buttons unless the system says otherwise, so focus follows a key press here.
     await page.keyboard.press('Shift')
-    const button = page.getByRole('button', { name: /Kéo file EPUB/ })
+    const button = page.getByRole('button', { name: 'Thêm sách EPUB hoặc kéo file vào đây' })
     await button.focus()
     await expect(button).toHaveCSS('outline-style', 'solid')
   })

@@ -1,3 +1,4 @@
+import { Ruler } from '~/shared/ui/ruler'
 import { Sheet } from '~/shared/ui/sheet'
 import { SPACING_NAMES, TEXT_SIZES } from '../domain/look'
 import type { ReadingLook } from '../domain/look'
@@ -5,6 +6,7 @@ import { readingLook } from './stores'
 
 const SIZES: ReadingLook['size'][] = ['small', 'medium', 'large']
 const SPACINGS: ReadingLook['spacing'][] = ['tight', 'normal', 'loose']
+const TICKS = [0, 0.5, 1]
 
 export function LookSheet({ onClose }: { onClose: () => void }) {
   const look = readingLook.useValue()
@@ -12,35 +14,30 @@ export function LookSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title="Trang giấy" onClose={onClose}>
       <b>Cỡ chữ</b>
-      <div className="ruler" role="radiogroup" aria-label="Cỡ chữ">
-        {SIZES.map((size, index) => (
-          <button
-            key={size}
-            type="button"
-            role="radio"
-            aria-checked={look.size === size}
-            aria-label={`Chữ cỡ ${index + 1}`}
-            style={{ fontSize: TEXT_SIZES[size] + index * 2 }}
-            onClick={() => change({ size })}
-          >
-            A
-          </button>
-        ))}
-      </div>
+      <Ruler
+        label="Cỡ chữ"
+        selectedId={look.size}
+        ticks={TICKS}
+        stops={SIZES.map((size, index) => ({
+          id: size,
+          fraction: TICKS[index] ?? 0,
+          name: `Chữ cỡ ${index + 1}`,
+          label: <span style={{ fontSize: TEXT_SIZES[size] + index * 2 }}>A</span>,
+        }))}
+        onChoose={(id) => change({ size: SIZES.find((size) => size === id) ?? look.size })}
+      />
       <b>Giãn dòng</b>
-      <div className="ruler" role="radiogroup" aria-label="Giãn dòng">
-        {SPACINGS.map((spacing) => (
-          <button
-            key={spacing}
-            type="button"
-            role="radio"
-            aria-checked={look.spacing === spacing}
-            onClick={() => change({ spacing })}
-          >
-            <small>{SPACING_NAMES[spacing]}</small>
-          </button>
-        ))}
-      </div>
+      <Ruler
+        label="Giãn dòng"
+        selectedId={look.spacing}
+        ticks={TICKS}
+        stops={SPACINGS.map((spacing, index) => ({
+          id: spacing,
+          fraction: TICKS[index] ?? 0,
+          label: <small>{SPACING_NAMES[spacing]}</small>,
+        }))}
+        onChoose={(id) => change({ spacing: SPACINGS.find((spacing) => spacing === id) ?? look.spacing })}
+      />
       <b>Trang giấy</b>
       <div className="paper-choice">
         <button

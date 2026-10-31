@@ -24,6 +24,22 @@ test.describe('listening', () => {
     expect((await stub.state()).speechCalls).toContain('Câu thứ hai rất ngắn.')
   })
 
+  test('selecting a sentence reads from that sentence, and a plain click does not', async ({ page }) => {
+    await signIn(page)
+    await stub.set({ speechDelay: 0 })
+    await open(page, CHAPTER)
+    const paragraph = page.getByText('Câu thứ hai rất ngắn.')
+    await paragraph.click()
+    await expect(page.getByRole('button', { name: 'Nghe từ câu này' })).toHaveCount(0)
+    await paragraph.evaluate((node) => {
+      const text = node.firstChild
+      const at = node.textContent?.indexOf('Câu thứ hai') ?? 0
+      if (text) document.getSelection()?.setBaseAndExtent(text, at, text, at + 3)
+    })
+    await page.getByRole('button', { name: 'Nghe từ câu này' }).click()
+    await expect(page.locator('mark')).toHaveText('Câu thứ hai rất ngắn.', { timeout: 10_000 })
+  })
+
   test('the keyboard pauses and moves between sentences', async ({ page }) => {
     await signIn(page)
     await stub.set({ speechDelay: 0 })
@@ -64,7 +80,7 @@ test.describe('listening', () => {
     await open(page, CHAPTER)
     await page.getByRole('button', { name: 'Nghe', exact: true }).click()
     await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', { timeout: 10_000 })
-    await page.getByRole('link', { name: /‹ Deep Work/ }).click()
+    await page.getByRole('link', { name: '‹ Mục lục' }).click()
     await expect(page.getByRole('region', { name: 'Đang nghe' })).toContainText('Deep Work')
     await page.getByRole('link', { name: 'Thư viện' }).click()
     await expect(page.getByRole('link', { name: /Nghe tiếp Deep Work/ })).toBeVisible()
@@ -121,6 +137,7 @@ test.describe('whole book and tasks', () => {
     await expect(page.getByText('Đang dịch Deep Work. Xong sẽ báo.')).toBeVisible()
     await expect(page.getByText(/Đang dịch cả sách, chương/)).toBeVisible()
     await expect(page.getByText('đang dịch 40%')).toBeVisible()
+    await page.getByRole('link', { name: '‹ Thư viện' }).click()
     await page.getByRole('link', { name: /Tác vụ/ }).click()
     await expect(page.getByRole('cell', { name: 'Dịch cả sách' })).toBeVisible()
     await expect(page.getByText('Đã dịch xong Deep Work.')).toBeVisible({ timeout: 20_000 })

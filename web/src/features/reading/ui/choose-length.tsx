@@ -4,8 +4,9 @@ import type { Book, ChapterSummary } from '~/features/books/domain/book'
 import { isForeign } from '~/features/books/domain/book'
 import { durationLabel } from '~/features/books/domain/words'
 import { Button } from '~/shared/ui/button'
+import { Ruler } from '~/shared/ui/ruler'
 import { Sheet } from '~/shared/ui/sheet'
-import { lengthHint, lengthName, lengthOptionsFor, sameOption } from '../domain/length'
+import { lengthHint, lengthName, lengthOptionsFor } from '../domain/length'
 import type { LengthOption, ReadingLength } from '../domain/length'
 import { lastLength } from './stores'
 
@@ -13,6 +14,14 @@ function actionLabel({ length, minutes }: LengthOption): string {
   if (length === 'original') return 'Đọc bản gốc'
   if (length === 'vietnamese') return 'Đọc bản tiếng Việt'
   return `Đọc bản ${durationLabel(minutes)}`
+}
+
+const MAX_TICKS = 16
+
+/** Every `step` minutes along the ruler, as fractions of the longest version. */
+function ticksFor(longest: number): number[] {
+  const step = Math.ceil(longest / MAX_TICKS)
+  return Array.from({ length: Math.floor(longest / step) + 1 }, (_, index) => (index * step) / longest)
 }
 
 function chosenLabel({ length, minutes }: LengthOption): string {
@@ -23,13 +32,11 @@ function chosenLabel({ length, minutes }: LengthOption): string {
 export function ChooseLength({
   book,
   chapter,
-  top,
   onClose,
 }: {
   book: Book
   chapters: ChapterSummary[]
   chapter: ChapterSummary
-  top: number
   onClose: () => void
 }) {
   const navigate = useNavigate()
@@ -44,6 +51,7 @@ export function ChooseLength({
   )
   const [vietnamese, setVietnamese] = useState(remembered === 'vietnamese')
   if (!selected) return null
+  const longest = Math.max(...ruler.map(({ minutes }) => minutes))
   const canTranslate = translation !== undefined && selected.length === 'original'
   const chosen = canTranslate && vietnamese ? translation : selected
 
@@ -57,23 +65,25 @@ export function ChooseLength({
   }
 
   return (
-    <Sheet title="Chọn độ dài" top={top} onClose={onClose}>
+    <Sheet title="Chọn độ dài" onClose={onClose}>
       <h2>{`${chapter.label} dài ${durationLabel(chapter.minutes)}`}</h2>
       <p className="soft">Kéo thước tới thời gian bạn có.</p>
-      <div className="ruler" role="radiogroup" aria-label="Độ dài">
-        {ruler.toReversed().map((option) => (
-          <button
-            key={option.length}
-            type="button"
-            role="radio"
-            aria-checked={sameOption(option, selected)}
-            onClick={() => setSelected(option)}
-          >
-            {`${option.minutes}'`}
-            <small>{lengthName(option.length)}</small>
-          </button>
-        ))}
-      </div>
+      <Ruler
+        label="Độ dài"
+        selectedId={selected.length}
+        ticks={ticksFor(longest)}
+        stops={ruler.toReversed().map((option) => ({
+          id: option.length,
+          fraction: option.minutes / longest,
+          label: (
+            <>
+              {`${option.minutes}'`}
+              <small>{lengthName(option.length)}</small>
+            </>
+          ),
+        }))}
+        onChoose={(id) => setSelected(ruler.find(({ length }) => length === id) ?? selected)}
+      />
       {canTranslate && (
         <label className="check">
           <input type="checkbox" checked={vietnamese} onChange={(event) => setVietnamese(event.target.checked)} />

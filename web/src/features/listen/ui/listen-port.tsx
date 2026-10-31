@@ -116,7 +116,7 @@ function ListenBar({
     </button>
   )
   return (
-    <div className="bar" role="region" aria-label="Nghe">
+    <div className={`dock ${stage.kind}`} role="region" aria-label="Nghe">
       {(() => {
         switch (stage.kind) {
           case 'off':
@@ -148,6 +148,14 @@ function ListenBar({
             const left = Math.ceil(minutes * (1 - state.done))
             return (
               <>
+                {voiceButton}
+                <span className="track" aria-hidden="true">
+                  <i style={{ width: `${state.done * 100}%` }} />
+                </span>
+                <div className="where" aria-live="off">
+                  <span>{`Câu ${stage.index + 1} trên ${stage.total}`}</span>
+                  <span>{`còn ${durationLabel(left)}`}</span>
+                </div>
                 <button
                   type="button"
                   className="pl"
@@ -157,21 +165,13 @@ function ListenBar({
                   {stage.paused ? '▶' : '❚❚'}
                 </button>
                 <button type="button" aria-label="Lùi một câu" onClick={() => controller.skip(-1)}>
-                  ‹
+                  ‹ Lùi
                 </button>
                 <button type="button" aria-label="Tới câu sau" onClick={() => controller.skip(1)}>
-                  ›
+                  Tới ›
                 </button>
-                {voiceButton}
-                <span className="track" aria-hidden="true">
-                  <i style={{ width: `${state.done * 100}%` }} />
-                </span>
-                <span
-                  className="quiet"
-                  aria-live="off"
-                >{`Câu ${stage.index + 1} trên ${stage.total}, còn ${durationLabel(left)}`}</span>
                 <button type="button" aria-label={`Tốc độ ${rateLabel(state.rate)}`} onClick={controller.cycleRate}>
-                  {rateLabel(state.rate)}
+                  {`Tốc độ ${rateLabel(state.rate)}`}
                 </button>
                 {state.voice && prepare(state.voice.code)}
                 <Button quiet onClick={controller.stop}>

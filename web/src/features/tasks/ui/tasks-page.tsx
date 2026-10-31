@@ -78,7 +78,7 @@ const columns = column.columns([
 function TaskTable({ tasks }: { tasks: LongTask[] }) {
   const table = useTable({ features, columns, data: tasks, getRowId: (task) => task.id })
   return (
-    <table>
+    <table className="task-table">
       <thead>
         {table.getHeaderGroups().map((group) => (
           <tr key={group.id}>
@@ -126,9 +126,7 @@ export function TasksPage() {
         return (
           inGroup.length > 0 && (
             <section key={group} aria-label={GROUP_NAMES[group]}>
-              <h2 className="soft" style={{ marginTop: 22 }}>
-                {GROUP_NAMES[group]}
-              </h2>
+              <h2 className="group-name">{GROUP_NAMES[group]}</h2>
               <TaskTable tasks={inGroup} />
             </section>
           )

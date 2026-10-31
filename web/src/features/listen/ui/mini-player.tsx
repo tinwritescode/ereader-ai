@@ -8,10 +8,11 @@ export function MiniPlayer() {
   const path = useRouterState({ select: (router) => router.location.pathname })
   const { source, stage } = state
   if (!source || stage.kind === 'off') return null
+  const heard = stage.kind === 'playing' ? controller.sentences[stage.index] : undefined
   const chapterPath = `/books/${source.bookId}/chapters/${source.chapterId}`
   if (decodeURIComponent(path) === chapterPath) return null
   return (
-    <div className="bar" role="region" aria-label="Đang nghe">
+    <div className="mini" role="region" aria-label="Đang nghe">
       {stage.kind === 'playing' && (
         <button
           type="button"
@@ -23,15 +24,18 @@ export function MiniPlayer() {
         </button>
       )}
       <Link
+        className="mini-text"
         to="/books/$bookId/chapters/$chapterId"
         params={{ bookId: source.bookId, chapterId: source.chapterId }}
         search={source.option}
       >
-        <b>{source.bookTitle}</b> <span className="quiet">{`${source.chapterLabel}, ${state.voice?.name ?? ''}`}</span>
+        <strong>{heard ?? source.bookTitle}</strong>
+        <small>{[source.bookTitle, source.chapterLabel, state.voice?.name].filter(Boolean).join(', ')}</small>
       </Link>
-      <button type="button" className="ink-link" onClick={controller.stop}>
+      <button type="button" onClick={controller.stop}>
         Tắt
       </button>
+      <i className="mini-done" aria-hidden="true" style={{ width: `${state.done * 100}%` }} />
     </div>
   )
 }

@@ -3,33 +3,37 @@ import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { chapterHeading } from '../domain/book'
 import type { Book, ChapterSummary } from '../domain/book'
-import { durationLabel } from '../domain/words'
 import { BookCover } from './book-cover'
 import { useShelf } from './with-book'
 
-const ROW_HEIGHT = 46
+const ROW_HEIGHT = 56
+const NUMBERED_ROW_HEIGHT = 84
 
 export type LengthChoice = {
   book: Book
   chapters: ChapterSummary[]
   chapter: ChapterSummary
-  top: number
   onClose: () => void
 }
 
 function ChapterList({
   chapters,
+  currentId,
   onChoose,
   markOf,
 }: {
   chapters: ChapterSummary[]
-  onChoose: (chapter: ChapterSummary, top: number) => void
+  currentId: string | null
+  onChoose: (chapter: ChapterSummary) => void
   markOf: (chapter: ChapterSummary, fallback: ReactNode) => ReactNode
 }) {
   const list = useRef<HTMLDivElement>(null)
   const virtual = useWindowVirtualizer({
     count: chapters.length,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (index) => {
+      const chapter = chapters[index]
+      return chapter && chapterHeading(chapter).number ? NUMBERED_ROW_HEIGHT : ROW_HEIGHT
+    },
     overscan: 8,
     scrollMargin: list.current?.offsetTop ?? 0,
     initialRect: { width: 800, height: 900 },
@@ -43,19 +47,19 @@ function ChapterList({
         return (
           <button
             key={chapter.chapterId}
+            ref={virtual.measureElement}
+            data-index={index}
             type="button"
-            className="row"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              height: ROW_HEIGHT,
-              transform: `translateY(${start - virtual.options.scrollMargin}px)`,
-            }}
-            onClick={(event) => onChoose(chapter, event.currentTarget.getBoundingClientRect().top)}
+            className={chapter.chapterId === currentId ? 'row on' : 'row'}
+            style={{ transform: `translateY(${start - virtual.options.scrollMargin}px)` }}
+            onClick={() => onChoose(chapter)}
           >
-            <span>{number ? `${number}. ${title}` : title}</span>
-            {markOf(chapter, <em className="s">{durationLabel(chapter.minutes)}</em>)}
+            <span className="row-text">
+              {number && <small>{number}</small>}
+              <b>{chapter.chapterId === currentId ? <mark>{title}</mark> : title}</b>
+            </span>
+            {markOf(chapter, <em className="s">{`${chapter.minutes}'`}</em>)}
+            <i aria-hidden="true">›</i>
           </button>
         )
       })}
@@ -68,29 +72,39 @@ type Slots = {
   aside?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   resume?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   markOf?: (book: Book, chapter: ChapterSummary, fallback: ReactNode) => ReactNode
+  currentId?: string | null
 }
 
-export function BookPage({ bookId, chooseLength, aside, resume, markOf }: { bookId: string } & Slots) {
+export function BookPage({
+  bookId,
+  chooseLength,
+  aside,
+  resume,
+  markOf,
+  currentId = null,
+}: { bookId: string } & Slots) {
   const { book, chapters } = useShelf(bookId)
-  const [chosen, setChosen] = useState<{ chapter: ChapterSummary; top: number } | null>(null)
+  const [chosen, setChosen] = useState<ChapterSummary | null>(null)
   return (
-    <div className="two">
-      <div className="book-side">
+    <>
+      <div className="book-head">
         <BookCover book={book} />
-        <div>{aside?.(book, chapters)}</div>
+        <div>
+          <h1>{book.title}</h1>
+          <p className="soft">{[book.author, `${book.chapterCount} chương`].filter(Boolean).join(', ')}</p>
+          <div className="book-acts">
+            {resume?.(book, chapters)}
+            {aside?.(book, chapters)}
+          </div>
+        </div>
       </div>
-      <div className="book-main">
-        <h1>{book.title}</h1>
-        <p className="soft">{[book.author, `${book.chapterCount} chương`].filter(Boolean).join(', ')}</p>
-        {resume?.(book, chapters)}
-        <ChapterList
-          chapters={chapters}
-          onChoose={(chapter, top) => setChosen({ chapter, top })}
-          markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}
-        />
-      </div>
-      {chosen &&
-        chooseLength({ book, chapters, chapter: chosen.chapter, top: chosen.top, onClose: () => setChosen(null) })}
-    </div>
+      <ChapterList
+        chapters={chapters}
+        currentId={currentId}
+        onChoose={setChosen}
+        markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}
+      />
+      {chosen && chooseLength({ book, chapters, chapter: chosen, onClose: () => setChosen(null) })}
+    </>
   )
 }
