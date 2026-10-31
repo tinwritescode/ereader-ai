@@ -120,6 +120,17 @@ describe('VieneuTtsGateway', () => {
     ]);
   });
 
+  it('holds off when a refusal does not say how long to wait', async () => {
+    let calls = 0;
+    const fetch: typeof globalThis.fetch = async () => {
+      calls += 1;
+      return new Response('{}', { status: 429 });
+    };
+    const gateway = new VieneuTtsGateway({ token: 'secret', fetch, timeoutMs: 30, throttleWaitMs: 20 });
+    await expect(gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
+    expect(calls).toBeLessThanOrEqual(2);
+  });
+
   it('stops waiting at the deadline', async () => {
     const throttled = () => new Response('{}', { status: 429, headers: { 'retry-after': '10' } });
     const gateway = new VieneuTtsGateway({ token: 'secret', fetch: async () => throttled(), timeoutMs: 5 });

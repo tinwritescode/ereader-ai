@@ -24,9 +24,6 @@ import 'listen_bloc.dart';
   _ => ('Chưa đọc được đoạn này', 'Thử lại, hoặc chọn giọng khác.'),
 };
 
-// What sets a voice apart from the others in the list.
-const _voiceNotes = {'omnivoice-hat-de': 'câu đầu có thể lâu'};
-
 /// Shared with the mini player: the two say the same thing during the wait.
 String preparingLine(int ready, int needed) =>
     needed == 0 ? 'Đang chuẩn bị giọng đọc' : 'Đã có $ready trên $needed câu';
@@ -521,7 +518,6 @@ class _CloudVoiceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isChosen = voice == chosen;
-    final note = isChosen ? 'đang dùng' : _voiceNotes[voice.code];
     return InkWell(
       onTap: () => Navigator.of(context).pop(voice),
       child: Container(
@@ -537,8 +533,11 @@ class _CloudVoiceTile extends StatelessWidget {
                 style: isChosen ? handStyle(size: 23) : readingStyle(size: 16),
               ),
             ),
-            if (note != null)
-              Text(note, style: readingStyle(size: 12.5, color: Palette.muted)),
+            if (isChosen)
+              Text(
+                'đang dùng',
+                style: readingStyle(size: 12.5, color: Palette.muted),
+              ),
           ],
         ),
       ),

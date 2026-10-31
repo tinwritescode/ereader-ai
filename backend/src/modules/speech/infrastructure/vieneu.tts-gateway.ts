@@ -25,6 +25,7 @@ export type VieneuOptions = {
   token: string;
   pollIntervalMs?: number;
   timeoutMs?: number;
+  throttleWaitMs?: number;
   /** Replaced in tests. */
   fetch?: typeof globalThis.fetch;
 };
@@ -80,11 +81,14 @@ export class VieneuTtsGateway implements TtsGateway {
   private readonly fetch: typeof globalThis.fetch;
   private readonly pollIntervalMs: number;
   private readonly timeoutMs: number;
+  private readonly throttleWaitMs: number;
 
   constructor(private readonly options: VieneuOptions) {
     this.fetch = options.fetch ?? globalThis.fetch;
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000;
     this.timeoutMs = options.timeoutMs ?? 180_000;
+    // Replicate sometimes refuses without a Retry-After, and asking at once only extends the refusal.
+    this.throttleWaitMs = options.throttleWaitMs ?? 10_000;
   }
 
   async voices(): Promise<CloudVoice[]> {
@@ -134,7 +138,8 @@ export class VieneuTtsGateway implements TtsGateway {
         throw new TtsError('UPSTREAM_ERROR');
       });
       if (response.ok) return response;
-      const waitMs = Number(response.headers.get('retry-after') ?? 0) * 1_000;
+      const retryAfter = response.headers.get('retry-after');
+      const waitMs = retryAfter === null ? this.throttleWaitMs : Number(retryAfter) * 1_000;
       if (response.status !== 429 || Date.now() + waitMs > deadline) throw new TtsError('UPSTREAM_ERROR');
       await new Promise((resolve) => setTimeout(resolve, waitMs));
     }

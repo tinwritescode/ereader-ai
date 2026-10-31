@@ -122,7 +122,6 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
 | Vbee voices | Batch API, 2 to 10 seconds per sentence. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
-| Hạt Dẻ Modal voice | From our OmniVoice service on Modal, through the backend. About 1 to 2 seconds per second of speech once awake; close to a minute when the service has gone to sleep. Counts against the same monthly minutes as Vbee | |
 | VieNeu voices | VieNeu-TTS on Replicate, in the Hạt Dẻ and Trung Tín voices, cloned from short reference clips shipped with the backend. Replicate allows only 6 sentences a minute while the account holds under $5 of credit, which is too slow to listen to. Counts against the same monthly minutes as Vbee | |
 | Platforms | iOS 16 and later | Android not tested yet |
 
@@ -189,7 +188,7 @@ Integration tests replace the app installed on the simulator, so rebuild the rea
 
 ## Deploy
 
-The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN`, `VBEE_APP_ID`, `OMNIVOICE_URL`, `OMNIVOICE_API_KEY` and `REPLICATE_API_TOKEN` in Railway's environment variables, never in the repo.
+The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN`, `VBEE_APP_ID`, `REPLICATE_API_TOKEN` in Railway's environment variables, never in the repo.
 
 To build for an iPhone against the deployed backend:
 
