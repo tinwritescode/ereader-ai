@@ -10,62 +10,67 @@ const features = tableFeatures({})
 const column = createColumnHelper<typeof features, LongTask>()
 const GROUPS: TaskGroup[] = ['running', 'queued', 'finished']
 
-function TaskTable({ tasks, actions }: { tasks: LongTask[]; actions: ReturnType<typeof useTaskActions> }) {
-  const columns = column.columns([
-    column.display({
-      id: 'kind',
-      header: 'Việc',
-      cell: ({ row: { original: task } }) => {
-        const row = rowOf(task)
-        return task.state === 'stopped' ? (
-          <span className="stopped-kind">
-            {row.stoppedNote}
-            <br />
-            <small>{row.failure}</small>
+function TaskAction({ task }: { task: LongTask }) {
+  const actions = useTaskActions()
+  if (task.state === 'done') return null
+  const stopped = task.state === 'stopped'
+  return (
+    <button type="button" className="ink-link" aria-label={`${stopped ? 'Chạy tiếp' : 'Huỷ'} ${rowOf(task).name}`} onClick={() => (stopped ? actions.resume(task) : actions.cancel(task))}>
+      {stopped ? 'Chạy tiếp' : 'Huỷ'}
+    </button>
+  )
+}
+
+// Outside any render: FlexRender mounts a cell by its function, so a new one would remount the row.
+const columns = column.columns([
+  column.display({
+    id: 'kind',
+    header: 'Việc',
+    cell: ({ row: { original: task } }) => {
+      const row = rowOf(task)
+      return task.state === 'stopped' ? (
+        <span className="stopped-kind">
+          {row.stoppedNote}
+          <br />
+          <small>{row.failure}</small>
+        </span>
+      ) : (
+        row.kind
+      )
+    },
+  }),
+  column.display({
+    id: 'book',
+    header: 'Sách',
+    cell: ({ row: { original: task } }) => (
+      <Link className="task-link" to="/books/$bookId" params={{ bookId: task.bookId }}>
+        {rowOf(task).name}
+      </Link>
+    ),
+  }),
+  column.display({
+    id: 'progress',
+    header: 'Tiến độ',
+    cell: ({ row: { original: task } }) => {
+      const row = rowOf(task)
+      return (
+        <>
+          <span className="track" aria-hidden="true">
+            <i style={{ width: `${row.percent}%` }} />
           </span>
-        ) : (
-          row.kind
-        )
-      },
-    }),
-    column.display({
-      id: 'book',
-      header: 'Sách',
-      cell: ({ row: { original: task } }) => (
-        <Link className="task-link" to="/books/$bookId" params={{ bookId: task.bookId }}>
-          {rowOf(task).name}
-        </Link>
-      ),
-    }),
-    column.display({
-      id: 'progress',
-      header: 'Tiến độ',
-      cell: ({ row: { original: task } }) => {
-        const row = rowOf(task)
-        return (
-          <>
-            <span className="track" aria-hidden="true">
-              <i style={{ width: `${row.percent}%` }} />
-            </span>
-            <i className="p">{`${row.percent}%`}</i> <span className="soft">{row.progress}</span>
-          </>
-        )
-      },
-    }),
-    column.display({
-      id: 'action',
-      header: () => <span className="sr-only">Thao tác</span>,
-      cell: ({ row: { original: task } }) => {
-        if (task.state === 'done') return null
-        const stopped = task.state === 'stopped'
-        return (
-          <button type="button" className="ink-link" aria-label={`${stopped ? 'Chạy tiếp' : 'Huỷ'} ${rowOf(task).name}`} onClick={() => (stopped ? actions.resume(task) : actions.cancel(task))}>
-            {stopped ? 'Chạy tiếp' : 'Huỷ'}
-          </button>
-        )
-      },
-    }),
-  ])
+          <i className="p">{`${row.percent}%`}</i> <span className="soft">{row.progress}</span>
+        </>
+      )
+    },
+  }),
+  column.display({
+    id: 'action',
+    header: () => <span className="sr-only">Thao tác</span>,
+    cell: ({ row: { original: task } }) => <TaskAction task={task} />,
+  }),
+])
+
+function TaskTable({ tasks }: { tasks: LongTask[] }) {
   const table = useTable({ features, columns, data: tasks, getRowId: (task) => task.id })
   return (
     <table>
@@ -97,7 +102,6 @@ function TaskTable({ tasks, actions }: { tasks: LongTask[]; actions: ReturnType<
 
 export function TasksPage() {
   const { data: tasks } = useSuspenseQuery(tasksQuery())
-  const actions = useTaskActions()
   if (tasks.length === 0) {
     return (
       <>
@@ -120,7 +124,7 @@ export function TasksPage() {
               <h2 className="soft" style={{ marginTop: 22 }}>
                 {GROUP_NAMES[group]}
               </h2>
-              <TaskTable tasks={inGroup} actions={actions} />
+              <TaskTable tasks={inGroup} />
             </section>
           )
         )

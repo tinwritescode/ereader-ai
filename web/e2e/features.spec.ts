@@ -87,6 +87,8 @@ test.describe('listening', () => {
   })
 })
 
+const queuedTask = { kind: 'chapterVoice', id: 'v1', bookId: 'deep', chapterId: 'deep-1', bookTitle: 'Deep Work', chapterLabel: 'Chương Một', minutes: null, voiceCode: 'hat-de', voiceName: 'Hạt Dẻ', state: 'queued', code: null, done: 0, total: 9, position: 1, progress: -1000, createdAt: '2026-10-01T00:00:00Z', finishedAt: null }
+
 test.describe('whole book and tasks', () => {
   test('translating the whole book is followed to its finish', async ({ page }) => {
     await signIn(page)
@@ -112,10 +114,20 @@ test.describe('whole book and tasks', () => {
     await expect(page.getByText(/Đang tạo giọng cả sách, chương/)).toBeVisible()
   })
 
+  test('a task row keeps keyboard focus when the list refreshes', async ({ page }) => {
+    await signIn(page)
+    await stub.task(queuedTask)
+    await open(page, '/tasks')
+    const cancel = page.getByRole('button', { name: 'Huỷ Chương Một, Deep Work' })
+    await cancel.focus()
+    await page.waitForResponse((response) => response.url().includes('/_serverFn/'), { timeout: 6000 })
+    await page.waitForTimeout(300)
+    await expect(cancel).toBeFocused()
+  })
+
   test('cancelling a task drops it at once, and a refusal puts it back', async ({ page }) => {
     await signIn(page)
-    const task = { kind: 'chapterVoice', id: 'v1', bookId: 'deep', chapterId: 'deep-1', bookTitle: 'Deep Work', chapterLabel: 'Chương Một', minutes: null, voiceCode: 'hat-de', voiceName: 'Hạt Dẻ', state: 'queued', code: null, done: 0, total: 9, position: 1, progress: -1000, createdAt: '2026-10-01T00:00:00Z', finishedAt: null }
-    await stub.task(task)
+    await stub.task(queuedTask)
     await stub.set({ cancelDelay: 1500, cancelFails: true })
     await open(page, '/tasks')
     const row = page.getByRole('row', { name: /Chương Một, Deep Work/ })
