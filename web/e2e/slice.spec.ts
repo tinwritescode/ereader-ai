@@ -109,7 +109,7 @@ test('choosing a length opens the chapter, and the versions switch', async ({ pa
   await page.getByRole('button', { name: '6 phút' }).click()
   await expect(page.getByText('Bản 6 phút của deep-1.')).toBeVisible()
   await page.getByRole('button', { name: 'Việt' }).click()
-  await expect(page.getByText('Chương này')).toHaveCount(0)
+  await expect(page.getByText('Chương này chưa được dịch')).toBeVisible()
 })
 
 test('running out of digests leaves the original one tap away', async ({ page }) => {

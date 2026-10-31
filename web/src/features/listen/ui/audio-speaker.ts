@@ -47,7 +47,10 @@ export function createAudioSpeaker(): Speaker<string> & { unlock: () => void } {
         player.src = url
         // Setting src resets the rate in some browsers.
         player.playbackRate = rate
-        player.play().catch(failed)
+        // A pause or stop landing before playback begins aborts play(); that is no failure (WebKit).
+        player.play().catch((error: unknown) => {
+          if (!(error instanceof DOMException && error.name === 'AbortError')) failed()
+        })
       }),
     pause: async () => audio().pause(),
     resume: async () => {
