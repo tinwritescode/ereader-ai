@@ -45,6 +45,7 @@ void main() {
           repository: BooksRepositoryImpl(api),
           speech: KokoroSpeech(vbee: VbeeVoices(api)),
           looks: PrefsReadingLookStore(),
+          listenChoices: FakeListenChoiceStore(),
           spots: PrefsReadingSpotStore(),
           pickEpub: () async => null,
         ),
