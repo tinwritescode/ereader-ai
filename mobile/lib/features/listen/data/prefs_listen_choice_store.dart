@@ -16,7 +16,7 @@ class PrefsListenChoiceStore implements ListenChoiceStore {
     final label = prefs.getString(_cloudLabel);
     final voice = code != null && label != null
         ? CloudVoice(code, label)
-        : DeviceVoice.values.asNameMap()[prefs.getString(_device)];
+        : _deviceVoice(prefs.getString(_device));
     if (voice == null) return null;
     return ListenChoice(voice: voice, rate: prefs.getDouble(_rate) ?? 1);
   }
@@ -37,3 +37,8 @@ class PrefsListenChoiceStore implements ListenChoiceStore {
     }
   }
 }
+
+/// A saved name this version no longer has, such as a Kokoro voice, reads as the default.
+Voice? _deviceVoice(String? name) => name == null
+    ? null
+    : DeviceVoice.values.asNameMap()[name] ?? defaultDeviceVoice;

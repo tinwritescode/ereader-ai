@@ -1,31 +1,38 @@
-"""Builds the offline speech assets from Kokoro-Vietnamese.
+"""Builds the offline speech assets for VieNeu-TTS v3 Nano.
 
-Needs: vig2p, torch, huggingface_hub, numpy. Run from mobile/:
-    python tool/build_speech_assets.py
+Needs: sea-g2p, numpy. Run from mobile/, with the voices file from the vieneu package
+(src/vieneu/assets/voices_v3_nano.json):
+    python tool/build_speech_assets.py path/to/voices_v3_nano.json
 
 Writes assets/speech/:
-  phonemes.tsv.gz  every Vietnamese syllable mapped by vig2p. vig2p works word by word,
-                   so this table gives the phone the same output without its Rust engine.
+  phonemes.tsv.gz  every Vietnamese syllable mapped by sea_g2p. After its normalizer, sea_g2p
+                   works word by word, so this table gives the phone the same output without
+                   its Rust engine and 60 MB dictionary.
   vocab.json       phoneme to model token id, from the model's config.json.
-  voices/*.bin     style vectors as little-endian float32, shape [510, 1, 256].
+  voices/*.bin     little-endian float32: speaker embedding [192], then style tokens [50, 256].
+  voices/null.bin  the unconditional voice for guidance, in the same layout.
 """
 import gzip
+import hashlib
+import io
 import json
+import sys
 import unicodedata
 from itertools import product
 from pathlib import Path
 from urllib.request import urlopen
 
 import numpy as np
-import torch
-from huggingface_hub import hf_hub_download
-from vig2p import VietnameseG2P
+from sea_g2p import G2P, SEAPipeline
 
-REPO = "contextboxai/Kokoro-Vietnamese"
+MODEL = "https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Nano/resolve/aba295eb96a6fa6003ebe417cc1f2802a7adc1dc"
+VOICES_SHA256 = "2ca4cbf475409e61fda662fbd3fb3a3ac3e980bbc3925fedb4d1199c4ccac3e7"
 ENGLISH_WORDS = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt"
 OUT = Path("assets/speech")
-VOICES = ["diem_trinh", "duc_an", "duc_duy", "hung_thinh", "mai_linh", "mai_loan", "manh_dung",
-          "my_yen", "ngoc_huyen", "phat_tai", "storyvert", "thanh_dat", "thuc_trinh", "tuan_ngoc"]
+CONTEXT = ("xin", "chào")
+VOICES = {"Adam": "adam", "Ái Hân": "ai_han", "Mỹ Duyên": "my_duyen", "Đức Trí": "duc_tri",
+          "Hữu Quân": "huu_quan", "Xuân Tiên": "xuan_tien", "Mai Anh": "mai_anh", "Trúc Ly": "truc_ly",
+          "Anh Khôi": "anh_khoi", "Minh Quân": "minh_quan", "Mạnh Dũng": "manh_dung"}
 
 ONSETS = ["", "b", "c", "ch", "d", "đ", "g", "gh", "gi", "h", "k", "kh", "l", "m", "n", "ng", "ngh",
           "nh", "p", "ph", "q", "qu", "r", "s", "t", "th", "tr", "v", "x"]
@@ -62,24 +69,59 @@ def foreign_words():
     yield from "abcdefghijklmnopqrstuvwxyz"
 
 
+def spoken(pipeline, word):
+    """Phonemes of [word] among Vietnamese words: alone, sea_g2p takes "to" and "an" for English."""
+    phonemes = pipeline.run(f"{CONTEXT[0]} {word} {CONTEXT[1]}.", punc_norm=False)
+    head, tail = pipeline.run(CONTEXT[0], punc_norm=False), pipeline.run(CONTEXT[1], punc_norm=False)
+    # The normalizer drops a word in a script it does not know.
+    if phonemes == f"{head} {tail}.":
+        return ""
+    return phonemes.removeprefix(f"{head} ").removesuffix(f" {tail}.")
+
+
+def fetch(name):
+    with urlopen(f"{MODEL}/{name}") as response:
+        return response.read()
+
+
+def write_voice(name, speaker, style):
+    speaker = np.asarray(speaker, dtype="<f4")
+    style = np.asarray(style, dtype="<f4")
+    assert speaker.shape == (192,) and style.shape == (50, 256), (speaker.shape, style.shape)
+    (OUT / "voices" / f"{name}.bin").write_bytes(speaker.tobytes() + style.tobytes())
+
+
 def main():
+    raw_voices = Path(sys.argv[1]).read_bytes()
+    assert hashlib.sha256(raw_voices).hexdigest() == VOICES_SHA256, "another voices file"
+    presets = json.loads(raw_voices)["presets"]
+    assert set(presets) == set(VOICES), set(presets) ^ set(VOICES)
+
     (OUT / "voices").mkdir(parents=True, exist_ok=True)
-    g2p = VietnameseG2P()
+    pipeline = SEAPipeline(lang="vi")
+    g2p = G2P(lang="vi")
     words = set(syllables()) | {word.lower() for word in foreign_words()}
-    table = {word: g2p(word) for word in sorted(words)}
+    table = {word: spoken(pipeline, word) for word in sorted(words)}
+    table = {word: phonemes for word, phonemes in table.items() if phonemes}
+    # Capitals read differently (GDP as letters, Tin as a word) get their own row.
+    for word in sorted(table):
+        upper = spoken(pipeline, word.upper())
+        if upper != table[word]:
+            table[word.upper()] = upper
+    # English letter names, for acronyms outside the table.
+    table |= {f"@{letter}": g2p.convert(f"<en>{letter}</en>") for letter in "abcdefghijklmnopqrstuvwxyz"}
     with gzip.open(OUT / "phonemes.tsv.gz", "wt", encoding="utf-8", compresslevel=9) as out:
         for word, phonemes in table.items():
             out.write(f"{word}\t{phonemes}\n")
     print("syllables", len(table))
 
-    config = json.loads(Path(hf_hub_download(REPO, "config.json")).read_text(encoding="utf-8"))
+    config = json.loads(fetch("config.json"))
     (OUT / "vocab.json").write_text(json.dumps(config["vocab"], ensure_ascii=False), encoding="utf-8")
 
-    for voice in VOICES:
-        pack = torch.load(hf_hub_download(REPO, f"voicepacks/{voice}.pt"), map_location="cpu", weights_only=True)
-        array = pack.detach().cpu().numpy().astype("<f4")
-        assert array.shape == (510, 1, 256), array.shape
-        array.tofile(OUT / "voices" / f"{voice}.bin")
+    constants = np.load(io.BytesIO(fetch("constants.npz")))
+    write_voice("null", constants["null_spk"], constants["null_style"])
+    for name, voice_id in VOICES.items():
+        write_voice(voice_id, presets[name]["speaker_emb"], presets[name]["style"])
 
 
 if __name__ == "__main__":

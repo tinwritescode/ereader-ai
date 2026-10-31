@@ -57,7 +57,7 @@ class ListenPanel extends StatelessWidget {
         child: switch (state.stage) {
           ListenOff() => const SizedBox.shrink(),
           ListenNeedsVoice() => _Message(
-            title: 'Tải giọng đọc (326 MB), một lần',
+            title: 'Tải giọng đọc (282 MB), một lần',
             text: 'Sau đó nghe không cần mạng.',
             action: 'Tải giọng đọc',
             onAction: () => bloc.add(const ListenDownloadConfirmed()),
@@ -482,7 +482,7 @@ Future<void> _chooseVoice(BuildContext context) async {
                 const _VoiceHeading('Trên máy, nghe không cần mạng'),
                 if (!modelReady)
                   Text(
-                    'Tải một lần, 326 MB.',
+                    'Tải một lần, 282 MB.',
                     style: readingStyle(size: 13, color: Palette.muted),
                   ),
                 for (var index = 0; index < device.length; index += 2)

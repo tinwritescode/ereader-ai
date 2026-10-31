@@ -72,7 +72,7 @@ flowchart LR
 flowchart LR
     subgraph phone["iPhone"]
         ui["Flutter app"]
-        tts["Kokoro ONNX, 14 voices"]
+        tts["VieNeu v3 Nano ONNX, 11 voices"]
         ui --> tts
     end
 
@@ -104,7 +104,7 @@ flowchart LR
     ui -- "EPUB, chapter requests" --> api
     ui -- "shorten requests" --> digest
     digest --> llm
-    hf -- "326 MB model, downloaded once" --> tts
+    hf -- "282 MB model, downloaded once" --> tts
     ui -- "one sentence at a time" --> speech
     speech -- "key stays on the server" --> gcloud
 ```
@@ -165,7 +165,7 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
-Without `API_BASE_URL`, the app calls `http://localhost:3000`. The first time you tap Nghe (Listen), the app asks before downloading the 326 MB model to the device.
+Without `API_BASE_URL`, the app calls `http://localhost:3000`. The first time you tap Nghe (Listen), the app asks before downloading the 282 MB model to the device.
 
 ## Test
 
@@ -199,5 +199,5 @@ xcrun devicectl device install app --device <device-id> build/ios/iphoneos/Runne
 
 ## Credits
 
-- Voice model: [Kokoro-Vietnamese](https://github.com/iamdinhthuan/Kokoro-Vietnamese), Apache-2.0. Downloaded at runtime, not stored in this repo.
+- Voice model: [VieNeu-TTS v3 Nano](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Nano), Apache-2.0. Downloaded at runtime, not stored in this repo; its 11 preset voices ship as `mobile/assets/speech/voices`. Phonemes come from [sea-g2p](https://pypi.org/project/sea-g2p/), built into a table by `mobile/tool/build_speech_assets.py`.
 - ONNX Runtime through `flutter_onnxruntime`, MIT.

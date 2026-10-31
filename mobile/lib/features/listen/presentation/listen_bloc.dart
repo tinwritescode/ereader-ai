@@ -74,7 +74,7 @@ final class ListenFailed extends ListenStage {
 class ListenState {
   const ListenState({
     this.stage = const ListenOff(),
-    this.voice = DeviceVoice.diemTrinh,
+    this.voice = defaultDeviceVoice,
     this.rate = 1,
     this.done = 0,
     this.source,

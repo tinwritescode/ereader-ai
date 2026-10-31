@@ -203,7 +203,7 @@ void main() {
       tester.getTopLeft(find.text('Lùi một câu')).dy,
       greaterThan(tester.getBottomLeft(find.textContaining('Tôi thực sự')).dy),
     );
-    expect(find.text('Diễm Trinh'), findsOneWidget);
+    expect(find.text('Minh Quân'), findsOneWidget);
     expect(find.text('Đổi giọng'), findsOneWidget);
 
     await tester.tap(find.text('Tắt'));
@@ -222,7 +222,7 @@ void main() {
     await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
-    expect(find.text('Tải giọng đọc (326 MB), một lần'), findsOneWidget);
+    expect(find.text('Tải giọng đọc (282 MB), một lần'), findsOneWidget);
     expect(speech.played, isEmpty);
 
     await tester.tap(find.text('Tải giọng đọc'));
@@ -240,10 +240,10 @@ void main() {
 
     await tester.tap(find.text('Đổi giọng'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Đức An'));
+    await tester.tap(find.text('Đức Trí'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Đức An'), findsOneWidget);
+    expect(find.text('Đức Trí'), findsOneWidget);
   });
 
   testWidgets('a cloud voice can be chosen from the player', (tester) async {

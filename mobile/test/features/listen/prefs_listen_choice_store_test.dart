@@ -13,17 +13,15 @@ void main() {
 
   test('brings back a device voice', () async {
     final store = PrefsListenChoiceStore();
-    await store.save(
-      const ListenChoice(voice: DeviceVoice.maiLinh, rate: 1.25),
-    );
+    await store.save(const ListenChoice(voice: DeviceVoice.maiAnh, rate: 1.25));
     final loaded = await store.load();
-    expect(loaded?.voice, DeviceVoice.maiLinh);
+    expect(loaded?.voice, DeviceVoice.maiAnh);
     expect(loaded?.rate, 1.25);
   });
 
   test('brings back a cloud voice, replacing a device voice', () async {
     final store = PrefsListenChoiceStore();
-    await store.save(const ListenChoice(voice: DeviceVoice.maiLinh, rate: 1));
+    await store.save(const ListenChoice(voice: DeviceVoice.maiAnh, rate: 1));
     await store.save(
       const ListenChoice(voice: CloudVoice('vieneu', 'VieNeu'), rate: 1),
     );
@@ -32,8 +30,16 @@ void main() {
     expect(voice?.label, 'VieNeu');
   });
 
-  test('ignores a device voice this version does not know', () async {
-    SharedPreferences.setMockInitialValues({'listen.device': 'gone'});
-    expect(await PrefsListenChoiceStore().load(), isNull);
-  });
+  test(
+    'a saved Kokoro voice gives way to the default, keeping the rate',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'listen.device': 'maiLinh',
+        'listen.rate': 1.25,
+      });
+      final loaded = await PrefsListenChoiceStore().load();
+      expect(loaded?.voice, defaultDeviceVoice);
+      expect(loaded?.rate, 1.25);
+    },
+  );
 }

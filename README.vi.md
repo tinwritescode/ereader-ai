@@ -72,7 +72,7 @@ flowchart LR
 flowchart LR
     subgraph phone["iPhone"]
         ui["App Flutter"]
-        tts["Kokoro ONNX, 14 giọng"]
+        tts["VieNeu v3 Nano ONNX, 11 giọng"]
         ui --> tts
     end
 
@@ -104,7 +104,7 @@ flowchart LR
     ui -- "EPUB, yêu cầu chương" --> api
     ui -- "yêu cầu rút gọn" --> digest
     digest --> llm
-    hf -- "model 326 MB, tải một lần" --> tts
+    hf -- "model 282 MB, tải một lần" --> tts
     ui -- "từng câu một" --> speech
     speech -- "khoá chỉ nằm trên server" --> gcloud
 ```
@@ -165,7 +165,7 @@ flutter pub get
 flutter run --dart-define=API_BASE_URL=http://localhost:3000
 ```
 
-Không truyền `API_BASE_URL` thì app gọi `http://localhost:3000`. Lần đầu bấm Nghe, app hỏi rồi tải model 326 MB vào máy.
+Không truyền `API_BASE_URL` thì app gọi `http://localhost:3000`. Lần đầu bấm Nghe, app hỏi rồi tải model 282 MB vào máy.
 
 ## Kiểm thử
 
@@ -199,5 +199,5 @@ xcrun devicectl device install app --device <device-id> build/ios/iphoneos/Runne
 
 ## Nguồn tài nguyên
 
-- Model giọng đọc: [Kokoro-Vietnamese](https://github.com/iamdinhthuan/Kokoro-Vietnamese), giấy phép Apache-2.0. Tải từ Hugging Face khi chạy, không nằm trong repo.
+- Model giọng đọc: [VieNeu-TTS v3 Nano](https://huggingface.co/pnnbao-ump/VieNeu-TTS-v3-Nano), giấy phép Apache-2.0. Tải từ Hugging Face khi chạy, không nằm trong repo; 11 giọng có sẵn đi kèm trong `mobile/assets/speech/voices`. Âm vị lấy từ [sea-g2p](https://pypi.org/project/sea-g2p/), dựng thành bảng bằng `mobile/tool/build_speech_assets.py`.
 - ONNX Runtime qua `flutter_onnxruntime`, giấy phép MIT.

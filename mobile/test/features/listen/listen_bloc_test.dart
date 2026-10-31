@@ -133,11 +133,11 @@ void main() {
       ..add(const ListenRequested(blocks, source: source));
     await settle();
 
-    bloc.add(const ListenVoiceChosen(DeviceVoice.ducAn));
+    bloc.add(const ListenVoiceChosen(DeviceVoice.ducTri));
     await settle();
 
     expect(playingText(bloc), 'Một.');
-    expect(speech.synthesized, contains(('Một.', DeviceVoice.ducAn)));
+    expect(speech.synthesized, contains(('Một.', DeviceVoice.ducTri)));
     await bloc.close();
   });
 
@@ -356,7 +356,7 @@ void main() {
       await settle();
       await settle();
 
-      bloc.add(const ListenVoiceChosen(DeviceVoice.maiLinh));
+      bloc.add(const ListenVoiceChosen(DeviceVoice.maiAnh));
       await settle();
       await settle();
 
@@ -427,10 +427,10 @@ void main() {
     test('goes back to the last voice and rate', () async {
       final speech = FakeSpeech(cloud: const [vieNeu, hatDe]);
       final store = FakeListenChoiceStore(
-        const ListenChoice(voice: DeviceVoice.maiLinh, rate: 1.5),
+        const ListenChoice(voice: DeviceVoice.maiAnh, rate: 1.5),
       );
       final bloc = await listen(speech, store);
-      expect(bloc.state.voice, DeviceVoice.maiLinh);
+      expect(bloc.state.voice, DeviceVoice.maiAnh);
       expect(bloc.state.rate, 1.5);
       expect(speech.rates.last, 1.5);
       await bloc.close();
@@ -473,7 +473,7 @@ void main() {
 
     test('without any cloud voice, the device voice reads', () async {
       final bloc = await listen(FakeSpeech(), FakeListenChoiceStore());
-      expect(bloc.state.voice, DeviceVoice.diemTrinh);
+      expect(bloc.state.voice, defaultDeviceVoice);
       await bloc.close();
     });
 

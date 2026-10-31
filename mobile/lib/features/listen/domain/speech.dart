@@ -7,20 +7,17 @@ sealed class Voice {
 
 /// Voices shipped with the app, as `assets/speech/voices/<id>.bin`.
 enum DeviceVoice implements Voice {
-  diemTrinh('diem_trinh', 'Diễm Trinh'),
-  maiLinh('mai_linh', 'Mai Linh'),
-  maiLoan('mai_loan', 'Mai Loan'),
-  myYen('my_yen', 'Mỹ Yến'),
-  ngocHuyen('ngoc_huyen', 'Ngọc Huyền'),
-  thucTrinh('thuc_trinh', 'Thục Trinh'),
-  ducAn('duc_an', 'Đức An'),
-  ducDuy('duc_duy', 'Đức Duy'),
-  hungThinh('hung_thinh', 'Hưng Thịnh'),
+  minhQuan('minh_quan', 'Minh Quân'),
   manhDung('manh_dung', 'Mạnh Dũng'),
-  phatTai('phat_tai', 'Phát Tài'),
-  thanhDat('thanh_dat', 'Thành Đạt'),
-  tuanNgoc('tuan_ngoc', 'Tuấn Ngọc'),
-  storyvert('storyvert', 'Storyvert');
+  anhKhoi('anh_khoi', 'Anh Khôi'),
+  ducTri('duc_tri', 'Đức Trí'),
+  huuQuan('huu_quan', 'Hữu Quân'),
+  adam('adam', 'Adam'),
+  myDuyen('my_duyen', 'Mỹ Duyên'),
+  maiAnh('mai_anh', 'Mai Anh'),
+  xuanTien('xuan_tien', 'Xuân Tiên'),
+  trucLy('truc_ly', 'Trúc Ly'),
+  aiHan('ai_han', 'Ái Hân');
 
   const DeviceVoice(this.id, this.label);
 
@@ -28,6 +25,9 @@ enum DeviceVoice implements Voice {
   @override
   final String label;
 }
+
+/// The device voice to read with when none was chosen.
+const defaultDeviceVoice = DeviceVoice.minhQuan;
 
 /// A cloud voice, rendered by our voice service through the backend.
 final class CloudVoice implements Voice {

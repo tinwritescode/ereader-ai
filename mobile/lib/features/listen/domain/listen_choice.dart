@@ -19,5 +19,5 @@ Voice openingVoice(Voice? saved, List<CloudVoice> offered) => switch (saved) {
   final DeviceVoice voice => voice,
   final CloudVoice voice when offered.isEmpty || offered.contains(voice) =>
     voice,
-  _ => offered.isEmpty ? DeviceVoice.diemTrinh : offered.first,
+  _ => offered.isEmpty ? defaultDeviceVoice : offered.first,
 };

@@ -3,7 +3,7 @@ import 'package:ereader_mobile/features/books/data/repositories/books_repository
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_look_store.dart';
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_spot_store.dart';
 import 'package:ereader_mobile/features/listen/data/cloud_voices.dart';
-import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
+import 'package:ereader_mobile/features/listen/data/nano_speech.dart';
 import 'package:ereader_mobile/features/listen/data/prefs_listen_choice_store.dart';
 import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +45,7 @@ void main() {
         EReaderApp(
           auth: FakeAuthRepository(),
           repository: BooksRepositoryImpl(api),
-          speech: KokoroSpeech(cloud: CloudVoices(api)),
+          speech: NanoSpeech(cloud: CloudVoices(api)),
           looks: PrefsReadingLookStore(),
           listenChoices: PrefsListenChoiceStore(),
           spots: PrefsReadingSpotStore(),
