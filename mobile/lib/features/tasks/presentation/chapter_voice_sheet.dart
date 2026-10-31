@@ -37,7 +37,9 @@ Future<void> chooseChapterVoice(BuildContext context) async {
   final voice = await showModalBottomSheet<CloudVoice>(
     context: context,
     isScrollControlled: true,
-    builder: (context) => _ChapterVoiceSheet(
+    builder: (context) => VoiceSheet(
+      title: 'Tạo giọng đọc cả chương',
+      action: 'Tạo giọng đọc',
       voices: voices,
       first: current is CloudVoice ? current : voices.first,
       note:
@@ -72,22 +74,28 @@ Future<void> chooseChapterVoice(BuildContext context) async {
   }
 }
 
-class _ChapterVoiceSheet extends StatefulWidget {
-  const _ChapterVoiceSheet({
+/// Asks which voice should read; answers with it, or null to leave it.
+class VoiceSheet extends StatefulWidget {
+  const VoiceSheet({
+    super.key,
+    required this.title,
+    required this.action,
     required this.voices,
     required this.first,
     required this.note,
   });
 
+  final String title;
+  final String action;
   final List<CloudVoice> voices;
   final CloudVoice first;
   final String note;
 
   @override
-  State<_ChapterVoiceSheet> createState() => _ChapterVoiceSheetState();
+  State<VoiceSheet> createState() => _VoiceSheetState();
 }
 
-class _ChapterVoiceSheetState extends State<_ChapterVoiceSheet> {
+class _VoiceSheetState extends State<VoiceSheet> {
   late var _chosen = widget.first;
 
   @override
@@ -101,7 +109,7 @@ class _ChapterVoiceSheetState extends State<_ChapterVoiceSheet> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Tạo giọng đọc cả chương',
+              widget.title,
               style: readingStyle(
                 size: 18,
                 weight: FontWeight.w600,
@@ -142,7 +150,7 @@ class _ChapterVoiceSheetState extends State<_ChapterVoiceSheet> {
             const SizedBox(height: 14),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(_chosen),
-              child: const Text('Tạo giọng đọc'),
+              child: Text(widget.action),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

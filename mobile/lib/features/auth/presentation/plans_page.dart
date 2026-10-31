@@ -78,7 +78,7 @@ class _PlanCard extends StatelessWidget {
             '${_count(limits.books)} cuốn sách',
             '${_count(limits.monthlyDigests)} chương AI mỗi tháng',
             '${_count(limits.monthlyVbeeMinutes)} phút giọng qua mạng mỗi tháng',
-            if (limits.chapterVoice) 'Tạo sẵn giọng đọc cả chương',
+            if (limits.chapterVoice) 'Tạo sẵn giọng đọc cả chương và cả sách',
             if (limits.monthlyBookTranslations > 0)
               'Dịch ${_count(limits.monthlyBookTranslations)} cuốn sách sang tiếng Việt mỗi tháng',
           ])

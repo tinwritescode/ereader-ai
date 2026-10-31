@@ -5,29 +5,37 @@ import '../../auth/presentation/account_widgets.dart';
 import '../../auth/presentation/plans_page.dart';
 import '../../tasks/domain/chapter_task.dart';
 import '../../tasks/presentation/tasks_page.dart';
-import 'translate_offer.dart';
+import 'whole_book_offer.dart';
 import 'widgets.dart';
 
-/// The book page's line about translating the whole book.
-class TranslateRow extends StatelessWidget {
-  const TranslateRow({
+/// How a [WholeBookRow] speaks of its task.
+typedef WholeBookWords = ({
+  String title,
+  String note,
+  String doing,
+  String waiting,
+  String named,
+  String finished,
+});
+
+/// The book page's line about one whole-book task.
+class WholeBookRow extends StatelessWidget {
+  const WholeBookRow({
     super.key,
     required this.offer,
-    required this.left,
+    required this.words,
     required this.onOffer,
     required this.onLocked,
     required this.onFollow,
     required this.onResume,
   });
 
-  final TranslateOffer offer;
-
-  /// Book translations left this month.
-  final int left;
+  final WholeBookOffer offer;
+  final WholeBookWords words;
   final VoidCallback onOffer;
   final VoidCallback onLocked;
   final VoidCallback onFollow;
-  final void Function(BookTranslationTask task) onResume;
+  final void Function(WholeBookTask task) onResume;
 
   @override
   Widget build(BuildContext context) {
@@ -38,36 +46,30 @@ class TranslateRow extends StatelessWidget {
       color: Palette.ink,
     );
     return switch (offer) {
-      TranslateHidden() => const SizedBox.shrink(),
-      TranslateDone() => _Line(
-        child: Text('Đã dịch cả sách sang tiếng Việt', style: soft),
-      ),
-      TranslateOffered() => _Line(
+      OfferHidden() => const SizedBox.shrink(),
+      OfferDone() => _Line(child: Text(words.finished, style: soft)),
+      OfferOpen() => _Line(
         onTap: onOffer,
         child: _Titled(
-          title: Text('Dịch cả sách sang tiếng Việt', style: title),
-          note: Text('gói Max, tháng này còn $left lượt', style: soft),
+          title: Text(words.title, style: title),
+          note: Text(words.note, style: soft),
         ),
       ),
-      TranslateLocked() => _Line(
+      OfferLocked() => _Line(
         onTap: onLocked,
         child: _Titled(
-          title: Text(
-            'Dịch cả sách sang tiếng Việt',
-            style: title.copyWith(color: Palette.muted),
-          ),
+          title: Text(words.title, style: title.copyWith(color: Palette.muted)),
           note: Text('gói Max', style: soft),
         ),
       ),
-      TranslateUnderWay(:final task) => _Line(
+      OfferUnderWay(:final task) => _Line(
         onTap: onFollow,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(switch (task.position) {
-              final position? => 'Chờ dịch cả sách, thứ $position trong hàng',
-              null =>
-                'Đang dịch cả sách, chương ${task.done} trên ${task.total}',
+              final position? => '${words.waiting}, thứ $position trong hàng',
+              null => '${words.doing}, chương ${task.done} trên ${task.total}',
             }, style: title),
             const SizedBox(height: 5),
             Row(
@@ -88,13 +90,13 @@ class TranslateRow extends StatelessWidget {
           ],
         ),
       ),
-      TranslateStopped(:final task) => _Line(
+      OfferStopped(:final task) => _Line(
         child: Row(
           children: [
             Expanded(
               child: _Titled(
                 title: Text(
-                  'Dịch cả sách, bị dừng ở ${task.percent}%',
+                  '${words.named}, bị dừng ở ${task.percent}%',
                   style: title.copyWith(color: Palette.red),
                 ),
                 note: Text(taskFailure(task.code), style: soft),
@@ -216,12 +218,16 @@ class TranslateSheet extends StatelessWidget {
   }
 }
 
-/// Shown to a reader whose plan has no book translations.
-class TranslateLockedSheet extends StatelessWidget {
-  const TranslateLockedSheet({super.key, required this.monthly});
+/// Shown to a reader whose plan does not have a whole-book task.
+class WholeBookLockedSheet extends StatelessWidget {
+  const WholeBookLockedSheet({
+    super.key,
+    required this.title,
+    required this.body,
+  });
 
-  /// Book translations a month on Max.
-  final int monthly;
+  final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -231,13 +237,9 @@ class TranslateLockedSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Dịch cả sách có ở gói Max', style: handStyle(size: 24)),
+          Text(title, style: handStyle(size: 24)),
           const SizedBox(height: 8),
-          Text(
-            'Gói Max dịch $monthly cuốn sách sang tiếng Việt mỗi tháng, '
-            'giữ nguyên từng đoạn của bản gốc.',
-            style: readingStyle(size: 15, height: 1.55),
-          ),
+          Text(body, style: readingStyle(size: 15, height: 1.55)),
           const SizedBox(height: 16),
           PrimaryButton(
             label: 'Xem các gói',
@@ -254,4 +256,71 @@ class TranslateLockedSheet extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// What to do about a foreign book with chapters not translated yet.
+enum PartlyTranslatedChoice { voiceTranslated, translateFirst }
+
+class PartlyTranslatedSheet extends StatelessWidget {
+  const PartlyTranslatedSheet({
+    super.key,
+    required this.chapters,
+    required this.skipped,
+  });
+
+  /// Chapters translated, which a voice can read.
+  final int chapters;
+  final int skipped;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = readingStyle(size: 15, height: 1.55);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Sách này cần bản tiếng Việt trước',
+              style: handStyle(size: 24),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Giọng đọc chỉ đọc tiếng Việt. Sách có ${chapters + skipped} '
+              'chương, mới dịch xong $chapters chương.',
+              style: body,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              chapters > 0
+                  ? 'Tạo giọng cho $chapters chương đã dịch, '
+                        'hoặc dịch nốt rồi tạo giọng sau.'
+                  : 'Dịch sách trước rồi tạo giọng sau.',
+              style: body,
+            ),
+            const SizedBox(height: 16),
+            if (chapters > 0)
+              PrimaryButton(
+                label: 'Tạo giọng $chapters chương đã dịch',
+                onPressed: () => Navigator.of(
+                  context,
+                ).pop(PartlyTranslatedChoice.voiceTranslated),
+              ),
+            InkLink(
+              label: 'Dịch cả sách trước',
+              onPressed: () => Navigator.of(
+                context,
+              ).pop(PartlyTranslatedChoice.translateFirst),
+            ),
+            InkLink(
+              label: 'Để sau',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

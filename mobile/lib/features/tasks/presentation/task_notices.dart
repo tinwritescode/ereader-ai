@@ -61,6 +61,7 @@ void openTasks(BuildContext context) => appNavigator.currentState?.push(
 Future<void> openMadeBy(BuildContext context, LongTask task) => switch (task) {
   ChapterVoiceTask() => openChapterOf(context, task),
   BookTranslationTask() => openTranslatedBook(context, task),
+  BookVoiceTask() => openVoicedBook(context, task),
 };
 
 /// Opens the book with Vietnamese offered first for every chapter.
@@ -118,6 +119,29 @@ Future<void> openChapterOf(BuildContext context, ChapterVoiceTask task) async {
   }
 }
 
+/// Goes back to where the book was left, with its voice already reading.
+Future<void> openVoicedBook(BuildContext context, BookVoiceTask task) async {
+  final repository = context.read<BooksRepository>();
+  final listen = context.read<ListenBloc>();
+  final speech = context.read<Speech>();
+  try {
+    final (books, voices) = await (
+      repository.books(),
+      speech.cloudVoices(),
+    ).wait;
+    final book = books.where((book) => book.bookId == task.bookId).firstOrNull;
+    final navigator = appNavigator.currentState;
+    if (book == null || navigator == null || !navigator.mounted) return;
+    final voice = voices.where((v) => v.code == task.voiceCode).firstOrNull;
+    if (voice != null) listen.add(ListenVoiceChosen(voice));
+    await navigator.push(
+      BookPage.route(navigator.context, book, resume: true, listen: true),
+    );
+  } on BooksException {
+    // The task list stays open; the reader can tap again.
+  }
+}
+
 /// Tells of finished tasks, and looks again whenever the app comes back.
 class TaskNotices extends StatefulWidget {
   const TaskNotices({super.key, required this.child});
@@ -158,6 +182,11 @@ class _TaskNoticesState extends State<TaskNotices> with WidgetsBindingObserver {
         ChapterVoiceTask(:final chapterLabel) => (
           done: 'Đã tạo xong giọng đọc $chapterLabel.',
           halted: 'Dừng tạo giọng đọc $chapterLabel ở ${task.percent}%.',
+          open: 'Nghe ngay',
+        ),
+        BookVoiceTask(:final bookTitle) => (
+          done: 'Đã tạo xong giọng đọc $bookTitle.',
+          halted: 'Dừng tạo giọng đọc $bookTitle ở ${task.percent}%.',
           open: 'Nghe ngay',
         ),
         BookTranslationTask(:final bookTitle) => (

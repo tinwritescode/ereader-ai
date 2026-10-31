@@ -118,4 +118,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.resumed, ['tr1']);
   });
+
+  testWidgets('shows a whole book voice by its chapters', (tester) async {
+    await show(tester, [bookVoice()]);
+    expect(find.text('Tạo giọng cả sách, Hạt Dẻ'), findsOneWidget);
+    expect(find.text('Cuộc chiến sinh tồn'), findsOneWidget);
+    expect(find.text('Chương 6 trên 27'), findsOneWidget);
+  });
+
+  testWidgets('says the minutes ran out and offers to go on', (tester) async {
+    final repository = await show(tester, [
+      bookVoice(
+        state: TaskState.stopped,
+        code: 'VBEE_LIMIT',
+        current: null,
+        finishedAt: DateTime(2026, 10, 31),
+      ),
+    ]);
+    expect(find.text('Tạo giọng cả sách, bị dừng ở 22%'), findsOneWidget);
+    expect(find.text('Hết phút giọng qua mạng'), findsOneWidget);
+    await tester.tap(find.text('Chạy tiếp'));
+    await tester.pumpAndSettle();
+    expect(repository.resumed, ['bv1']);
+  });
 }

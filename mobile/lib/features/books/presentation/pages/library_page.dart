@@ -371,7 +371,8 @@ class _ShelfBook extends StatelessWidget {
             if (working != null)
               Text(
                 switch (working) {
-                  ChapterVoiceTask() => 'tạo giọng đọc ${working.percent}%',
+                  ChapterVoiceTask() ||
+                  BookVoiceTask() => 'tạo giọng đọc ${working.percent}%',
                   BookTranslationTask() => 'đang dịch ${working.percent}%',
                 },
                 maxLines: 1,

@@ -74,6 +74,20 @@ class TasksCubit extends Cubit<TasksState> {
     return task;
   }
 
+  Future<BookVoiceTask> voiceBook(
+    String bookId, {
+    required String voiceCode,
+    String? startChapterId,
+  }) async {
+    final task = await _repository.voiceBook(
+      bookId,
+      voiceCode: voiceCode,
+      startChapterId: startChapterId,
+    );
+    await refresh();
+    return task;
+  }
+
   Future<void> putFirst(BookTranslationTask task, String chapterId) async {
     await _repository.putFirst(task.id, chapterId);
     await refresh();

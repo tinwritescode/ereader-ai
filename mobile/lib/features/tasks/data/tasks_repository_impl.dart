@@ -9,11 +9,12 @@ class TasksRepositoryImpl implements TasksRepository {
 
   @override
   Future<List<LongTask>> tasks() => _call(() async {
-    final [voices, translations] = await Future.wait([
+    final [voices, translations, books] = await Future.wait([
       _list('/speech/tasks', _toVoiceTask),
       _list('/translations/tasks', _toTranslationTask),
+      _list('/voices/tasks', _toBookVoiceTask),
     ]);
-    return [...voices, ...translations]
+    return [...voices, ...translations, ...books]
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   });
 
@@ -71,6 +72,39 @@ class TasksRepositoryImpl implements TasksRepository {
   });
 
   @override
+  Future<BookVoiceTask> voiceBook(
+    String bookId, {
+    required String voiceCode,
+    String? startChapterId,
+  }) => _call(() async {
+    final response = await _api.post<Object?>(
+      '/books/$bookId/voice',
+      data: {'voiceCode': voiceCode, 'startChapterId': startChapterId},
+    );
+    return _toBookVoiceTask(response.data);
+  });
+
+  @override
+  Future<BookVoice> voiceOf(String bookId) => _call(() async {
+    final response = await _api.get<Object?>('/books/$bookId/voice');
+    return switch (response.data) {
+      {
+        'chapters': final int chapters,
+        'skipped': final int skipped,
+        'minutes': final int minutes,
+        'task': final task,
+      } =>
+        BookVoice(
+          chapters: chapters,
+          skipped: skipped,
+          minutes: minutes,
+          task: task == null ? null : _toBookVoiceTask(task),
+        ),
+      _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+    };
+  });
+
+  @override
   Future<void> putFirst(String taskId, String chapterId) => _call(
     () => _api.post<Object?>(
       '/translations/tasks/$taskId/first',
@@ -89,6 +123,7 @@ class TasksRepositoryImpl implements TasksRepository {
   String _address(LongTask task) => switch (task) {
     ChapterVoiceTask() => '/speech/tasks/${task.id}',
     BookTranslationTask() => '/translations/tasks/${task.id}',
+    BookVoiceTask() => '/voices/tasks/${task.id}',
   };
 
   Future<T> _call<T>(Future<T> Function() request) async {
@@ -167,18 +202,60 @@ BookTranslationTask _toTranslationTask(Object? json) => switch (json) {
       total: total,
       percent: percent,
       position: position,
-      current: switch (current) {
-        {'chapterId': final String chapterId, 'percent': final int percent} => (
-          chapterId: chapterId,
-          percent: percent,
-        ),
-        _ => null,
-      },
+      current: _current(current),
       waiting: waiting.whereType<String>().toList(),
       createdAt: DateTime.parse(createdAt),
       finishedAt: finishedAt == null ? null : DateTime.parse(finishedAt),
     ),
   _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+};
+
+BookVoiceTask _toBookVoiceTask(Object? json) => switch (json) {
+  {
+    'id': final String id,
+    'bookId': final String bookId,
+    'bookTitle': final String bookTitle,
+    'voiceCode': final String voiceCode,
+    'voiceName': final String voiceName,
+    'state': final String state,
+    'code': final String? code,
+    'done': final int done,
+    'total': final int total,
+    'percent': final int percent,
+    'position': final int? position,
+    'current': final Object? current,
+    'waiting': final List<Object?> waiting,
+    'voiced': final List<Object?> voiced,
+    'createdAt': final String createdAt,
+    'finishedAt': final String? finishedAt,
+  } =>
+    BookVoiceTask(
+      id: id,
+      bookId: bookId,
+      bookTitle: bookTitle,
+      voiceCode: voiceCode,
+      voiceName: voiceName,
+      state: _state(state),
+      code: code,
+      done: done,
+      total: total,
+      percent: percent,
+      position: position,
+      current: _current(current),
+      waiting: waiting.whereType<String>().toList(),
+      voiced: voiced.whereType<String>().toList(),
+      createdAt: DateTime.parse(createdAt),
+      finishedAt: finishedAt == null ? null : DateTime.parse(finishedAt),
+    ),
+  _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+};
+
+({String chapterId, int percent})? _current(Object? json) => switch (json) {
+  {'chapterId': final String chapterId, 'percent': final int percent} => (
+    chapterId: chapterId,
+    percent: percent,
+  ),
+  _ => null,
 };
 
 TaskState _state(String name) =>

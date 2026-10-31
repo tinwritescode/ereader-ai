@@ -111,7 +111,7 @@ class _Empty extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Khi tạo sẵn giọng đọc cả chương hay dịch cả sách, '
+          'Khi tạo sẵn giọng đọc hay dịch cả sách, '
           'tiến độ sẽ hiện ở đây.',
           style: readingStyle(size: 15, color: Palette.muted),
         ),
@@ -170,6 +170,12 @@ class _TaskRow extends StatelessWidget {
         name: task.bookTitle,
         progress: 'Chương $done trên $total',
         stoppedNote: 'Dịch cả sách, bị dừng ở ${task.percent}%',
+      ),
+      BookVoiceTask(:final voiceName, :final done, :final total) => (
+        kind: 'Tạo giọng cả sách, $voiceName',
+        name: task.bookTitle,
+        progress: 'Chương $done trên $total',
+        stoppedNote: 'Tạo giọng cả sách, bị dừng ở ${task.percent}%',
       ),
     };
     return InkWell(

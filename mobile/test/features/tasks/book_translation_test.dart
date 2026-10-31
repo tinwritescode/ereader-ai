@@ -21,4 +21,11 @@ void main() {
     expect(task.turnOf('c5'), ChapterTurn.none);
     expect(task.turnOf('c6'), ChapterTurn.none);
   });
+
+  test('a whole book voice takes turns the same way', () {
+    final task = bookVoice();
+    expect(task.turnOf('c7'), ChapterTurn.now);
+    expect(task.turnOf('c8'), ChapterTurn.later);
+    expect(task.turnOf('c2'), ChapterTurn.none);
+  });
 }

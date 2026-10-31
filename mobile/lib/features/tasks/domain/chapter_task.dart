@@ -65,9 +65,9 @@ final class ChapterVoiceTask extends LongTask {
   int get percent => total == 0 ? 0 : (done * 100 / total).floor();
 }
 
-/// Translating a whole book into Vietnamese, chapter by chapter.
-final class BookTranslationTask extends LongTask {
-  const BookTranslationTask({
+/// Work done chapter by chapter across a whole book.
+sealed class WholeBookTask extends LongTask {
+  const WholeBookTask({
     required super.id,
     required super.bookId,
     required super.bookTitle,
@@ -83,15 +83,15 @@ final class BookTranslationTask extends LongTask {
     required this.waiting,
   });
 
-  /// Chapters translated, of [total].
+  /// Chapters finished, of [total].
   final int done;
   final int total;
 
-  /// Share of the words translated, weighed by chapter length.
+  /// Share of the words done, weighed by chapter length.
   @override
   final int percent;
 
-  /// The chapter being translated, and how far along it is.
+  /// The chapter under way, and how far along it is.
   final ({String chapterId, int percent})? current;
 
   /// Chapters still to come, in order, [current] first.
@@ -106,9 +106,56 @@ final class BookTranslationTask extends LongTask {
       : ChapterTurn.none;
 }
 
-/// Where a chapter stands in a book's translation.
+/// Translating a whole book into Vietnamese, chapter by chapter.
+final class BookTranslationTask extends WholeBookTask {
+  const BookTranslationTask({
+    required super.id,
+    required super.bookId,
+    required super.bookTitle,
+    required super.state,
+    required super.code,
+    required super.position,
+    required super.createdAt,
+    required super.finishedAt,
+    required super.done,
+    required super.total,
+    required super.percent,
+    required super.current,
+    required super.waiting,
+  });
+}
+
+/// Reading a whole book into stored audio, chapter by chapter.
+final class BookVoiceTask extends WholeBookTask {
+  const BookVoiceTask({
+    required super.id,
+    required super.bookId,
+    required super.bookTitle,
+    required this.voiceCode,
+    required this.voiceName,
+    required super.state,
+    required super.code,
+    required super.position,
+    required super.createdAt,
+    required super.finishedAt,
+    required super.done,
+    required super.total,
+    required super.percent,
+    required super.current,
+    required super.waiting,
+    required this.voiced,
+  });
+
+  final String voiceCode;
+  final String voiceName;
+
+  /// Chapters whose audio is ready.
+  final List<String> voiced;
+}
+
+/// Where a chapter stands in a whole-book task.
 enum ChapterTurn {
-  /// Being translated right now.
+  /// Being worked on right now.
   now,
 
   /// Waiting its turn.
@@ -126,6 +173,28 @@ class BookTranslation {
 
   /// The newest task for the book; null when there has been none lately.
   final BookTranslationTask? task;
+}
+
+/// What a voice for the whole book would read, before it starts.
+class BookVoice {
+  const BookVoice({
+    required this.chapters,
+    required this.skipped,
+    required this.minutes,
+    required this.task,
+  });
+
+  /// Chapters a Vietnamese voice can read now.
+  final int chapters;
+
+  /// Chapters of a foreign book not translated yet.
+  final int skipped;
+
+  /// About how long [chapters] take to read.
+  final int minutes;
+
+  /// The newest task for the book; null when there has been none lately.
+  final BookVoiceTask? task;
 }
 
 /// What the reader asks to have prepared.
@@ -172,6 +241,14 @@ abstract interface class TasksRepository {
   });
 
   Future<BookTranslation> translationOf(String bookId);
+
+  Future<BookVoiceTask> voiceBook(
+    String bookId, {
+    required String voiceCode,
+    String? startChapterId,
+  });
+
+  Future<BookVoice> voiceOf(String bookId);
 
   /// Moves a waiting chapter to the front of the book's line.
   Future<void> putFirst(String taskId, String chapterId);

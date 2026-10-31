@@ -119,4 +119,14 @@ void main() {
     await cubit.refresh();
     expect(cubit.state.notices.single, isA<BookTranslationTask>());
   });
+
+  test('starts a whole book voice and follows it', () async {
+    await cubit.voiceBook('b1', voiceCode: 'v', startChapterId: 'c3');
+    expect(repository.voicing.single, (
+      bookId: 'b1',
+      voiceCode: 'v',
+      startChapterId: 'c3',
+    ));
+    expect(cubit.state.active, 1);
+  });
 }

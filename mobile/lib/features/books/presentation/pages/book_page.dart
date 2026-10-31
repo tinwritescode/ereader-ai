@@ -7,9 +7,11 @@ import '../../../../app/theme.dart';
 import '../../../auth/domain/account.dart';
 import '../../../auth/presentation/auth_cubit.dart';
 import '../../../listen/domain/listen_source.dart';
+import '../../../listen/domain/speech.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/mini_player.dart';
 import '../../../tasks/domain/chapter_task.dart';
+import '../../../tasks/presentation/chapter_voice_sheet.dart';
 import '../../../tasks/presentation/task_notices.dart';
 import '../../../tasks/presentation/tasks_cubit.dart';
 import '../../domain/entities/book.dart';
@@ -21,8 +23,8 @@ import '../bloc/book_bloc.dart';
 import '../formatting.dart';
 import '../length_memory.dart';
 import '../reading_spots_cubit.dart';
-import '../translate_offer.dart';
-import '../translate_widgets.dart';
+import '../whole_book_offer.dart';
+import '../whole_book_widgets.dart';
 import '../widgets.dart';
 import 'choose_length_sheet.dart';
 import 'reader_page.dart';
@@ -71,10 +73,25 @@ class _BookPageState extends State<BookPage> {
   /// What the server last said about this book's translation.
   BookTranslation? _translation;
 
+  /// What the server last said about a voice for the whole book.
+  BookVoice? _voice;
+
   @override
   void initState() {
     super.initState();
     if (widget.book.isForeign) unawaited(_loadTranslation());
+    unawaited(_loadVoice());
+  }
+
+  Future<void> _loadVoice() async {
+    try {
+      final voice = await context.read<TasksRepository>().voiceOf(
+        widget.book.bookId,
+      );
+      if (mounted) setState(() => _voice = voice);
+    } on TasksException {
+      // The book reads as before; the next change to the task asks again.
+    }
   }
 
   Future<void> _loadTranslation() async {
@@ -88,15 +105,28 @@ class _BookPageState extends State<BookPage> {
     }
   }
 
-  BookTranslationTask? _liveTask(TasksState tasks) => tasks.tasks
-      .whereType<BookTranslationTask>()
+  T? _liveTask<T extends WholeBookTask>(TasksState tasks) => tasks.tasks
+      .whereType<T>()
       .where((task) => task.bookId == widget.book.bookId)
       .lastOrNull;
 
   /// The loaded standing, with the task as the task list last saw it.
+  BookVoice? _voiceStanding(TasksState tasks) {
+    final loaded = _voice;
+    final live = _liveTask<BookVoiceTask>(tasks);
+    if (loaded == null) return null;
+    return BookVoice(
+      chapters: loaded.chapters,
+      skipped: loaded.skipped,
+      minutes: loaded.minutes,
+      task: live ?? loaded.task,
+    );
+  }
+
+  /// The loaded standing, with the task as the task list last saw it.
   BookTranslation? _standing(TasksState tasks) {
     final loaded = _translation;
-    final live = _liveTask(tasks);
+    final live = _liveTask<BookTranslationTask>(tasks);
     if (loaded == null && live == null) return null;
     return BookTranslation(
       translated: loaded?.translated ?? const {},
@@ -155,19 +185,113 @@ class _BookPageState extends State<BookPage> {
     }
   }
 
-  void _showLocked() {
+  void _showLocked({required String title, required String body}) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Palette.paper,
+      builder: (_) => WholeBookLockedSheet(title: title, body: body),
+    );
+  }
+
+  void _showTranslationLocked() {
     final auth = context.read<AuthCubit>().state;
     final max = auth is AuthSignedIn
         ? auth.account.plans[PlanName.max]?.monthlyBookTranslations ?? 0
         : 0;
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Palette.paper,
-      builder: (_) => TranslateLockedSheet(monthly: max),
+    _showLocked(
+      title: 'Dịch cả sách có ở gói Max',
+      body:
+          'Gói Max dịch $max cuốn sách sang tiếng Việt mỗi tháng, '
+          'giữ nguyên từng đoạn của bản gốc.',
     );
   }
 
-  Future<void> _resumeTranslation(BookTranslationTask task) async {
+  /// Foreign books are read from their translation, so that comes first.
+  Future<void> _offerVoice() async {
+    final repository = context.read<TasksRepository>();
+    try {
+      final voice = await repository.voiceOf(widget.book.bookId);
+      if (!mounted) return;
+      setState(() => _voice = voice);
+      if (voice.skipped > 0) {
+        final choice = await showModalBottomSheet<PartlyTranslatedChoice>(
+          context: context,
+          backgroundColor: Palette.paper,
+          builder: (_) => PartlyTranslatedSheet(
+            chapters: voice.chapters,
+            skipped: voice.skipped,
+          ),
+        );
+        if (!mounted) return;
+        if (choice == PartlyTranslatedChoice.translateFirst) {
+          await _offerTranslation();
+        }
+        if (choice != PartlyTranslatedChoice.voiceTranslated) return;
+      }
+      await _chooseBookVoice(voice);
+    } on TasksException {
+      _tellVoiceFailed();
+    } on SpeechException {
+      _tellVoiceFailed();
+    }
+  }
+
+  void _tellVoiceFailed() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Chưa tạo được, kiểm tra mạng rồi thử lại.'),
+      ),
+    );
+  }
+
+  Future<void> _chooseBookVoice(BookVoice standing) async {
+    final auth = context.read<AuthCubit>();
+    final tasks = context.read<TasksCubit>();
+    final current = context.read<ListenBloc>().state.voice;
+    final book = widget.book;
+    final spot = context.read<ReadingSpotsCubit>().state[book.bookId];
+    final voices = await context.read<Speech>().cloudVoices();
+    final state = auth.state;
+    if (!mounted || voices.isEmpty || state is! AuthSignedIn) return;
+    final account = state.account;
+    final left = account.limits.monthlyVbeeMinutes - account.vbeeMinutesUsed;
+    final enough = left >= standing.minutes;
+    final chosen = await showModalBottomSheet<CloudVoice>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => VoiceSheet(
+        title: 'Tạo giọng đọc cả sách',
+        action: enough ? 'Tạo giọng cả sách' : 'Tạo tới khi hết phút',
+        voices: voices,
+        first: current is CloudVoice ? current : voices.first,
+        note: [
+          '${standing.chapters} chương, khoảng '
+              '${durationLabel(standing.minutes)} giọng. '
+              'Tháng này còn $left phút.',
+          if (spot != null)
+            'Tạo từ ${spot.chapterLabel} tới hết, '
+                'rồi quay lại các chương trước.',
+          if (enough)
+            'Câu đã có giọng không tính phút. Huỷ thì giữ phần đã tạo, '
+                'không tính phần chưa tạo.'
+          else
+            'Đủ khoảng ${chaptersWithin(chapters: standing.chapters, minutes: standing.minutes, left: left)} '
+                'chương. Hết phút thì dừng, phần đã tạo vẫn nghe được. '
+                'Tháng sau bấm Chạy tiếp để làm nốt.',
+        ].join('\n'),
+      ),
+    );
+    if (chosen == null || !mounted) return;
+    await tasks.voiceBook(
+      book.bookId,
+      voiceCode: chosen.code,
+      startChapterId: spot?.chapterId,
+    );
+    if (mounted) showTaskStarted(context, book.title);
+    await _loadVoice();
+  }
+
+  Future<void> _resumeTask(WholeBookTask task) async {
     try {
       await context.read<TasksCubit>().resume(task);
     } on TasksException {
@@ -246,7 +370,9 @@ class _BookPageState extends State<BookPage> {
     final heard = context.watch<ListenBloc>().state.heard;
     final hearing = heard?.book.bookId == book.bookId ? heard : null;
     final spot = context.watch<ReadingSpotsCubit>().state[book.bookId];
-    final standing = _standing(context.watch<TasksCubit>().state);
+    final tasks = context.watch<TasksCubit>().state;
+    final standing = _standing(tasks);
+    final voice = _voiceStanding(tasks);
     final account = switch (context.watch<AuthCubit>().state) {
       AuthSignedIn(:final account) => account,
       _ => null,
@@ -264,12 +390,18 @@ class _BookPageState extends State<BookPage> {
         // Chapters finished while the page is open get their marks.
         BlocListener<TasksCubit, TasksState>(
           listenWhen: (before, after) {
-            final was = _liveTask(before);
-            final now = _liveTask(after);
+            final was = _liveTask<BookTranslationTask>(before);
+            final now = _liveTask<BookTranslationTask>(after);
             return now != null &&
                 (was?.done != now.done || was?.state != now.state);
           },
           listener: (_, _) => unawaited(_loadTranslation()),
+        ),
+        BlocListener<TasksCubit, TasksState>(
+          listenWhen: (before, after) =>
+              _liveTask<BookVoiceTask>(before)?.state !=
+              _liveTask<BookVoiceTask>(after)?.state,
+          listener: (_, _) => unawaited(_loadVoice()),
         ),
       ],
       child: Scaffold(
@@ -315,25 +447,65 @@ class _BookPageState extends State<BookPage> {
                                     ),
                                   ),
                                 SliverToBoxAdapter(
-                                  child: TranslateRow(
+                                  child: WholeBookRow(
                                     offer: offer,
-                                    left:
-                                        monthly -
-                                        (account?.bookTranslationsUsed ?? 0),
+                                    words: (
+                                      title: 'Dịch cả sách sang tiếng Việt',
+                                      note:
+                                          'gói Max, tháng này còn '
+                                          '${monthly - (account?.bookTranslationsUsed ?? 0)} lượt',
+                                      doing: 'Đang dịch cả sách',
+                                      waiting: 'Chờ dịch cả sách',
+                                      named: 'Dịch cả sách',
+                                      finished:
+                                          'Đã dịch cả sách sang tiếng Việt',
+                                    ),
                                     onOffer: _offerTranslation,
-                                    onLocked: _showLocked,
+                                    onLocked: _showTranslationLocked,
                                     onFollow: () => openTasks(context),
-                                    onResume: _resumeTranslation,
+                                    onResume: _resumeTask,
+                                  ),
+                                ),
+                                SliverToBoxAdapter(
+                                  child: WholeBookRow(
+                                    offer: voiceOfferFor(
+                                      allowed:
+                                          account?.limits.chapterVoice ?? false,
+                                      standing: voice,
+                                    ),
+                                    words: (
+                                      title: 'Tạo giọng đọc cả sách',
+                                      note: 'gói Max',
+                                      doing: 'Đang tạo giọng cả sách',
+                                      waiting: 'Chờ tạo giọng cả sách',
+                                      named: 'Tạo giọng cả sách',
+                                      finished: 'Đã có giọng đọc cả sách',
+                                    ),
+                                    onOffer: _offerVoice,
+                                    onLocked: () => _showLocked(
+                                      title: 'Giọng đọc cả sách có ở gói Max',
+                                      body:
+                                          'Gói Max tạo sẵn giọng cho cả cuốn, '
+                                          'nghe liền mạch từ đầu tới cuối, kể cả khi mạng yếu.',
+                                    ),
+                                    onFollow: () => openTasks(context),
+                                    onResume: _resumeTask,
                                   ),
                                 ),
                                 SliverList.builder(
                                   itemCount: chapters.length,
                                   itemBuilder: (context, index) => _ChapterRow(
                                     chapter: chapters[index],
-                                    mark: _markOf(
-                                      chapters[index].chapterId,
-                                      standing,
-                                    ),
+                                    mark: [
+                                      ?_markOf(
+                                        chapters[index].chapterId,
+                                        standing,
+                                      ),
+                                      ?_voiceMarkOf(
+                                        chapters[index].chapterId,
+                                        voice?.task,
+                                      ),
+                                    ].join(', '),
                                     hearing:
                                         hearing?.chapter.chapterId ==
                                         chapters[index].chapterId,
@@ -432,6 +604,17 @@ String? _markOf(String chapterId, BookTranslation? standing) {
   };
 }
 
+/// How far a chapter's voice is, as a note on its row.
+String? _voiceMarkOf(String chapterId, BookVoiceTask? task) {
+  if (task == null) return null;
+  if (task.voiced.contains(chapterId)) return 'có giọng';
+  return switch (task.turnOf(chapterId)) {
+    ChapterTurn.now => 'đang tạo ${task.current?.percent ?? 0}%',
+    ChapterTurn.later => 'chờ giọng',
+    ChapterTurn.none => null,
+  };
+}
+
 class _Head extends StatelessWidget {
   const _Head({required this.book});
 
@@ -508,8 +691,8 @@ class _ChapterRow extends StatelessWidget {
 
   final ChapterSummary chapter;
 
-  /// How far its translation is, when the book is being translated.
-  final String? mark;
+  /// How far its translation and voice are; empty when neither has begun.
+  final String mark;
   final bool hearing;
   final VoidCallback onTap;
 
@@ -522,7 +705,11 @@ class _ChapterRow extends StatelessWidget {
       weight: FontWeight.w600,
       color: Palette.ink,
     );
-    final note = [?number, if (hearing) 'đang nghe', ?mark].join(', ');
+    final note = [
+      ?number,
+      if (hearing) 'đang nghe',
+      if (mark.isNotEmpty) mark,
+    ].join(', ');
     return Container(
       foregroundDecoration: const BoxDecoration(
         border: Border(top: BorderSide(color: _rowDivider, width: 1.5)),
