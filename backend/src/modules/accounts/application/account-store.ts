@@ -69,6 +69,7 @@ export class InMemoryAccountStore implements AccountStore {
     return {
       digests: this.meters.get(`${id}/${month}/digests`) ?? NO_USAGE.digests,
       vbeeSeconds: this.meters.get(`${id}/${month}/vbeeSeconds`) ?? NO_USAGE.vbeeSeconds,
+      bookTranslations: this.meters.get(`${id}/${month}/bookTranslations`) ?? NO_USAGE.bookTranslations,
     };
   }
 

@@ -9,6 +9,7 @@ export const SUPER_ADMIN_EMAIL = Symbol('SUPER_ADMIN_EMAIL');
 const METER_LIMITS = {
   digests: { code: 'DIGEST_LIMIT', limit: (account: Account) => PLANS[account.plan].monthlyDigests },
   vbeeSeconds: { code: 'VBEE_LIMIT', limit: (account: Account) => PLANS[account.plan].monthlyVbeeMinutes * 60 },
+  bookTranslations: { code: 'TRANSLATION_LIMIT', limit: (account: Account) => PLANS[account.plan].monthlyBookTranslations },
 } satisfies Record<Meter, { code: string; limit: (account: Account) => number }>;
 
 @Injectable()
@@ -46,13 +47,13 @@ export class AccountService {
 
   async summary(account: Account) {
     const now = new Date();
-    const { digests, vbeeSeconds } = await this.store.usage(account.id, usageMonth(now));
+    const { digests, vbeeSeconds, bookTranslations } = await this.store.usage(account.id, usageMonth(now));
     return {
       email: account.email,
       role: account.role,
       plan: account.plan,
       requestedPlan: account.requestedPlan,
-      usage: { digests, vbeeMinutes: Math.ceil(vbeeSeconds / 60) },
+      usage: { digests, vbeeMinutes: Math.ceil(vbeeSeconds / 60), bookTranslations },
       resetsOn: nextReset(now),
       plans: PLANS,
     };

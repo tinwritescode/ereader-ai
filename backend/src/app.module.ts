@@ -23,10 +23,26 @@ import { llmOptionsFromEnv } from './shared/llm/llm-config';
 import { LLM_GATEWAY } from './shared/llm/llm-gateway';
 import { OpenAiCompatibleLlmGateway } from './shared/llm/openai-compatible.llm-gateway';
 import { storageFromEnv } from './shared/storage/storage-config';
+import { AccountSlots } from './shared/tasks/account-slots';
+import { BookTranslationService } from './modules/translation/application/book-translation.service';
+import {
+  BOOK_TRANSLATION_STORE,
+  CHAPTER_TRANSLATIONS,
+  InMemoryBookTranslationStore,
+  InMemoryChapterTranslations,
+} from './modules/translation/application/translation-stores';
+import {
+  PostgresBookTranslationStore,
+  PostgresChapterTranslations,
+} from './modules/translation/infrastructure/postgres.translation-stores';
+import { BookTranslationController } from './modules/translation/presentation/book-translation.controller';
 
 const storage = storageFromEnv(process.env);
 const vbee = vbeeOptionsFromEnv(process.env);
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
+
+// Voice and translation tasks share one per-account limit.
+const slots = new AccountSlots();
 
 const vieneu = vieneuOptionsFromEnv(process.env);
 const ttsProviders: TtsGateway[] = [
@@ -50,12 +66,17 @@ const ttsProviders: TtsGateway[] = [
       storage,
       index: pool ? new PostgresSpeechClipIndex(pool) : new InMemorySpeechClipIndex(),
       ...(pool ? { chapterVoices: new PostgresChapterVoiceStore(pool) } : {}),
+      slots,
     }),
   ],
-  controllers: [DigestController],
+  controllers: [DigestController, BookTranslationController],
   providers: [
     DigestService,
     FormatAgentService,
+    BookTranslationService,
+    { provide: AccountSlots, useValue: slots },
+    { provide: BOOK_TRANSLATION_STORE, useValue: pool ? new PostgresBookTranslationStore(pool) : new InMemoryBookTranslationStore() },
+    { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },
     { provide: LLM_GATEWAY, useFactory: () => new OpenAiCompatibleLlmGateway(llmOptionsFromEnv(process.env)) },
   ],
   exports: [FormatAgentService],

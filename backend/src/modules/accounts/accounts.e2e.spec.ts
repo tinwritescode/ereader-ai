@@ -38,8 +38,11 @@ describe('accounts', () => {
       role: 'user',
       plan: 'free',
       requestedPlan: null,
-      usage: { digests: 0, vbeeMinutes: 0 },
-      plans: { free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30 } },
+      usage: { digests: 0, vbeeMinutes: 0, bookTranslations: 0 },
+      plans: {
+        free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, monthlyBookTranslations: 0 },
+        max: { monthlyBookTranslations: 3 },
+      },
     });
     expect(me.body.resetsOn).toMatch(/^\d{4}-\d{2}-01$/);
   });
@@ -107,7 +110,7 @@ describe('accounts', () => {
       role: 'user',
       plan: 'free',
       requestedPlan: 'plus',
-      usage: { digests: 2, vbeeSeconds: 0 },
+      usage: { digests: 2, vbeeSeconds: 0, bookTranslations: 0 },
     });
 
     await http().patch('/admin/accounts/user-1').set(as('owner')).send({ plan: 'plus' }).expect(200);

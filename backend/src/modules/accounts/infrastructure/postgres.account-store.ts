@@ -33,7 +33,7 @@ function toAccount({ id, email, role, plan, requested_plan }: AccountRow): Accou
 
 function toUsage(rows: { meter: Meter; used: number }[]): MonthlyUsage {
   const used = (meter: Meter) => rows.find((row) => row.meter === meter)?.used ?? 0;
-  return { digests: used('digests'), vbeeSeconds: used('vbeeSeconds') };
+  return { digests: used('digests'), vbeeSeconds: used('vbeeSeconds'), bookTranslations: used('bookTranslations') };
 }
 
 export class PostgresAccountStore implements AccountStore {

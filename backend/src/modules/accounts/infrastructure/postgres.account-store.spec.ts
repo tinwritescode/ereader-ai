@@ -55,7 +55,7 @@ const url = process.env.TEST_DATABASE_URL;
     expect(await store.spend({ accountId: 'a', month, meter: 'vbeeSeconds', amount: 11, limit: 10 })).toBe(false);
     await store.spend({ accountId: 'a', month, meter: 'vbeeSeconds', amount: 4, limit: 10 });
     await store.refund({ accountId: 'a', month, meter: 'vbeeSeconds', amount: 3 });
-    expect(await store.usage('a', month)).toEqual({ digests: 0, vbeeSeconds: 1 });
+    expect(await store.usage('a', month)).toEqual({ digests: 0, vbeeSeconds: 1, bookTranslations: 0 });
   });
 
   it('lists accounts with their usage, and records a plan request until it is decided', async () => {
@@ -69,7 +69,7 @@ const url = process.env.TEST_DATABASE_URL;
         role: 'user',
         plan: 'free',
         requestedPlan: 'max',
-        usage: { digests: 2, vbeeSeconds: 0 },
+        usage: { digests: 2, vbeeSeconds: 0, bookTranslations: 0 },
       },
     ]);
     expect((await store.setPlan('a', 'max'))?.requestedPlan).toBeNull();

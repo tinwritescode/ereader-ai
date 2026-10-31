@@ -8,19 +8,21 @@ export type PlanLimits = {
   maxFileBytes: number;
   /** May prepare a whole chapter's audio ahead of listening. */
   chapterVoice: boolean;
+  /** Whole books translated into Vietnamese a month. */
+  monthlyBookTranslations: number;
 };
 
 const MB = 1024 * 1024;
 
 export const PLANS = {
-  free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 20 * MB, chapterVoice: false },
-  plus: { books: 30, monthlyDigests: 100, monthlyVbeeMinutes: 300, maxFileBytes: 100 * MB, chapterVoice: false },
-  max: { books: 200, monthlyDigests: 500, monthlyVbeeMinutes: 1_500, maxFileBytes: 100 * MB, chapterVoice: true },
+  free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 20 * MB, chapterVoice: false, monthlyBookTranslations: 0 },
+  plus: { books: 30, monthlyDigests: 100, monthlyVbeeMinutes: 300, maxFileBytes: 100 * MB, chapterVoice: false, monthlyBookTranslations: 0 },
+  max: { books: 200, monthlyDigests: 500, monthlyVbeeMinutes: 1_500, maxFileBytes: 100 * MB, chapterVoice: true, monthlyBookTranslations: 3 },
 } satisfies Record<PlanName, PlanLimits>;
 
 export type Role = 'user' | 'super_admin';
 
-export type Meter = 'digests' | 'vbeeSeconds';
+export type Meter = 'digests' | 'vbeeSeconds' | 'bookTranslations';
 
 export type Account = {
   id: string;
@@ -33,7 +35,7 @@ export type Account = {
 
 export type MonthlyUsage = Record<Meter, number>;
 
-export const NO_USAGE: MonthlyUsage = { digests: 0, vbeeSeconds: 0 };
+export const NO_USAGE: MonthlyUsage = { digests: 0, vbeeSeconds: 0, bookTranslations: 0 };
 
 /** The calendar month usage counts against, in UTC, e.g. "2026-11". */
 export function usageMonth(now: Date): string {

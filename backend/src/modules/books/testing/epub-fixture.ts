@@ -6,6 +6,7 @@ export type EpubFixtureOptions = {
   withNav?: boolean;
   /** How the package names its cover image; none by default. */
   cover?: 'epub3' | 'epub2';
+  language?: string;
 };
 
 export const COVER_PNG = Buffer.from('fake-png-bytes');
@@ -21,6 +22,7 @@ export async function buildEpub({
   title = 'Synthetic Book',
   withNav = true,
   cover,
+  language = 'vi',
 }: EpubFixtureOptions = {}): Promise<Buffer> {
   const zip = new JSZip();
   zip.file('mimetype', mimetype, { compression: 'STORE' });
@@ -34,7 +36,7 @@ export async function buildEpub({
     <dc:identifier id="id">synthetic</dc:identifier>
     <dc:title>${title}</dc:title>
     <dc:creator id="author">Ada Writer</dc:creator>
-    <dc:language>vi</dc:language>
+    <dc:language>${language}</dc:language>
     ${cover === 'epub2' ? '<meta name="cover" content="art"/>' : ''}
   </metadata>
   <manifest>
