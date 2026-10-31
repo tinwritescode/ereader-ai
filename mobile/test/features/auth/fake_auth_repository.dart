@@ -9,18 +9,21 @@ const testPlans = {
     monthlyDigests: 10,
     monthlyVbeeMinutes: 30,
     chapterVoice: false,
+    monthlyBookTranslations: 0,
   ),
   PlanName.plus: PlanLimits(
     books: 30,
     monthlyDigests: 100,
     monthlyVbeeMinutes: 300,
     chapterVoice: false,
+    monthlyBookTranslations: 0,
   ),
   PlanName.max: PlanLimits(
     books: 200,
     monthlyDigests: 500,
     monthlyVbeeMinutes: 1500,
     chapterVoice: true,
+    monthlyBookTranslations: 3,
   ),
 };
 
@@ -29,6 +32,7 @@ Account testAccount({
   bool isSuperAdmin = false,
   int digestsUsed = 7,
   int vbeeMinutesUsed = 12,
+  int bookTranslationsUsed = 0,
   PlanName? requestedPlan,
 }) => Account(
   email: 'reader@example.com',
@@ -37,6 +41,7 @@ Account testAccount({
   requestedPlan: requestedPlan,
   digestsUsed: digestsUsed,
   vbeeMinutesUsed: vbeeMinutesUsed,
+  bookTranslationsUsed: bookTranslationsUsed,
   resetsOn: DateTime(2026, 12),
   plans: testPlans,
 );

@@ -7,6 +7,8 @@ import '../../../app/theme.dart';
 import '../../auth/presentation/auth_cubit.dart';
 import '../../books/domain/entities/reading_length.dart';
 import '../../books/domain/repositories/books_repository.dart';
+import '../../books/presentation/length_memory.dart';
+import '../../books/presentation/pages/book_page.dart';
 import '../../books/presentation/pages/reader_page.dart';
 import '../../listen/domain/speech.dart';
 import '../../listen/presentation/listen_bloc.dart';
@@ -44,12 +46,43 @@ void showTaskStarted(BuildContext context, String chapterLabel) => _show(
   onAction: () => openTasks(context),
 );
 
-void openTasks(BuildContext context) => appNavigator.currentState?.push(
-  TasksPage.route((task) => unawaited(openChapterOf(context, task))),
+void showTranslationStarted(BuildContext context, String bookTitle) => _show(
+  ScaffoldMessenger.of(context),
+  text: 'Đang dịch $bookTitle. Xong sẽ báo.',
+  action: 'Xem tác vụ',
+  onAction: () => openTasks(context),
 );
 
+void openTasks(BuildContext context) => appNavigator.currentState?.push(
+  TasksPage.route((task) => unawaited(openMadeBy(context, task))),
+);
+
+/// Opens what a finished task made: the voiced chapter, or the translated book.
+Future<void> openMadeBy(BuildContext context, LongTask task) => switch (task) {
+  ChapterVoiceTask() => openChapterOf(context, task),
+  BookTranslationTask() => openTranslatedBook(context, task),
+};
+
+/// Opens the book with Vietnamese offered first for every chapter.
+Future<void> openTranslatedBook(
+  BuildContext context,
+  BookTranslationTask task,
+) async {
+  final repository = context.read<BooksRepository>();
+  context.read<LengthMemory>().last = ReadingLength.vietnamese;
+  try {
+    final books = await repository.books();
+    final book = books.where((book) => book.bookId == task.bookId).firstOrNull;
+    final navigator = appNavigator.currentState;
+    if (book == null || navigator == null || !navigator.mounted) return;
+    await navigator.push(BookPage.route(navigator.context, book));
+  } on BooksException {
+    // The task list stays open; the reader can tap again.
+  }
+}
+
 /// Opens the task's chapter with its voice already reading.
-Future<void> openChapterOf(BuildContext context, ChapterTask task) async {
+Future<void> openChapterOf(BuildContext context, ChapterVoiceTask task) async {
   final repository = context.read<BooksRepository>();
   final listen = context.read<ListenBloc>();
   final speech = context.read<Speech>();
@@ -120,15 +153,25 @@ class _TaskNoticesState extends State<TaskNotices> with WidgetsBindingObserver {
   void _tell(BuildContext context, TasksState state) {
     final messenger = ScaffoldMessenger.of(context);
     for (final task in state.notices) {
-      final stopped = task.state == ChapterTaskState.stopped;
+      final stopped = task.state == TaskState.stopped;
+      final (:done, :halted, :open) = switch (task) {
+        ChapterVoiceTask(:final chapterLabel) => (
+          done: 'Đã tạo xong giọng đọc $chapterLabel.',
+          halted: 'Dừng tạo giọng đọc $chapterLabel ở ${task.percent}%.',
+          open: 'Nghe ngay',
+        ),
+        BookTranslationTask(:final bookTitle) => (
+          done: 'Đã dịch xong $bookTitle.',
+          halted: 'Dừng dịch $bookTitle ở ${task.percent}%.',
+          open: 'Đọc ngay',
+        ),
+      };
       _show(
         messenger,
-        text: stopped
-            ? 'Dừng tạo giọng đọc ${task.chapterLabel} ở ${task.percent}%.'
-            : 'Đã tạo xong giọng đọc ${task.chapterLabel}.',
-        action: stopped ? 'Xem tác vụ' : 'Nghe ngay',
+        text: stopped ? halted : done,
+        action: stopped ? 'Xem tác vụ' : open,
         onAction: () =>
-            stopped ? openTasks(context) : openChapterOf(context, task),
+            stopped ? openTasks(context) : openMadeBy(context, task),
       );
     }
     context.read<TasksCubit>().noticesShown();

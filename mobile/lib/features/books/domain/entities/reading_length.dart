@@ -1,4 +1,14 @@
-enum ReadingLength { original, shortened, keyPoints }
+enum ReadingLength {
+  original,
+
+  /// The whole chapter, translated into Vietnamese.
+  vietnamese,
+  shortened,
+  keyPoints;
+
+  /// AI rewrote it shorter; the original and its translation are whole.
+  bool get isShortened => this == shortened || this == keyPoints;
+}
 
 class LengthOption {
   const LengthOption(this.length, this.minutes);
@@ -24,11 +34,18 @@ const minimumShortenableMinutes = 5;
 const _minimumOptionMinutes = 2;
 
 /// Lengths scale with the chapter (about 50% and 25%), so a short chapter is never offered a longer version.
-List<LengthOption> lengthOptionsFor(int chapterMinutes) {
-  final original = LengthOption(ReadingLength.original, chapterMinutes);
-  if (chapterMinutes < minimumShortenableMinutes) return [original];
+/// With [vietnamese], the book's translation follows the original.
+List<LengthOption> lengthOptionsFor(
+  int chapterMinutes, {
+  bool vietnamese = false,
+}) {
+  final original = [
+    LengthOption(ReadingLength.original, chapterMinutes),
+    if (vietnamese) LengthOption(ReadingLength.vietnamese, chapterMinutes),
+  ];
+  if (chapterMinutes < minimumShortenableMinutes) return original;
   return [
-    original,
+    ...original,
     LengthOption(ReadingLength.shortened, (chapterMinutes * 0.5).round()),
     LengthOption(
       ReadingLength.keyPoints,

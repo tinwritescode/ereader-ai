@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../app/theme.dart';
 import '../../auth/presentation/auth_cubit.dart';
-import '../../books/domain/entities/reading_length.dart';
 import '../../books/presentation/formatting.dart';
 import '../../listen/domain/speech.dart';
 import '../../listen/domain/speech_plan.dart';
@@ -55,9 +54,10 @@ Future<void> chooseChapterVoice(BuildContext context) async {
         chapterId: source.chapter.chapterId,
         bookTitle: source.book.title,
         chapterLabel: label,
-        minutes: source.option.length == ReadingLength.original
-            ? null
-            : source.option.minutes,
+        // Only a shortened version has its own length to note.
+        minutes: source.option.length.isShortened
+            ? source.option.minutes
+            : null,
         voiceCode: voice.code,
         sentences: sentences,
       ),

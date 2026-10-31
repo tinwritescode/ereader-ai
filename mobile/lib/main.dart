@@ -99,6 +99,7 @@ class EReaderApp extends StatelessWidget {
         RepositoryProvider.value(value: auth),
         RepositoryProvider.value(value: repository),
         RepositoryProvider.value(value: speech),
+        RepositoryProvider.value(value: tasks),
         RepositoryProvider(create: (_) => LengthMemory()),
       ],
       child: MultiBlocProvider(

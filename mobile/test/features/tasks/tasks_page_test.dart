@@ -11,7 +11,7 @@ import 'fake_tasks.dart';
 void main() {
   Future<FakeTasksRepository> show(
     WidgetTester tester,
-    List<ChapterTask> list,
+    List<LongTask> list,
   ) async {
     final repository = FakeTasksRepository(list);
     final cubit = TasksCubit(
@@ -43,10 +43,10 @@ void main() {
   ) async {
     await show(tester, [
       task(),
-      task(id: 't2', state: ChapterTaskState.queued, done: 0, position: 1),
+      task(id: 't2', state: TaskState.queued, done: 0, position: 1),
       task(
         id: 't3',
-        state: ChapterTaskState.done,
+        state: TaskState.done,
         done: 180,
         finishedAt: DateTime(2026, 10, 31, 14, 20),
       ),
@@ -80,7 +80,7 @@ void main() {
   ) async {
     final repository = await show(tester, [
       task(
-        state: ChapterTaskState.stopped,
+        state: TaskState.stopped,
         code: 'VBEE_LIMIT',
         finishedAt: DateTime(2026, 10, 31),
       ),
@@ -90,5 +90,32 @@ void main() {
     await tester.tap(find.text('Chạy tiếp'));
     await tester.pumpAndSettle();
     expect(repository.resumed, ['t1']);
+  });
+
+  testWidgets('shows a book translation by its chapters', (tester) async {
+    final repository = await show(tester, [translation()]);
+    expect(find.text('Dịch cả sách'), findsOneWidget);
+    expect(find.text('Dune'), findsOneWidget);
+    expect(find.text('Chương 4 trên 22'), findsOneWidget);
+    expect(find.text('18%'), findsOneWidget);
+    await tester.tap(find.text('Huỷ'));
+    await tester.pumpAndSettle();
+    expect(repository.cancelled, ['tr1']);
+  });
+
+  testWidgets('offers to go on with a stopped translation', (tester) async {
+    final repository = await show(tester, [
+      translation(
+        state: TaskState.stopped,
+        code: 'TRANSLATE_FAILED',
+        current: null,
+        finishedAt: DateTime(2026, 10, 31),
+      ),
+    ]);
+    expect(find.text('Dịch cả sách, bị dừng ở 18%'), findsOneWidget);
+    expect(find.text('Không kết nối được tới máy dịch'), findsOneWidget);
+    await tester.tap(find.text('Chạy tiếp'));
+    await tester.pumpAndSettle();
+    expect(repository.resumed, ['tr1']);
   });
 }

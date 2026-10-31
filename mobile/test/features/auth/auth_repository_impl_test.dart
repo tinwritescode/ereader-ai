@@ -14,7 +14,7 @@ const _me = {
   'role': 'super_admin',
   'plan': 'max',
   'requestedPlan': null,
-  'usage': {'digests': 2, 'vbeeMinutes': 3},
+  'usage': {'digests': 2, 'vbeeMinutes': 3, 'bookTranslations': 1},
   'resetsOn': '2026-12-01',
   'plans': {
     'free': {
@@ -22,6 +22,7 @@ const _me = {
       'monthlyDigests': 10,
       'monthlyVbeeMinutes': 30,
       'chapterVoice': false,
+      'monthlyBookTranslations': 0,
       'maxFileBytes': 1,
     },
     'plus': {
@@ -29,6 +30,7 @@ const _me = {
       'monthlyDigests': 100,
       'monthlyVbeeMinutes': 300,
       'chapterVoice': false,
+      'monthlyBookTranslations': 0,
       'maxFileBytes': 1,
     },
     'max': {
@@ -36,6 +38,7 @@ const _me = {
       'monthlyDigests': 500,
       'monthlyVbeeMinutes': 1500,
       'chapterVoice': true,
+      'monthlyBookTranslations': 3,
       'maxFileBytes': 1,
     },
   },
@@ -131,6 +134,8 @@ void main() {
     expect(account.isSuperAdmin, isTrue);
     expect(account.plan, PlanName.max);
     expect(account.limits.books, 200);
+    expect(account.limits.monthlyBookTranslations, 3);
+    expect(account.bookTranslationsUsed, 1);
     expect(account.resetLabel, 'ngày 1/12');
   });
 

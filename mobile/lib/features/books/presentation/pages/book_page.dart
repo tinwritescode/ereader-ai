@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../app/theme.dart';
+import '../../../auth/domain/account.dart';
+import '../../../auth/presentation/auth_cubit.dart';
 import '../../../listen/domain/listen_source.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/mini_player.dart';
+import '../../../tasks/domain/chapter_task.dart';
+import '../../../tasks/presentation/task_notices.dart';
+import '../../../tasks/presentation/tasks_cubit.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
@@ -16,6 +21,8 @@ import '../bloc/book_bloc.dart';
 import '../formatting.dart';
 import '../length_memory.dart';
 import '../reading_spots_cubit.dart';
+import '../translate_offer.dart';
+import '../translate_widgets.dart';
 import '../widgets.dart';
 import 'choose_length_sheet.dart';
 import 'reader_page.dart';
@@ -60,6 +67,113 @@ class BookPage extends StatefulWidget {
 class _BookPageState extends State<BookPage> {
   final _scroll = ScrollController();
   late bool _resume = widget.resume;
+
+  /// What the server last said about this book's translation.
+  BookTranslation? _translation;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.book.isForeign) unawaited(_loadTranslation());
+  }
+
+  Future<void> _loadTranslation() async {
+    try {
+      final translation = await context.read<TasksRepository>().translationOf(
+        widget.book.bookId,
+      );
+      if (mounted) setState(() => _translation = translation);
+    } on TasksException {
+      // The book reads as before; the next change to the task asks again.
+    }
+  }
+
+  BookTranslationTask? _liveTask(TasksState tasks) => tasks.tasks
+      .whereType<BookTranslationTask>()
+      .where((task) => task.bookId == widget.book.bookId)
+      .lastOrNull;
+
+  /// The loaded standing, with the task as the task list last saw it.
+  BookTranslation? _standing(TasksState tasks) {
+    final loaded = _translation;
+    final live = _liveTask(tasks);
+    if (loaded == null && live == null) return null;
+    return BookTranslation(
+      translated: loaded?.translated ?? const {},
+      task: live ?? loaded?.task,
+    );
+  }
+
+  /// Vietnamese is offered once a translation of the book has begun.
+  bool _hasVietnamese() {
+    final standing = _standing(context.read<TasksCubit>().state);
+    return widget.book.isForeign &&
+        standing != null &&
+        (standing.translated.isNotEmpty || standing.task != null);
+  }
+
+  Future<void> _offerTranslation() async {
+    final auth = context.read<AuthCubit>();
+    final tasks = context.read<TasksCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+    if (auth.state case AuthSignedIn(:final account)) {
+      final monthly = account.limits.monthlyBookTranslations;
+      final spot = context.read<ReadingSpotsCubit>().state[widget.book.bookId];
+      final go = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Palette.paper,
+        builder: (_) => TranslateSheet(
+          chapterCount: widget.book.chapterCount,
+          from: spot?.chapterLabel,
+          left: monthly - account.bookTranslationsUsed,
+          monthly: monthly,
+          resetLabel: account.resetLabel,
+        ),
+      );
+      if (go != true || !mounted) return;
+      try {
+        await tasks.translateBook(
+          widget.book.bookId,
+          startChapterId: spot?.chapterId,
+        );
+        if (mounted) showTranslationStarted(context, widget.book.title);
+        unawaited(auth.refresh());
+        await _loadTranslation();
+      } on TasksException catch (error) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(switch (error.code) {
+              'TRANSLATION_LIMIT' => 'Đã hết lượt dịch sách tháng này.',
+              'PLAN_REQUIRED' => 'Dịch cả sách có ở gói Max.',
+              'ALREADY_TRANSLATED' => 'Sách đã được dịch xong.',
+              _ => 'Chưa dịch được, kiểm tra mạng rồi thử lại.',
+            }),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLocked() {
+    final auth = context.read<AuthCubit>().state;
+    final max = auth is AuthSignedIn
+        ? auth.account.plans[PlanName.max]?.monthlyBookTranslations ?? 0
+        : 0;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Palette.paper,
+      builder: (_) => TranslateLockedSheet(monthly: max),
+    );
+  }
+
+  Future<void> _resumeTranslation(BookTranslationTask task) async {
+    try {
+      await context.read<TasksCubit>().resume(task);
+    } on TasksException {
+      // The row stays as it was; another tap tries again.
+    }
+  }
 
   void _resumeOnLoad(BuildContext context, BookState state) {
     if (state case BookLoaded(:final chapters) when _resume) {
@@ -132,8 +246,32 @@ class _BookPageState extends State<BookPage> {
     final heard = context.watch<ListenBloc>().state.heard;
     final hearing = heard?.book.bookId == book.bookId ? heard : null;
     final spot = context.watch<ReadingSpotsCubit>().state[book.bookId];
-    return BlocListener<BookBloc, BookState>(
-      listener: _resumeOnLoad,
+    final standing = _standing(context.watch<TasksCubit>().state);
+    final account = switch (context.watch<AuthCubit>().state) {
+      AuthSignedIn(:final account) => account,
+      _ => null,
+    };
+    final monthly = account?.limits.monthlyBookTranslations ?? 0;
+    final offer = translateOfferFor(
+      foreign: book.isForeign,
+      chapterCount: book.chapterCount,
+      monthly: monthly,
+      standing: standing,
+    );
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<BookBloc, BookState>(listener: _resumeOnLoad),
+        // Chapters finished while the page is open get their marks.
+        BlocListener<TasksCubit, TasksState>(
+          listenWhen: (before, after) {
+            final was = _liveTask(before);
+            final now = _liveTask(after);
+            return now != null &&
+                (was?.done != now.done || was?.state != now.state);
+          },
+          listener: (_, _) => unawaited(_loadTranslation()),
+        ),
+      ],
       child: Scaffold(
         body: RuledPaper(
           scroll: _scroll,
@@ -176,10 +314,26 @@ class _BookPageState extends State<BookPage> {
                                       ),
                                     ),
                                   ),
+                                SliverToBoxAdapter(
+                                  child: TranslateRow(
+                                    offer: offer,
+                                    left:
+                                        monthly -
+                                        (account?.bookTranslationsUsed ?? 0),
+                                    onOffer: _offerTranslation,
+                                    onLocked: _showLocked,
+                                    onFollow: () => openTasks(context),
+                                    onResume: _resumeTranslation,
+                                  ),
+                                ),
                                 SliverList.builder(
                                   itemCount: chapters.length,
                                   itemBuilder: (context, index) => _ChapterRow(
                                     chapter: chapters[index],
+                                    mark: _markOf(
+                                      chapters[index].chapterId,
+                                      standing,
+                                    ),
                                     hearing:
                                         hearing?.chapter.chapterId ==
                                         chapters[index].chapterId,
@@ -222,7 +376,10 @@ class _BookPageState extends State<BookPage> {
   }) async {
     final chapter = chapters[index];
     final next = index + 1 < chapters.length ? chapters[index + 1] : null;
-    final options = lengthOptionsFor(chapter.minutes);
+    final options = lengthOptionsFor(
+      chapter.minutes,
+      vietnamese: _hasVietnamese(),
+    );
     final memory = context.read<LengthMemory>();
     final navigator = Navigator.of(context);
     final repository = context.read<BooksRepository>();
@@ -260,6 +417,19 @@ class _BookPageState extends State<BookPage> {
       ),
     );
   }
+}
+
+/// How far a chapter's translation is, as a note on its row.
+String? _markOf(String chapterId, BookTranslation? standing) {
+  if (standing == null) return null;
+  if (standing.translated.contains(chapterId)) return 'đã dịch';
+  final task = standing.task;
+  if (task == null) return null;
+  return switch (task.turnOf(chapterId)) {
+    ChapterTurn.now => 'đang dịch ${task.current?.percent ?? 0}%',
+    ChapterTurn.later => 'chờ dịch',
+    ChapterTurn.none => null,
+  };
 }
 
 class _Head extends StatelessWidget {
@@ -331,11 +501,15 @@ class _Continue extends StatelessWidget {
 class _ChapterRow extends StatelessWidget {
   const _ChapterRow({
     required this.chapter,
+    required this.mark,
     required this.hearing,
     required this.onTap,
   });
 
   final ChapterSummary chapter;
+
+  /// How far its translation is, when the book is being translated.
+  final String? mark;
   final bool hearing;
   final VoidCallback onTap;
 
@@ -348,7 +522,7 @@ class _ChapterRow extends StatelessWidget {
       weight: FontWeight.w600,
       color: Palette.ink,
     );
-    final note = [?number, if (hearing) 'đang nghe'].join(', ');
+    final note = [?number, if (hearing) 'đang nghe', ?mark].join(', ');
     return Container(
       foregroundDecoration: const BoxDecoration(
         border: Border(top: BorderSide(color: _rowDivider, width: 1.5)),

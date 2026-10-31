@@ -25,4 +25,15 @@ void main() {
       LengthOption(ReadingLength.original, 4),
     ]);
   });
+
+  test('puts the Vietnamese translation right after the original', () {
+    expect(lengthOptionsFor(15, vietnamese: true).take(2), const [
+      LengthOption(ReadingLength.original, 15),
+      LengthOption(ReadingLength.vietnamese, 15),
+    ]);
+    expect(lengthOptionsFor(4, vietnamese: true), const [
+      LengthOption(ReadingLength.original, 4),
+      LengthOption(ReadingLength.vietnamese, 4),
+    ]);
+  });
 }

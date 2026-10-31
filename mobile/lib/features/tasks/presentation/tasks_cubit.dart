@@ -7,10 +7,10 @@ import '../domain/chapter_task.dart';
 class TasksState {
   const TasksState({this.tasks = const [], this.notices = const []});
 
-  final List<ChapterTask> tasks;
+  final List<LongTask> tasks;
 
   /// Finishes the reader has not been told about yet.
-  final List<ChapterTask> notices;
+  final List<LongTask> notices;
 
   int get active => tasks.where((task) => task.active).length;
 }
@@ -62,13 +62,30 @@ class TasksCubit extends Cubit<TasksState> {
     await refresh();
   }
 
-  Future<void> cancel(String id) async {
-    await _repository.cancel(id);
+  Future<BookTranslationTask> translateBook(
+    String bookId, {
+    String? startChapterId,
+  }) async {
+    final task = await _repository.translateBook(
+      bookId,
+      startChapterId: startChapterId,
+    );
+    await refresh();
+    return task;
+  }
+
+  Future<void> putFirst(BookTranslationTask task, String chapterId) async {
+    await _repository.putFirst(task.id, chapterId);
     await refresh();
   }
 
-  Future<void> resume(String id) async {
-    await _repository.resume(id);
+  Future<void> cancel(LongTask task) async {
+    await _repository.cancel(task);
+    await refresh();
+  }
+
+  Future<void> resume(LongTask task) async {
+    await _repository.resume(task);
     await refresh();
   }
 
@@ -80,5 +97,5 @@ class TasksCubit extends Cubit<TasksState> {
 }
 
 // A resumed task finishes anew, so the moment is part of what was told.
-String _finishOf(ChapterTask task) =>
+String _finishOf(LongTask task) =>
     '${task.id}:${task.state.name}:${task.finishedAt?.toIso8601String()}';

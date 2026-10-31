@@ -14,6 +14,7 @@ class PlanLimits {
     required this.monthlyDigests,
     required this.monthlyVbeeMinutes,
     required this.chapterVoice,
+    required this.monthlyBookTranslations,
   });
 
   final int books;
@@ -22,6 +23,9 @@ class PlanLimits {
 
   /// May prepare a whole chapter's audio ahead of listening.
   final bool chapterVoice;
+
+  /// Whole books translated into Vietnamese a month.
+  final int monthlyBookTranslations;
 }
 
 class Account {
@@ -32,6 +36,7 @@ class Account {
     required this.requestedPlan,
     required this.digestsUsed,
     required this.vbeeMinutesUsed,
+    required this.bookTranslationsUsed,
     required this.resetsOn,
     required this.plans,
   });
@@ -42,6 +47,7 @@ class Account {
   final PlanName? requestedPlan;
   final int digestsUsed;
   final int vbeeMinutesUsed;
+  final int bookTranslationsUsed;
 
   /// The day the monthly counters start again.
   final DateTime resetsOn;

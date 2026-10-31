@@ -9,6 +9,7 @@ import 'tasks_cubit.dart';
 /// Why a task stopped, in the reader's words.
 String taskFailure(String? code) => switch (code) {
   'VBEE_LIMIT' => 'Hết phút giọng qua mạng',
+  'TRANSLATE_FAILED' => 'Không kết nối được tới máy dịch',
   _ => 'Không kết nối được tới máy đọc',
 };
 
@@ -16,10 +17,10 @@ String taskFailure(String? code) => switch (code) {
 class TasksPage extends StatefulWidget {
   const TasksPage({super.key, required this.onOpen});
 
-  /// Opens a finished task's chapter.
-  final void Function(ChapterTask task) onOpen;
+  /// Opens what a finished task made.
+  final void Function(LongTask task) onOpen;
 
-  static Route<void> route(void Function(ChapterTask task) onOpen) =>
+  static Route<void> route(void Function(LongTask task) onOpen) =>
       MaterialPageRoute(builder: (_) => TasksPage(onOpen: onOpen));
 
   @override
@@ -39,10 +40,10 @@ class _TasksPageState extends State<TasksPage> {
   Widget build(BuildContext context) {
     final onOpen = widget.onOpen;
     final tasks = context.watch<TasksCubit>().state.tasks;
-    List<ChapterTask> inState(bool Function(ChapterTask) wanted) =>
+    List<LongTask> inState(bool Function(LongTask) wanted) =>
         tasks.where(wanted).toList();
-    final running = inState((task) => task.state == ChapterTaskState.running);
-    final queued = inState((task) => task.state == ChapterTaskState.queued);
+    final running = inState((task) => task.state == TaskState.running);
+    final queued = inState((task) => task.state == TaskState.queued);
     final finished = inState((task) => !task.active).reversed.toList();
     return Scaffold(
       body: RuledPaper(
@@ -110,7 +111,8 @@ class _Empty extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          'Khi đang nghe, chọn Tạo sẵn cả chương, tiến độ sẽ hiện ở đây.',
+          'Khi tạo sẵn giọng đọc cả chương hay dịch cả sách, '
+          'tiến độ sẽ hiện ở đây.',
           style: readingStyle(size: 15, color: Palette.muted),
         ),
       ],
@@ -122,8 +124,8 @@ class _Group extends StatelessWidget {
   const _Group(this.title, this.tasks, this.onOpen);
 
   final String title;
-  final List<ChapterTask> tasks;
-  final void Function(ChapterTask task) onOpen;
+  final List<LongTask> tasks;
+  final void Function(LongTask task) onOpen;
 
   @override
   Widget build(BuildContext context) => tasks.isEmpty
@@ -141,19 +143,37 @@ class _Group extends StatelessWidget {
 class _TaskRow extends StatelessWidget {
   const _TaskRow(this.task, this.onOpen);
 
-  final ChapterTask task;
-  final void Function(ChapterTask task) onOpen;
+  final LongTask task;
+  final void Function(LongTask task) onOpen;
 
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<TasksCubit>();
     final soft = readingStyle(size: 13, color: Palette.muted);
     final position = task.position;
-    final kind = 'Tạo giọng đọc, ${task.voiceName}';
-    final stopped = task.state == ChapterTaskState.stopped;
-    final name = '${task.chapterLabel}, ${task.bookTitle}';
+    final stopped = task.state == TaskState.stopped;
+    final (:kind, :name, :progress, :stoppedNote) = switch (task) {
+      ChapterVoiceTask(
+        :final voiceName,
+        :final chapterLabel,
+        :final done,
+        :final total,
+      ) =>
+        (
+          kind: 'Tạo giọng đọc, $voiceName',
+          name: '$chapterLabel, ${task.bookTitle}',
+          progress: 'Câu $done trên $total',
+          stoppedNote: 'Bị dừng ở ${task.percent}%, phần đã làm vẫn còn',
+        ),
+      BookTranslationTask(:final done, :final total) => (
+        kind: 'Dịch cả sách',
+        name: task.bookTitle,
+        progress: 'Chương $done trên $total',
+        stoppedNote: 'Dịch cả sách, bị dừng ở ${task.percent}%',
+      ),
+    };
     return InkWell(
-      onTap: task.state == ChapterTaskState.done ? () => onOpen(task) : null,
+      onTap: task.state == TaskState.done ? () => onOpen(task) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: const BoxDecoration(
@@ -164,7 +184,7 @@ class _TaskRow extends StatelessWidget {
           children: [
             Text(
               stopped
-                  ? 'Bị dừng ở ${task.percent}%, phần đã làm vẫn còn'
+                  ? stoppedNote
                   : position != null
                   ? '$kind, thứ $position trong hàng'
                   : kind,
@@ -173,23 +193,22 @@ class _TaskRow extends StatelessWidget {
                   : soft,
             ),
             Text(name, style: readingStyle(size: 16)),
-            if (task.state == ChapterTaskState.running) _Share(task),
+            if (task.state == TaskState.running) _Share(task),
             if (task.active || stopped)
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
                     child: Text(switch (task.state) {
-                      ChapterTaskState.running =>
-                        'Câu ${task.done} trên ${task.total}',
-                      ChapterTaskState.stopped => taskFailure(task.code),
+                      TaskState.running => progress,
+                      TaskState.stopped => taskFailure(task.code),
                       _ => '',
                     }, style: soft),
                   ),
                   _Action(
                     label: stopped ? 'Chạy tiếp' : 'Huỷ',
                     onTap: () =>
-                        stopped ? cubit.resume(task.id) : cubit.cancel(task.id),
+                        stopped ? cubit.resume(task) : cubit.cancel(task),
                   ),
                 ],
               ),
@@ -203,7 +222,7 @@ class _TaskRow extends StatelessWidget {
 class _Share extends StatelessWidget {
   const _Share(this.task);
 
-  final ChapterTask task;
+  final LongTask task;
 
   @override
   Widget build(BuildContext context) => Padding(

@@ -337,8 +337,7 @@ class _ShelfBook extends StatelessWidget {
         .tasks
         .where(
           (task) =>
-              task.bookId == book.bookId &&
-              task.state == ChapterTaskState.running,
+              task.bookId == book.bookId && task.state == TaskState.running,
         )
         .firstOrNull;
     return SizedBox(
@@ -371,7 +370,10 @@ class _ShelfBook extends StatelessWidget {
               ),
             if (working != null)
               Text(
-                'tạo giọng đọc ${working.percent}%',
+                switch (working) {
+                  ChapterVoiceTask() => 'tạo giọng đọc ${working.percent}%',
+                  BookTranslationTask() => 'đang dịch ${working.percent}%',
+                },
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: handStyle(size: 17),

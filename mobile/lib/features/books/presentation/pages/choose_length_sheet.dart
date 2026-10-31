@@ -10,6 +10,7 @@ import '../widgets.dart';
 
 String _hint(ReadingLength length) => switch (length) {
   ReadingLength.original => 'Đọc nguyên văn, không qua AI.',
+  ReadingLength.vietnamese => 'Cả chương, AI dịch sang tiếng Việt.',
   ReadingLength.shortened => 'Giữ mọi luận điểm, bỏ ví dụ lặp lại.',
   ReadingLength.keyPoints => 'Chỉ những điều tác giả muốn bạn nhớ.',
 };
@@ -39,15 +40,31 @@ class ChooseLengthSheet extends StatefulWidget {
 }
 
 class _ChooseLengthSheetState extends State<ChooseLengthSheet> {
-  late LengthOption _selected = widget.options.firstWhere(
-    (option) => option.length == widget.preselected,
-    orElse: () => widget.options.first,
+  // The translation is as long as the original, so it is a switch, not a stop on the ruler.
+  late final _ruler = widget.options
+      .where((option) => option.length != ReadingLength.vietnamese)
+      .toList();
+  late final _translation = widget.options
+      .where((option) => option.length == ReadingLength.vietnamese)
+      .firstOrNull;
+  late LengthOption _selected = _ruler.firstWhere(
+    (option) =>
+        option.length == widget.preselected ||
+        (widget.preselected == ReadingLength.vietnamese &&
+            option.length == ReadingLength.original),
+    orElse: () => _ruler.first,
   );
+  late bool _vietnamese = widget.preselected == ReadingLength.vietnamese;
 
   @override
   Widget build(BuildContext context) {
-    final isOriginal = _selected.length == ReadingLength.original;
-    final duration = durationLabel(_selected.minutes);
+    final translation = _translation;
+    final canTranslate =
+        translation != null && _selected.length == ReadingLength.original;
+    final chosen = canTranslate && _vietnamese ? translation : _selected;
+    final isOriginal = chosen.length == ReadingLength.original;
+    final isVietnamese = chosen.length == ReadingLength.vietnamese;
+    final duration = durationLabel(chosen.minutes);
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -70,15 +87,30 @@ class _ChooseLengthSheetState extends State<ChooseLengthSheet> {
             ),
             const SizedBox(height: 28),
             TimeRuler(
-              options: widget.options,
+              options: _ruler,
               selected: _selected,
               onChanged: (option) => setState(() => _selected = option),
             ),
+            if (canTranslate)
+              InkWell(
+                onTap: () => setState(() => _vietnamese = !_vietnamese),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _vietnamese,
+                      activeColor: Palette.ink,
+                      onChanged: (value) =>
+                          setState(() => _vietnamese = value ?? false),
+                    ),
+                    Text('Tiếng Việt', style: readingStyle(size: 15)),
+                  ],
+                ),
+              ),
             const SizedBox(height: 18),
             Text(
-              isOriginal
-                  ? 'Bản gốc $duration'
-                  : '${lengthName(_selected.length)} còn $duration',
+              isOriginal || isVietnamese
+                  ? '${lengthName(chosen.length)} $duration'
+                  : '${lengthName(chosen.length)} còn $duration',
               style: readingStyle(
                 size: 16,
                 weight: FontWeight.w600,
@@ -87,19 +119,21 @@ class _ChooseLengthSheetState extends State<ChooseLengthSheet> {
             ),
             const SizedBox(height: 2),
             Text(
-              _hint(_selected.length),
+              _hint(chosen.length),
               style: readingStyle(size: 14, color: Palette.muted),
             ),
             const SizedBox(height: 18),
             PrimaryButton(
-              label: isOriginal ? 'Đọc bản gốc' : 'Đọc bản $duration',
-              onPressed: () =>
-                  Navigator.of(context).pop(LengthChoice(_selected)),
+              label: isOriginal
+                  ? 'Đọc bản gốc'
+                  : isVietnamese
+                  ? 'Đọc bản tiếng Việt'
+                  : 'Đọc bản $duration',
+              onPressed: () => Navigator.of(context).pop(LengthChoice(chosen)),
             ),
             TextButton(
-              onPressed: () => Navigator.of(
-                context,
-              ).pop(LengthChoice(_selected, listen: true)),
+              onPressed: () =>
+                  Navigator.of(context).pop(LengthChoice(chosen, listen: true)),
               child: Text(
                 'Nghe bản này',
                 style: readingStyle(

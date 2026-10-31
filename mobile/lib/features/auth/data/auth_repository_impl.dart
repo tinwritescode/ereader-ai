@@ -180,6 +180,7 @@ Account _toAccount(Object? json) => switch (json) {
     'usage': {
       'digests': final int digests,
       'vbeeMinutes': final int vbeeMinutes,
+      'bookTranslations': final int bookTranslations,
     },
     'resetsOn': final String resetsOn,
     'plans': final Map<String, Object?> plans,
@@ -191,6 +192,7 @@ Account _toAccount(Object? json) => switch (json) {
       requestedPlan: requestedPlan == null ? null : _plan(requestedPlan),
       digestsUsed: digests,
       vbeeMinutesUsed: vbeeMinutes,
+      bookTranslationsUsed: bookTranslations,
       resetsOn: DateTime.parse(resetsOn),
       plans: {
         for (final MapEntry(:key, :value) in plans.entries)
@@ -206,12 +208,14 @@ PlanLimits _toLimits(Object? json) => switch (json) {
     'monthlyDigests': final int monthlyDigests,
     'monthlyVbeeMinutes': final int monthlyVbeeMinutes,
     'chapterVoice': final bool chapterVoice,
+    'monthlyBookTranslations': final int monthlyBookTranslations,
   } =>
     PlanLimits(
       books: books,
       monthlyDigests: monthlyDigests,
       monthlyVbeeMinutes: monthlyVbeeMinutes,
       chapterVoice: chapterVoice,
+      monthlyBookTranslations: monthlyBookTranslations,
     ),
   _ => throw const AuthException('UNEXPECTED_RESPONSE'),
 };

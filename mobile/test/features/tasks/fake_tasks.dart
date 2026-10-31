@@ -1,14 +1,14 @@
 import 'package:ereader_mobile/features/tasks/domain/chapter_task.dart';
 
-ChapterTask task({
+ChapterVoiceTask task({
   String id = 't1',
-  ChapterTaskState state = ChapterTaskState.running,
+  TaskState state = TaskState.running,
   int done = 112,
   int total = 180,
   int? position,
   String? code,
   DateTime? finishedAt,
-}) => ChapterTask(
+}) => ChapterVoiceTask(
   id: id,
   bookId: 'b1',
   chapterId: 'c1',
@@ -22,21 +22,53 @@ ChapterTask task({
   done: done,
   total: total,
   position: position,
+  createdAt: DateTime.utc(2026, 10, 31),
+  finishedAt: finishedAt,
+);
+
+BookTranslationTask translation({
+  String id = 'tr1',
+  String bookId = 'b1',
+  TaskState state = TaskState.running,
+  int done = 4,
+  int total = 22,
+  int percent = 18,
+  ({String chapterId, int percent})? current = (chapterId: 'c5', percent: 40),
+  List<String> waiting = const ['c5', 'c6'],
+  int? position,
+  String? code,
+  DateTime? finishedAt,
+}) => BookTranslationTask(
+  id: id,
+  bookId: bookId,
+  bookTitle: 'Dune',
+  state: state,
+  code: code,
+  done: done,
+  total: total,
+  percent: percent,
+  current: current,
+  waiting: waiting,
+  position: position,
+  createdAt: DateTime.utc(2026, 10, 31),
   finishedAt: finishedAt,
 );
 
 class FakeTasksRepository implements TasksRepository {
   FakeTasksRepository([this.list = const []]);
 
-  List<ChapterTask> list;
+  List<LongTask> list;
+  Set<String> translated = {};
   TasksException? failure;
   final created = <ChapterVoiceJob>[];
   final cancelled = <String>[];
   final resumed = <String>[];
+  final translating = <({String bookId, String? startChapterId})>[];
+  final putFirsts = <({String taskId, String chapterId})>[];
   var fetches = 0;
 
   @override
-  Future<List<ChapterTask>> tasks() async {
+  Future<List<LongTask>> tasks() async {
     fetches++;
     final error = failure;
     if (error != null) throw error;
@@ -44,7 +76,7 @@ class FakeTasksRepository implements TasksRepository {
   }
 
   @override
-  Future<ChapterTask> create(ChapterVoiceJob job) async {
+  Future<ChapterVoiceTask> create(ChapterVoiceJob job) async {
     final error = failure;
     if (error != null) throw error;
     created.add(job);
@@ -52,10 +84,40 @@ class FakeTasksRepository implements TasksRepository {
   }
 
   @override
-  Future<void> cancel(String id) async => cancelled.add(id);
+  Future<BookTranslationTask> translateBook(
+    String bookId, {
+    String? startChapterId,
+  }) async {
+    final error = failure;
+    if (error != null) throw error;
+    translating.add((bookId: bookId, startChapterId: startChapterId));
+    final started = translation(bookId: bookId, state: TaskState.queued);
+    list = [...list, started];
+    return started;
+  }
 
   @override
-  Future<void> resume(String id) async => resumed.add(id);
+  Future<BookTranslation> translationOf(String bookId) async {
+    final error = failure;
+    if (error != null) throw error;
+    final tasks = list.whereType<BookTranslationTask>().where(
+      (task) => task.bookId == bookId,
+    );
+    return BookTranslation(
+      translated: translated,
+      task: tasks.isEmpty ? null : tasks.last,
+    );
+  }
+
+  @override
+  Future<void> putFirst(String taskId, String chapterId) async =>
+      putFirsts.add((taskId: taskId, chapterId: chapterId));
+
+  @override
+  Future<void> cancel(LongTask task) async => cancelled.add(task.id);
+
+  @override
+  Future<void> resume(LongTask task) async => resumed.add(task.id);
 }
 
 class FakeTaskNoticeStore implements TaskNoticeStore {

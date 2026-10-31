@@ -61,6 +61,17 @@ class BooksRepositoryImpl implements BooksRepository {
   });
 
   @override
+  Future<ChapterText> translated(String chapterId) => _call(() async {
+    final response = await _dio.get<Object>('/chapters/$chapterId/translation');
+    return switch (response.data) {
+      {'blocks': final List<Object?> blocks} => ChapterText(
+        blocks.map(_toTextBlock).toList(),
+      ),
+      _ => throw const BooksException('UNEXPECTED_RESPONSE'),
+    };
+  });
+
+  @override
   Future<ChapterText> shortened(String chapterId, {required int minutes}) =>
       _call(() async {
         final response = await _dio.post<Object>(
@@ -86,6 +97,7 @@ class BooksRepositoryImpl implements BooksRepository {
       'hasCover': final bool hasCover,
       'chapterCount': final int chapterCount,
       'minutes': final int minutes,
+      'language': final String? language,
     } =>
       Book(
         bookId: bookId,
@@ -94,6 +106,7 @@ class BooksRepositoryImpl implements BooksRepository {
         status: status,
         chapterCount: chapterCount,
         minutes: minutes,
+        language: language,
         coverUrl: hasCover
             ? '${_dio.options.baseUrl}/books/$bookId/cover'
             : null,

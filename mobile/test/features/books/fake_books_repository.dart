@@ -45,6 +45,9 @@ class FakeBooksRepository implements BooksRepository {
   final BooksException? shortenedError;
   final shortenedRequests = <({String chapterId, int minutes})>[];
 
+  /// Chapters translated so far; the rest answer TRANSLATION_NOT_READY.
+  final translations = <String, ChapterText>{};
+
   /// When set, shortened versions wait for it, like a slow AI call.
   Completer<void>? shortenedGate;
 
@@ -93,4 +96,9 @@ class FakeBooksRepository implements BooksRepository {
       TextBlock(TextBlockKind.paragraph, 'Bản $minutes phút của $chapterId.'),
     ]);
   }
+
+  @override
+  Future<ChapterText> translated(String chapterId) async =>
+      translations[chapterId] ??
+      (throw const BooksException('TRANSLATION_NOT_READY'));
 }

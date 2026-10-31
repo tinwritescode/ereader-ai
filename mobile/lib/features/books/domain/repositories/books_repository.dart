@@ -26,4 +26,7 @@ abstract interface class BooksRepository {
   Future<ChapterText> original(String chapterId);
 
   Future<ChapterText> shortened(String chapterId, {required int minutes});
+
+  /// The chapter in Vietnamese; throws `TRANSLATION_NOT_READY` until it is translated.
+  Future<ChapterText> translated(String chapterId);
 }

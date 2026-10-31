@@ -8,16 +8,28 @@ class TasksRepositoryImpl implements TasksRepository {
   final Dio _api;
 
   @override
-  Future<List<ChapterTask>> tasks() => _call(() async {
-    final response = await _api.get<Object?>('/speech/tasks');
-    return switch (response.data) {
-      {'tasks': final List<Object?> tasks} => tasks.map(_toTask).toList(),
-      _ => throw const TasksException('UNEXPECTED_RESPONSE'),
-    };
+  Future<List<LongTask>> tasks() => _call(() async {
+    final [voices, translations] = await Future.wait([
+      _list('/speech/tasks', _toVoiceTask),
+      _list('/translations/tasks', _toTranslationTask),
+    ]);
+    return [...voices, ...translations]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   });
 
+  Future<List<LongTask>> _list(
+    String path,
+    LongTask Function(Object?) parse,
+  ) async {
+    final response = await _api.get<Object?>(path);
+    return switch (response.data) {
+      {'tasks': final List<Object?> tasks} => tasks.map(parse).toList(),
+      _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+    };
+  }
+
   @override
-  Future<ChapterTask> create(ChapterVoiceJob job) => _call(() async {
+  Future<ChapterVoiceTask> create(ChapterVoiceJob job) => _call(() async {
     final response = await _api.post<Object?>(
       '/speech/tasks',
       data: {
@@ -30,16 +42,54 @@ class TasksRepositoryImpl implements TasksRepository {
         'sentences': job.sentences,
       },
     );
-    return _toTask(response.data);
+    return _toVoiceTask(response.data);
   });
 
   @override
-  Future<void> cancel(String id) =>
-      _call(() => _api.delete<Object?>('/speech/tasks/$id'));
+  Future<BookTranslationTask> translateBook(
+    String bookId, {
+    String? startChapterId,
+  }) => _call(() async {
+    final response = await _api.post<Object?>(
+      '/books/$bookId/translation',
+      data: {'startChapterId': startChapterId},
+    );
+    return _toTranslationTask(response.data);
+  });
 
   @override
-  Future<void> resume(String id) =>
-      _call(() => _api.post<Object?>('/speech/tasks/$id/resume'));
+  Future<BookTranslation> translationOf(String bookId) => _call(() async {
+    final response = await _api.get<Object?>('/books/$bookId/translation');
+    return switch (response.data) {
+      {'translated': final List<Object?> translated, 'task': final task} =>
+        BookTranslation(
+          translated: translated.whereType<String>().toSet(),
+          task: task == null ? null : _toTranslationTask(task),
+        ),
+      _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+    };
+  });
+
+  @override
+  Future<void> putFirst(String taskId, String chapterId) => _call(
+    () => _api.post<Object?>(
+      '/translations/tasks/$taskId/first',
+      data: {'chapterId': chapterId},
+    ),
+  );
+
+  @override
+  Future<void> cancel(LongTask task) =>
+      _call(() => _api.delete<Object?>(_address(task)));
+
+  @override
+  Future<void> resume(LongTask task) =>
+      _call(() => _api.post<Object?>('${_address(task)}/resume'));
+
+  String _address(LongTask task) => switch (task) {
+    ChapterVoiceTask() => '/speech/tasks/${task.id}',
+    BookTranslationTask() => '/translations/tasks/${task.id}',
+  };
 
   Future<T> _call<T>(Future<T> Function() request) async {
     try {
@@ -53,7 +103,7 @@ class TasksRepositoryImpl implements TasksRepository {
   }
 }
 
-ChapterTask _toTask(Object? json) => switch (json) {
+ChapterVoiceTask _toVoiceTask(Object? json) => switch (json) {
   {
     'id': final String id,
     'bookId': final String bookId,
@@ -68,9 +118,10 @@ ChapterTask _toTask(Object? json) => switch (json) {
     'done': final int done,
     'total': final int total,
     'position': final int? position,
+    'createdAt': final String createdAt,
     'finishedAt': final String? finishedAt,
   } =>
-    ChapterTask(
+    ChapterVoiceTask(
       id: id,
       bookId: bookId,
       chapterId: chapterId,
@@ -79,14 +130,57 @@ ChapterTask _toTask(Object? json) => switch (json) {
       minutes: minutes,
       voiceCode: voiceCode,
       voiceName: voiceName,
-      state:
-          ChapterTaskState.values.asNameMap()[state] ??
-          (throw const TasksException('UNEXPECTED_RESPONSE')),
+      state: _state(state),
       code: code,
       done: done,
       total: total,
       position: position,
+      createdAt: DateTime.parse(createdAt),
       finishedAt: finishedAt == null ? null : DateTime.parse(finishedAt),
     ),
   _ => throw const TasksException('UNEXPECTED_RESPONSE'),
 };
+
+BookTranslationTask _toTranslationTask(Object? json) => switch (json) {
+  {
+    'id': final String id,
+    'bookId': final String bookId,
+    'bookTitle': final String bookTitle,
+    'state': final String state,
+    'code': final String? code,
+    'done': final int done,
+    'total': final int total,
+    'percent': final int percent,
+    'position': final int? position,
+    'current': final Object? current,
+    'waiting': final List<Object?> waiting,
+    'createdAt': final String createdAt,
+    'finishedAt': final String? finishedAt,
+  } =>
+    BookTranslationTask(
+      id: id,
+      bookId: bookId,
+      bookTitle: bookTitle,
+      state: _state(state),
+      code: code,
+      done: done,
+      total: total,
+      percent: percent,
+      position: position,
+      current: switch (current) {
+        {'chapterId': final String chapterId, 'percent': final int percent} => (
+          chapterId: chapterId,
+          percent: percent,
+        ),
+        _ => null,
+      },
+      waiting: waiting.whereType<String>().toList(),
+      createdAt: DateTime.parse(createdAt),
+      finishedAt: finishedAt == null ? null : DateTime.parse(finishedAt),
+    ),
+  _ => throw const TasksException('UNEXPECTED_RESPONSE'),
+};
+
+TaskState _state(String name) =>
+    TaskState.values.asNameMap()[name] ??
+    (throw const TasksException('UNEXPECTED_RESPONSE'));

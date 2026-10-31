@@ -13,6 +13,8 @@ import '../../../listen/domain/speech_plan.dart';
 import '../../../listen/presentation/listen_bloc.dart';
 import '../../../listen/presentation/listen_panel.dart';
 import '../../../listen/presentation/mini_player.dart';
+import '../../../tasks/domain/chapter_task.dart';
+import '../../../tasks/presentation/tasks_cubit.dart';
 import '../../domain/entities/book.dart';
 import '../../domain/entities/chapter.dart';
 import '../../domain/entities/reading_length.dart';
@@ -404,6 +406,16 @@ class _ReaderPageState extends State<ReaderPage> {
     return false;
   }
 
+  /// The newest translation of this book.
+  BookTranslationTask? _translationOf(TasksState tasks) => tasks.tasks
+      .whereType<BookTranslationTask>()
+      .where((task) => task.bookId == widget.book.bookId)
+      .lastOrNull;
+
+  ChapterTurn _turnIn(TasksState tasks) =>
+      _translationOf(tasks)?.turnOf(widget.chapter.chapterId) ??
+      ChapterTurn.none;
+
   void _chooseVersion(LengthOption option) {
     if (_scroll.hasClients) _scroll.jumpTo(0);
     final listen = context.read<ListenBloc>();
@@ -429,7 +441,14 @@ class _ReaderPageState extends State<ReaderPage> {
     // With nothing to read yet, or while listening, the tools stay up.
     final tools = _tools || loaded == null || listening;
     final minutesLeft = (state.option.minutes * (1 - _read)).ceil();
-    final shortened = state.option.length != ReadingLength.original;
+    final shortened = state.option.length.isShortened;
+    final made = switch (state.option.length) {
+      ReadingLength.original => null,
+      ReadingLength.vietnamese => 'AI dịch từ bản gốc',
+      ReadingLength.shortened ||
+      ReadingLength.keyPoints => 'AI viết lại từ bản gốc',
+    };
+    final translation = _translationOf(context.watch<TasksCubit>().state);
     final safe = MediaQuery.paddingOf(context);
     final picked = _picked;
 
@@ -449,6 +468,18 @@ class _ReaderPageState extends State<ReaderPage> {
               :final sentence,
             ) when _heardHere(listening, option)) {
               _reveal(sentence);
+            }
+          },
+        ),
+        // A chapter translated while it waited on screen opens by itself.
+        BlocListener<TasksCubit, TasksState>(
+          listenWhen: (before, after) =>
+              _turnIn(before) != ChapterTurn.none &&
+              _turnIn(after) == ChapterTurn.none,
+          listener: (context, _) {
+            final reader = context.read<ReaderBloc>();
+            if (reader.state.text is ReaderTextUntranslated) {
+              reader.add(ReaderLengthChosen(reader.state.option));
             }
           },
         ),
@@ -506,6 +537,62 @@ class _ReaderPageState extends State<ReaderPage> {
                                 child: Text('${errorMessage(code)} Thử lại'),
                               ),
                             ),
+                            ReaderTextUntranslated(:final original) => Stack(
+                              children: [
+                                Opacity(
+                                  opacity: 0.35,
+                                  child: SingleChildScrollView(
+                                    controller: _scroll,
+                                    padding: EdgeInsets.fromLTRB(
+                                      0,
+                                      safe.top + 52,
+                                      24,
+                                      safe.bottom + 220,
+                                    ),
+                                    child: _Chapter(
+                                      chapter: widget.chapter,
+                                      blocks: original.blocks,
+                                      blockKeys: _blockKeys,
+                                      marked: null,
+                                      look: look,
+                                      colors: colors,
+                                      next: null,
+                                      onNext: null,
+                                      onHold: (_, _, _) {},
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 0,
+                                  right: 24,
+                                  bottom: safe.bottom + 24,
+                                  child: _Untranslated(
+                                    colors: colors,
+                                    turn:
+                                        translation?.turnOf(
+                                          widget.chapter.chapterId,
+                                        ) ??
+                                        ChapterTurn.none,
+                                    percent: translation?.current?.percent,
+                                    onOriginal: () => _chooseVersion(
+                                      widget.options.firstWhere(
+                                        (option) =>
+                                            option.length ==
+                                            ReadingLength.original,
+                                      ),
+                                    ),
+                                    onFirst: translation == null
+                                        ? null
+                                        : () => context
+                                              .read<TasksCubit>()
+                                              .putFirst(
+                                                translation,
+                                                widget.chapter.chapterId,
+                                              ),
+                                  ),
+                                ),
+                              ],
+                            ),
                             ReaderTextLoaded(:final text) =>
                               SingleChildScrollView(
                                 controller: _scroll,
@@ -557,7 +644,7 @@ class _ReaderPageState extends State<ReaderPage> {
                         child: _ToolBar(
                           colors: colors,
                           minutesLeft: minutesLeft,
-                          shortened: shortened,
+                          made: made,
                           onLook: () => showModalBottomSheet<void>(
                             context: context,
                             builder: (_) => const LookSheet(),
@@ -598,6 +685,77 @@ class _ReaderPageState extends State<ReaderPage> {
               ListenPanel(minutes: state.option.minutes)
             else
               const MiniPlayer(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Stands over a chapter whose translation is not ready yet.
+class _Untranslated extends StatelessWidget {
+  const _Untranslated({
+    required this.colors,
+    required this.turn,
+    required this.percent,
+    required this.onOriginal,
+    required this.onFirst,
+  });
+
+  final _PageColors colors;
+  final ChapterTurn turn;
+
+  /// How far the chapter being translated is.
+  final int? percent;
+  final VoidCallback onOriginal;
+  final VoidCallback? onFirst;
+
+  @override
+  Widget build(BuildContext context) {
+    final onFirst = this.onFirst;
+    final action = readingStyle(
+      size: 15,
+      weight: FontWeight.w600,
+      color: colors.title,
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.paper,
+        border: Border.all(color: colors.line),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(switch (turn) {
+              ChapterTurn.now => 'Chương này đang được dịch',
+              ChapterTurn.later => 'Chương này đang chờ dịch',
+              ChapterTurn.none => 'Chương này chưa được dịch',
+            }, style: handStyle(size: 22)),
+            const SizedBox(height: 4),
+            Text(switch (turn) {
+              ChapterTurn.now => 'Xong ${percent ?? 0}%. Bản dịch sẽ tự hiện.',
+              ChapterTurn.later =>
+                'Bạn có thể đọc bản gốc trong lúc chờ, '
+                    'hoặc cho chương này dịch trước.',
+              ChapterTurn.none => 'Dịch cả sách ở trang sách.',
+            }, style: readingStyle(size: 13.5, color: colors.muted)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: onOriginal,
+                  child: Text('Đọc bản gốc', style: action),
+                ),
+                if (turn == ChapterTurn.later && onFirst != null)
+                  TextButton(
+                    onPressed: onFirst,
+                    child: Text('Dịch chương này trước', style: action),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -894,14 +1052,16 @@ class _ToolBar extends StatelessWidget {
   const _ToolBar({
     required this.colors,
     required this.minutesLeft,
-    required this.shortened,
+    required this.made,
     required this.onLook,
     required this.onListen,
   });
 
   final _PageColors colors;
   final int minutesLeft;
-  final bool shortened;
+
+  /// How AI made this version; null for the original.
+  final String? made;
   final VoidCallback onLook;
   final VoidCallback onListen;
 
@@ -932,9 +1092,9 @@ class _ToolBar extends StatelessWidget {
                       'còn ${durationLabel(minutesLeft)}',
                       style: handStyle(size: 20),
                     ),
-                    if (shortened)
+                    if (made case final made?)
                       Text(
-                        'AI viết lại từ bản gốc',
+                        made,
                         style: readingStyle(size: 12.5, color: colors.muted),
                       ),
                   ],
@@ -1170,9 +1330,11 @@ class _VersionTab extends StatelessWidget {
               ),
             ),
             child: Text(
-              option.length == ReadingLength.original
-                  ? 'gốc'
-                  : "${option.minutes}'",
+              switch (option.length) {
+                ReadingLength.original => 'gốc',
+                ReadingLength.vietnamese => 'Việt',
+                _ => "${option.minutes}'",
+              },
               style: handStyle(size: 21, color: selected ? Palette.red : muted),
             ),
           ),
