@@ -1,0 +1,9 @@
+node_modules
+.output
+.tanstack
+.nitro
+test-results
+playwright-report
+e2e
+.env
+.env.*

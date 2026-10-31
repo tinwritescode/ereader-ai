@@ -41,6 +41,32 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:boundaries
+      - run: npm test
+      - run: npx playwright install --with-deps chromium webkit
+      # Plain React must keep building, so Redact stays one line to turn off.
+      - run: npm run build
+        env:
+          WEB_RUNTIME: react
+      - run: npm run e2e
+      - run: npm run build
+      - run: '! grep -rlE "TanStackDevtools|solid-primitives" .output'
+      - run: npm run e2e
+
   mobile:
     runs-on: ubuntu-latest
     defaults:
