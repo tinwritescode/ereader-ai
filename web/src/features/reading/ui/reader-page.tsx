@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useDebouncedCallback } from '@tanstack/react-pacer'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { chapterHeading, chapterName, isForeign } from '~/features/books/domain/book'
 import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/book'
@@ -111,7 +111,7 @@ export function ReaderPage({
   const look = readingLook.useValue()
   const [showLook, setShowLook] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
-  const option: LengthOption = { length: search.length, minutes: search.minutes }
+  const option = useMemo<LengthOption>(() => ({ length: search.length, minutes: search.minutes }), [search.length, search.minutes])
   const index = chapters.findIndex((chapter) => chapter.chapterId === chapterId)
   const chapter = chapters[index]
   const next = chapters[index + 1]
@@ -123,8 +123,6 @@ export function ReaderPage({
   const options = chapter ? lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) }) : []
   const blocks = text.kind === 'loaded' ? text.blocks : null
   const key = `${chapterId}:${option.length}:${option.minutes}`
-  const held = useRef(false)
-  held.current = offer !== null
 
   const goTo = useCallback((block: number) => {
     document.querySelector(`[data-block="${block}"]`)?.scrollIntoView({ block: 'start' })
@@ -132,7 +130,7 @@ export function ReaderPage({
   }, [])
 
   const remember = useCallback(() => {
-    if (held.current || !blocks || !chapter || voice.heardHere(option)) return
+    if (offer || !blocks || !chapter || voice.heardHere(option)) return
     if (finished()) {
       if (next) recordSpot({ bookId: book.bookId, spot: nextChapterSpot({ chapterId: next.chapterId, chapterLabel: chapterName(next), minutes: next.minutes, listened: false }) })
       else clearSpot(book.bookId)
@@ -153,7 +151,7 @@ export function ReaderPage({
         listened: false,
       },
     })
-  }, [blocks, book.bookId, chapter, chapterId, finished, next, option.length, option.minutes, voice])
+  }, [blocks, book.bookId, chapter, chapterId, finished, next, offer, option, voice])
 
   const rememberPaced = useDebouncedCallback(remember, { wait: SAVE_SPOT_MS })
 
@@ -162,15 +160,14 @@ export function ReaderPage({
     return () => window.removeEventListener('scroll', rememberPaced)
   }, [rememberPaced])
 
-  // The opening text decides once whether to ask about the last spot.
-  useEffect(() => {
-    if (!blocks || placed.current === key) return
+  const place = useEffectEvent(({ opened, at }: { opened: TextBlock[]; at: string }) => {
+    if (placed.current === at) return
     const first = placed.current === null
-    placed.current = key
-    const saved = savedSpotFor({ spot: readingSpots.read()[book.bookId], chapterId, option, blocks })
+    placed.current = at
+    const saved = savedSpotFor({ spot: readingSpots.read()[book.bookId], chapterId, option, blocks: opened })
     if (search.listen && !voice.heardHere(option)) {
       const from = search.resume ? saved : null
-      voice.start({ blocks, option, block: from?.block ?? 0, offset: from?.offset ?? 0 })
+      voice.start({ blocks: opened, option, block: from?.block ?? 0, offset: from?.offset ?? 0 })
     }
     if (!first || !saved) {
       remember()
@@ -179,13 +176,21 @@ export function ReaderPage({
     } else {
       setOffer(saved)
     }
+  })
+
+  // The opening text decides once whether to ask about the last spot.
+  useEffect(() => {
+    // Asks once from the saved spot, then the answer is the reader's: rendering must not re-ask.
+    // oxlint-disable-next-line react/set-state-in-effect
+    if (blocks) place({ opened: blocks, at: key })
   }, [blocks, key])
 
   // Keeps the sentence being heard on the page.
+  const heardBlock = voice.marked?.block
   useEffect(() => {
-    if (!voice.marked) return
-    document.querySelector(`[data-block="${voice.marked.block}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  }, [voice.marked?.block])
+    if (heardBlock === undefined) return
+    document.querySelector(`[data-block="${heardBlock}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [heardBlock])
 
   if (!chapter) return <p className="failure">{errorMessage('CHAPTER_NOT_FOUND')}</p>
 

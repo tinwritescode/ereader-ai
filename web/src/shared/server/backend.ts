@@ -8,11 +8,7 @@ import { clearTokens, readTokens, writeTokens } from './session'
 const KEEP_RENEWAL_MS = 30_000
 
 /** A failed call; `message` is the backend's stable code, which survives the trip to the browser. */
-export class BackendFailure extends Error {
-  constructor(code: string) {
-    super(code)
-  }
-}
+export class BackendFailure extends Error {}
 
 async function failureOf(response: Response): Promise<BackendFailure> {
   const body: unknown = await response.json().catch(() => null)

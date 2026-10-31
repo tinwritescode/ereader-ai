@@ -1,11 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRenewal } from './renewal'
+import type { Renewed } from './renewal'
 
 const tokens = { access: 'a2', refresh: 'r2' }
+const renewing = () => vi.fn<(refresh: string) => Promise<Renewed>>(async () => ({ kind: 'renewed', tokens }))
 
 describe('createRenewal', () => {
   it('spends a refresh token once when requests fail together', async () => {
-    const exchange = vi.fn(async () => ({ kind: 'renewed' as const, tokens }))
+    const exchange = renewing()
     const renew = createRenewal({ exchange, keepMs: 1000, now: () => 0 })
     expect(await Promise.all([renew('r1'), renew('r1')])).toEqual([
       { kind: 'renewed', tokens },
@@ -15,7 +17,7 @@ describe('createRenewal', () => {
   })
 
   it('answers a late request carrying the spent token', async () => {
-    const exchange = vi.fn(async () => ({ kind: 'renewed' as const, tokens }))
+    const exchange = renewing()
     const renew = createRenewal({ exchange, keepMs: 1000, now: () => 0 })
     await renew('r1')
     await renew('r1')
@@ -24,7 +26,7 @@ describe('createRenewal', () => {
 
   it('forgets the answer once the browser must have the new cookies', async () => {
     let time = 0
-    const exchange = vi.fn(async () => ({ kind: 'renewed' as const, tokens }))
+    const exchange = renewing()
     const renew = createRenewal({ exchange, keepMs: 1000, now: () => time })
     await renew('r1')
     time = 2000

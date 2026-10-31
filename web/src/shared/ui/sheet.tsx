@@ -12,6 +12,8 @@ export function Sheet({ title, top, onClose, children }: { title: string; top?: 
     return () => node?.close()
   }, [])
   return (
+    // The click only closes on the backdrop; the keyboard's way out is Escape, through onCancel.
+    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
     <dialog
       ref={dialog}
       className="sheet"

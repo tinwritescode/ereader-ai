@@ -64,7 +64,7 @@ const listTasks = createServerFn()
       Object.values(PATHS).map((path) => context.backend.json({ path, schema: z.object({ tasks: z.array(TaskWire) }) })),
     )
     // Oldest first, as the app shows them.
-    return lists.flatMap(({ tasks }) => tasks).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    return lists.flatMap(({ tasks }) => tasks).toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
   })
 
 const BookInput = z.object({ bookId: z.string().min(1) })

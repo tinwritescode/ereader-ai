@@ -49,7 +49,7 @@ export function ChooseLength({ book, chapter, top, onClose }: { book: Book; chap
       <h2>{`${chapter.label} dài ${durationLabel(chapter.minutes)}`}</h2>
       <p className="soft">Kéo thước tới thời gian bạn có.</p>
       <div className="ruler" role="radiogroup" aria-label="Độ dài">
-        {[...ruler].reverse().map((option) => (
+        {ruler.toReversed().map((option) => (
           <button key={option.length} type="button" role="radio" aria-checked={sameOption(option, selected)} onClick={() => setSelected(option)}>
             {`${option.minutes}'`}
             <small>{lengthName(option.length)}</small>
