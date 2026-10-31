@@ -174,7 +174,7 @@ cd backend && npm run build && npm test
 cd mobile && flutter analyze && flutter test --concurrency=1
 ```
 
-GitHub Actions runs these on every push to `main` and every pull request.
+The `pre-push` hook runs these for the parts a push touches. Turn it on once per clone with `git config core.hooksPath .githooks`.
 
 Testing with the real model needs a simulator:
 

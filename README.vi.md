@@ -174,7 +174,7 @@ cd backend && npm run build && npm test
 cd mobile && flutter analyze && flutter test --concurrency=1
 ```
 
-GitHub Actions chạy các lệnh trên ở mỗi push lên `main` và mỗi pull request.
+Hook `pre-push` chạy các lệnh trên cho những phần mà lần push thay đổi. Bật một lần cho mỗi clone bằng `git config core.hooksPath .githooks`.
 
 Test với model thật cần simulator:
 

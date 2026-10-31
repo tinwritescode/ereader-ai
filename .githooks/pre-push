@@ -1,0 +1,69 @@
+#!/bin/sh
+# Runs the checks for each part of the repo this push touches, in place of hosted CI.
+# Turn on once per clone: git config core.hooksPath .githooks
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+zero=0000000000000000000000000000000000000000
+changed=""
+
+while read -r _ local_sha _ remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then
+    base=$(git merge-base "$local_sha" origin/main)
+  else
+    base=$remote_sha
+  fi
+  changed="$changed
+$(git diff --name-only "$base" "$local_sha")"
+done
+
+touched() {
+  printf '%s\n' "$changed" | grep -q "^$1/"
+}
+
+# Postgres specs skip themselves without a database, so give them one when it is up.
+backend_tests() {
+  if docker exec v2-postgres true 2>/dev/null; then
+    db="ereader_prepush_$$"
+    docker exec v2-postgres psql -q -U postgres -c "CREATE DATABASE $db;"
+    trap 'docker exec v2-postgres psql -q -U postgres -c "DROP DATABASE IF EXISTS $db;"' EXIT
+    TEST_DATABASE_URL="postgres://postgres:postgres@localhost:55432/$db" npm test
+  else
+    echo "pre-push: v2-postgres is down, Postgres specs will skip"
+    npm test
+  fi
+}
+
+if touched backend; then
+  echo "pre-push: backend"
+  cd "$root/backend"
+  [ -d node_modules ] || npm ci
+  npm run build
+  NODE_OPTIONS=--max-old-space-size=3072 backend_tests
+fi
+
+if touched web; then
+  echo "pre-push: web"
+  cd "$root/web"
+  [ -d node_modules ] || npm ci
+  npm run lint
+  npm run format:check
+  npm run check:boundaries
+  npm test
+  # Plain React must keep building, so Redact stays one line to turn off.
+  WEB_RUNTIME=react npm run build
+  # The build writes routeTree.gen.ts, which the types need.
+  npm run typecheck
+  npm run build
+  if grep -rlE "TanStackDevtools|solid-primitives" .output; then exit 1; fi
+  npm run e2e
+fi
+
+if touched mobile; then
+  echo "pre-push: mobile"
+  cd "$root/mobile"
+  flutter pub get
+  flutter analyze
+  flutter test --concurrency=1
+fi
