@@ -17,10 +17,7 @@ import { Account } from '../../accounts/domain/plan';
 import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
 import { SpeechService } from '../application/speech.service';
 import { TTS_GATEWAY, TtsError, TtsGateway } from '../application/tts-gateway';
-import { SpeechRequestSchema } from '../domain/cloud-voice';
-
-// About what a Vietnamese voice reads in a second; plans count minutes before the audio exists.
-const SPOKEN_CHARS_PER_SECOND = 15;
+import { SpeechRequestSchema, spokenSeconds } from '../domain/cloud-voice';
 
 @Controller('speech')
 @UseGuards(AuthGuard)
@@ -47,8 +44,7 @@ export class SpeechController {
     if (!voices.some((voice) => voice.code === voiceCode)) {
       throw new BadRequestException({ code: 'VOICE_UNKNOWN' });
     }
-    const seconds = Math.ceil(text.length / SPOKEN_CHARS_PER_SECOND);
-    const charge = this.accounts.charge(account, 'vbeeSeconds', seconds);
+    const charge = this.accounts.charge(account, 'vbeeSeconds', spokenSeconds(text));
     const audio = await this.upstream(() => this.speech.speak(tts, text, voiceCode, charge));
     response.status(200).type('audio/wav').send(audio);
   }

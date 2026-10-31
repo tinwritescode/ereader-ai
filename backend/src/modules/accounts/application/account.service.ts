@@ -40,6 +40,10 @@ export class AccountService {
     return id === null ? null : this.store.find(id);
   }
 
+  byId(id: string): Promise<Account | null> {
+    return this.store.find(id);
+  }
+
   async summary(account: Account) {
     const now = new Date();
     const { digests, vbeeSeconds } = await this.store.usage(account.id, usageMonth(now));

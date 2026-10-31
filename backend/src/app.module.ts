@@ -12,6 +12,7 @@ import { BooksModule, booksOptionsFromEnv } from './modules/books/books.module';
 import { DigestService } from './modules/ai-reading/application/digest.service';
 import { DigestController } from './modules/ai-reading/presentation/digest.controller';
 import { InMemorySpeechClipIndex } from './modules/speech/application/speech-clip-index';
+import { PostgresChapterVoiceStore } from './modules/speech/infrastructure/postgres.chapter-voice-store';
 import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgres.speech-clip-index';
 import { RoutedTtsGateway } from './modules/speech/application/routed-tts-gateway';
 import { TtsGateway } from './modules/speech/application/tts-gateway';
@@ -48,6 +49,7 @@ const ttsProviders: TtsGateway[] = [
       tts: ttsProviders.length > 0 ? new RoutedTtsGateway(ttsProviders) : null,
       storage,
       index: pool ? new PostgresSpeechClipIndex(pool) : new InMemorySpeechClipIndex(),
+      ...(pool ? { chapterVoices: new PostgresChapterVoiceStore(pool) } : {}),
     }),
   ],
   controllers: [DigestController],

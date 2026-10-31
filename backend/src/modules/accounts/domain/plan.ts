@@ -6,14 +6,16 @@ export type PlanLimits = {
   monthlyDigests: number;
   monthlyVbeeMinutes: number;
   maxFileBytes: number;
+  /** May prepare a whole chapter's audio ahead of listening. */
+  chapterVoice: boolean;
 };
 
 const MB = 1024 * 1024;
 
 export const PLANS = {
-  free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 20 * MB },
-  plus: { books: 30, monthlyDigests: 100, monthlyVbeeMinutes: 300, maxFileBytes: 100 * MB },
-  max: { books: 200, monthlyDigests: 500, monthlyVbeeMinutes: 1_500, maxFileBytes: 100 * MB },
+  free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 20 * MB, chapterVoice: false },
+  plus: { books: 30, monthlyDigests: 100, monthlyVbeeMinutes: 300, maxFileBytes: 100 * MB, chapterVoice: false },
+  max: { books: 200, monthlyDigests: 500, monthlyVbeeMinutes: 1_500, maxFileBytes: 100 * MB, chapterVoice: true },
 } satisfies Record<PlanName, PlanLimits>;
 
 export type Role = 'user' | 'super_admin';

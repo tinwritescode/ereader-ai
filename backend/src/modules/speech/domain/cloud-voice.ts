@@ -13,4 +13,11 @@ export const SpeechRequestSchema = z.object({
   voiceCode: z.string().min(1),
 });
 
+// About what a Vietnamese voice reads in a second; plans count minutes before the audio exists.
+const SPOKEN_CHARS_PER_SECOND = 15;
+
+export function spokenSeconds(text: string): number {
+  return Math.ceil(text.length / SPOKEN_CHARS_PER_SECOND);
+}
+
 export type SpeechRequest = z.infer<typeof SpeechRequestSchema>;
