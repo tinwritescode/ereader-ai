@@ -7,7 +7,7 @@ const SAMPLE_RATE = 24_000;
 const TIMEOUT_MS = 180_000;
 const SPOKEN_VOICE = 'hat_de';
 
-export const OMNIVOICE_HAT_DE: CloudVoice = { code: 'omnivoice-hat-de', name: 'Hạt Dẻ', gender: 'female' };
+export const OMNIVOICE_HAT_DE: CloudVoice = { code: 'omnivoice-hat-de', name: 'Hạt Dẻ Modal', gender: 'female' };
 
 export type OmnivoiceOptions = {
   url: string;

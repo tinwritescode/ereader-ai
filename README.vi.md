@@ -122,8 +122,8 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
 | Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
-| Giọng Hạt Dẻ | Từ dịch vụ OmniVoice của mình trên Modal, đi qua backend. Khi đã chạy, mỗi giây tiếng mất khoảng 1 đến 2 giây; nếu dịch vụ đang ngủ thì câu đầu mất gần 1 phút. Tính chung vào số phút hằng tháng với Vbee | |
-| Giọng VieNeu | VieNeu-TTS trên Replicate, nhân bản từ một đoạn mẫu ngắn đi kèm backend, đi qua backend. Khi tài khoản dưới $5 credit, Replicate chỉ cho 6 câu mỗi phút, quá chậm để nghe. Tính chung vào số phút hằng tháng với Vbee | |
+| Giọng Hạt Dẻ Modal | Từ dịch vụ OmniVoice của mình trên Modal, đi qua backend. Khi đã chạy, mỗi giây tiếng mất khoảng 1 đến 2 giây; nếu dịch vụ đang ngủ thì câu đầu mất gần 1 phút. Tính chung vào số phút hằng tháng với Vbee | |
+| Giọng VieNeu | VieNeu-TTS trên Replicate, có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn đi kèm backend. Khi tài khoản dưới $5 credit, Replicate chỉ cho 6 câu mỗi phút, quá chậm để nghe. Tính chung vào số phút hằng tháng với Vbee | |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.

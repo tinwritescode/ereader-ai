@@ -1,6 +1,6 @@
 import { TtsError } from '../application/tts-gateway';
-import { VIENEU_VOICE, VieneuTtsGateway, vieneuOptionsFromEnv } from './vieneu.tts-gateway';
-import { VIENEU_REFERENCE_AUDIO } from './vieneu-reference';
+import { TRUNG_TIN_VOICE, VIENEU_HAT_DE, VieneuTtsGateway, vieneuOptionsFromEnv } from './vieneu.tts-gateway';
+import { TRUNG_TIN_REFERENCE_AUDIO, HAT_DE_REFERENCE_AUDIO } from './vieneu-reference';
 
 const PREDICTION_URL = 'https://api.replicate.test/v1/predictions/p1';
 const AUDIO_URL = 'https://replicate.delivery/p1/out.wav';
@@ -47,23 +47,35 @@ describe('VieneuTtsGateway', () => {
   const done = () => json(prediction({ status: 'succeeded', output: AUDIO_URL }));
   const audio = (body: Buffer) => () => new Response(new Uint8Array(body));
 
-  it('offers the VieNeu voice', async () => {
-    expect(await gatewayAnswering().gateway.voices()).toEqual([VIENEU_VOICE]);
+  it('offers Hạt Dẻ first, then Trung Tín', async () => {
+    expect(await gatewayAnswering().gateway.voices()).toEqual([VIENEU_HAT_DE, TRUNG_TIN_VOICE]);
+  });
+
+  it('clones the clip of the voice asked for', async () => {
+    const { calls, gateway } = gatewayAnswering(done, audio(wav([0, 0])));
+    await gateway.speak('Xin chào.', TRUNG_TIN_VOICE.code);
+    expect(JSON.parse(String(calls[0].init?.body)).input.ref_audio).toBe(TRUNG_TIN_REFERENCE_AUDIO);
+  });
+
+  it('refuses a voice it does not have, without calling Replicate', async () => {
+    const { calls, gateway } = gatewayAnswering();
+    await expect(gateway.speak('Xin chào.', 'nobody')).rejects.toThrow(TtsError);
+    expect(calls).toEqual([]);
   });
 
   it('asks for the text in the cloned voice, with the token in a header', async () => {
     const { calls, gateway } = gatewayAnswering(done, audio(wav([0, 0])));
-    await gateway.speak('Xin chào.');
+    await gateway.speak('Xin chào.', VIENEU_HAT_DE.code);
 
     const [{ url, init }] = calls;
     expect(url).toBe('https://api.replicate.com/v1/predictions');
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer secret');
-    expect(JSON.parse(String(init?.body)).input).toEqual({ text: 'Xin chào.', ref_audio: VIENEU_REFERENCE_AUDIO });
+    expect(JSON.parse(String(init?.body)).input).toEqual({ text: 'Xin chào.', ref_audio: HAT_DE_REFERENCE_AUDIO });
   });
 
   it('returns audio at the rate the app plays', async () => {
     const { gateway } = gatewayAnswering(done, audio(wav(new Array<number>(96).fill(1000))));
-    const spoken = await gateway.speak('Xin chào.');
+    const spoken = await gateway.speak('Xin chào.', VIENEU_HAT_DE.code);
 
     expect(spoken.readUInt32LE(24)).toBe(24_000);
     expect(spoken.readUInt32LE(28)).toBe(48_000);
@@ -75,7 +87,7 @@ describe('VieneuTtsGateway', () => {
   it('removes tones the lower rate cannot carry', async () => {
     const whine = Array.from({ length: 96 }, (_, index) => (index % 2 === 0 ? 8000 : -8000));
     const { gateway } = gatewayAnswering(done, audio(wav(whine)));
-    const inner = samplesOf(await gateway.speak('Xin chào.')).slice(4, -4);
+    const inner = samplesOf(await gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).slice(4, -4);
     expect(inner.every((sample) => sample === 0)).toBe(true);
   });
 
@@ -86,7 +98,7 @@ describe('VieneuTtsGateway', () => {
       done,
       audio(wav([0, 0])),
     );
-    await gateway.speak('Xin chào.');
+    await gateway.speak('Xin chào.', VIENEU_HAT_DE.code);
     expect(calls.map(({ url }) => url)).toEqual([
       'https://api.replicate.com/v1/predictions',
       PREDICTION_URL,
@@ -100,7 +112,7 @@ describe('VieneuTtsGateway', () => {
   it('tries again when Replicate says to wait', async () => {
     const throttled = () => new Response('{}', { status: 429, headers: { 'retry-after': '0' } });
     const { calls, gateway } = gatewayAnswering(throttled, done, audio(wav([0, 0])));
-    await gateway.speak('Xin chào.');
+    await gateway.speak('Xin chào.', VIENEU_HAT_DE.code);
     expect(calls.map(({ url }) => url)).toEqual([
       'https://api.replicate.com/v1/predictions',
       'https://api.replicate.com/v1/predictions',
@@ -111,18 +123,18 @@ describe('VieneuTtsGateway', () => {
   it('stops waiting at the deadline', async () => {
     const throttled = () => new Response('{}', { status: 429, headers: { 'retry-after': '10' } });
     const gateway = new VieneuTtsGateway({ token: 'secret', fetch: async () => throttled(), timeoutMs: 5 });
-    await expect(gateway.speak('Xin chào.')).rejects.toThrow('UPSTREAM_ERROR');
+    await expect(gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
   });
 
   it('gives up on a prediction that never finishes', async () => {
     const running = () => json(prediction({ status: 'processing', output: null }));
     const gateway = new VieneuTtsGateway({ token: 'secret', fetch: async () => running(), pollIntervalMs: 1, timeoutMs: 5 });
-    await expect(gateway.speak('Xin chào.')).rejects.toThrow(TtsError);
+    await expect(gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow(TtsError);
   });
 
   it.each(['failed', 'canceled'])('reports a %s prediction without its message', async (status) => {
     const { gateway } = gatewayAnswering(() => json(prediction({ status, error: 'Xin chào.' })));
-    await expect(gateway.speak('Xin chào.')).rejects.toThrow('UPSTREAM_ERROR');
+    await expect(gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
   });
 
   it.each([
@@ -132,12 +144,12 @@ describe('VieneuTtsGateway', () => {
     ['something that is not a WAV', Buffer.from('{"detail":"no"}')],
   ])('refuses %s', async (_, body) => {
     const { gateway } = gatewayAnswering(done, audio(body));
-    await expect(gateway.speak('Xin chào.')).rejects.toThrow(TtsError);
+    await expect(gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow(TtsError);
   });
 
   it('reports a refused request and an unreachable service the same way', async () => {
-    await expect(gatewayAnswering(() => json({}, 401)).gateway.speak('Xin chào.')).rejects.toThrow('UPSTREAM_ERROR');
-    await expect(gatewayAnswering().gateway.speak('Xin chào.')).rejects.toThrow('UPSTREAM_ERROR');
+    await expect(gatewayAnswering(() => json({}, 401)).gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
+    await expect(gatewayAnswering().gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
   });
 
   it('stays off without a token', () => {

@@ -2,47 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../app/theme.dart';
-import '../../books/domain/entities/chapter.dart';
 import '../../books/presentation/formatting.dart';
-import '../domain/listen_source.dart';
 import '../domain/speech.dart';
 import 'listen_bloc.dart';
 
-String _failure(String code) => switch (code) {
-  'VOICE_DOWNLOAD_FAILED' =>
-    'Chưa tải được giọng đọc. Kiểm tra mạng rồi thử lại.',
-  'VOICE_DOWNLOAD_CORRUPT' => 'File giọng đọc bị lỗi. Hãy tải lại.',
-  'CLOUD_VOICE_FAILED' =>
-    'Chưa gọi được giọng qua mạng. Kiểm tra mạng, hoặc chọn giọng trên máy.',
-  'VBEE_LIMIT' =>
-    'Hết phút giọng qua mạng tháng này. Chọn giọng trên máy để nghe tiếp.',
-  _ => 'Chưa đọc được đoạn này.',
+/// What went wrong, and what to do about it.
+(String, String) _failure(String code) => switch (code) {
+  'VOICE_DOWNLOAD_FAILED' => (
+    'Chưa tải được giọng đọc',
+    'Kiểm tra mạng rồi thử lại.',
+  ),
+  'VOICE_DOWNLOAD_CORRUPT' => ('File giọng đọc bị lỗi', 'Hãy tải lại.'),
+  'CLOUD_VOICE_FAILED' => (
+    'Chưa gọi được giọng qua mạng',
+    'Kiểm tra mạng, hoặc chọn giọng trên máy.',
+  ),
+  'VBEE_LIMIT' => (
+    'Hết phút giọng qua mạng',
+    'Tháng này đã dùng hết. Chọn giọng trên máy để nghe tiếp từ câu này.',
+  ),
+  _ => ('Chưa đọc được đoạn này', 'Thử lại, hoặc chọn giọng khác.'),
 };
 
-String _voiceLine(Voice voice) => switch (voice) {
-  DeviceVoice(:final label) => 'Giọng $label, chạy trên máy, không cần mạng',
-  CloudVoice(:final label) => 'Giọng $label, cần mạng',
-};
+// What sets a voice apart from the others in the list.
+const _voiceNotes = {'omnivoice-hat-de': 'câu đầu có thể lâu'};
 
 /// Shared with the mini player: the two say the same thing during the wait.
-String preparingLine(int ready, int needed) => needed == 0
-    ? 'Đang chuẩn bị giọng đọc'
-    : 'Đang chuẩn bị $ready trên $needed câu';
+String preparingLine(int ready, int needed) =>
+    needed == 0 ? 'Đang chuẩn bị giọng đọc' : 'Đã có $ready trên $needed câu';
 
 String _rateLabel(double rate) =>
     rate == rate.roundToDouble() ? rate.toStringAsFixed(1) : rate.toString();
 
 /// Everything about listening, in the ink panel that replaces the reader's footer.
 class ListenPanel extends StatelessWidget {
-  const ListenPanel({
-    super.key,
-    required this.blocks,
-    required this.source,
-    required this.minutes,
-  });
-
-  final List<TextBlock> blocks;
-  final ListenSource source;
+  const ListenPanel({super.key, required this.minutes});
 
   /// Reading time of the version being listened to, at normal speed.
   final int minutes;
@@ -62,8 +56,8 @@ class ListenPanel extends StatelessWidget {
         child: switch (state.stage) {
           ListenOff() => const SizedBox.shrink(),
           ListenNeedsVoice() => _Message(
-            text:
-                'Tải giọng đọc (326 MB), một lần. Sau đó nghe không cần mạng.',
+            title: 'Tải giọng đọc (326 MB), một lần',
+            text: 'Sau đó nghe không cần mạng.',
             action: 'Tải giọng đọc',
             onAction: () => bloc.add(const ListenDownloadConfirmed()),
             dismiss: 'Để sau',
@@ -75,16 +69,32 @@ class ListenPanel extends StatelessWidget {
             dismiss: 'Huỷ',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
-          ListenPreparing(:final ready, :final needed) => _Progress(
-            text: preparingLine(ready, needed),
-            value: needed == 0 ? null : ready / needed,
+          ListenPreparing(needed: 0) => _Progress(
+            text: preparingLine(0, 0),
             dismiss: 'Tắt',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
+          ListenPreparing(:final ready, :final needed) => _Waiting(
+            ready: ready,
+            needed: needed,
+            voice: state.voice,
+          ),
+          ListenFailed(code: 'VBEE_LIMIT') => _Message(
+            title: _failure('VBEE_LIMIT').$1,
+            text: _failure('VBEE_LIMIT').$2,
+            action: 'Chọn giọng',
+            onAction: () => _chooseVoice(context),
+            dismiss: 'Đóng',
+            onDismiss: () => bloc.add(const ListenStopped()),
+          ),
           ListenFailed(:final code) => _Message(
-            text: _failure(code),
+            title: _failure(code).$1,
+            text: _failure(code).$2,
             action: 'Thử lại',
-            onAction: () => bloc.add(ListenRequested(blocks, source: source)),
+            // Choosing the same voice picks up from the sentence that failed.
+            onAction: () => bloc.add(ListenVoiceChosen(state.voice)),
+            second: 'Chọn giọng',
+            onSecond: () => _chooseVoice(context),
             dismiss: 'Đóng',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
@@ -102,6 +112,7 @@ class ListenPanel extends StatelessWidget {
 TextStyle get _onInk => readingStyle(size: 14, color: Palette.sheet);
 TextStyle get _quiet =>
     readingStyle(size: 13, color: Palette.sheet.withValues(alpha: 0.72));
+TextStyle get _written => handStyle(size: 25, color: Palette.marker);
 
 class _PanelButton extends StatelessWidget {
   const _PanelButton({required this.label, required this.onTap});
@@ -123,49 +134,65 @@ class _PanelButton extends StatelessWidget {
 
 class _Message extends StatelessWidget {
   const _Message({
+    required this.title,
     required this.text,
     required this.action,
     required this.onAction,
+    this.second,
+    this.onSecond,
     required this.dismiss,
     required this.onDismiss,
   });
 
+  final String title;
   final String text;
   final String action;
   final VoidCallback onAction;
+  final String? second;
+  final VoidCallback? onSecond;
   final String dismiss;
   final VoidCallback onDismiss;
 
   @override
-  Widget build(BuildContext context) => Column(
-    mainAxisSize: MainAxisSize.min,
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text(text, style: readingStyle(size: 15, color: Palette.sheet)),
-      const SizedBox(height: 8),
-      Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _PanelButton(label: dismiss, onTap: onDismiss),
-          FilledButton(
-            onPressed: onAction,
-            style: FilledButton.styleFrom(
-              backgroundColor: Palette.marker,
-              foregroundColor: Palette.ink,
-            ),
-            child: Text(
-              action,
-              style: readingStyle(
-                size: 14,
-                weight: FontWeight.w600,
-                color: Palette.ink,
+  Widget build(BuildContext context) {
+    final second = this.second;
+    final onSecond = this.onSecond;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: _written),
+        const SizedBox(height: 2),
+        Text(text, style: _onInk),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _PanelButton(label: dismiss, onTap: onDismiss),
+            const Spacer(),
+            if (second != null && onSecond != null) ...[
+              _PanelButton(label: second, onTap: onSecond),
+              const SizedBox(width: 8),
+            ],
+            FilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                backgroundColor: Palette.marker,
+                foregroundColor: Palette.ink,
+              ),
+              child: Text(
+                action,
+                style: readingStyle(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: Palette.ink,
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-    ],
-  );
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 class _Track extends StatelessWidget {
@@ -214,6 +241,99 @@ class _Progress extends StatelessWidget {
   );
 }
 
+/// The wait, counted the way a notebook counts: four strokes and a slash.
+class _Tally extends StatelessWidget {
+  const _Tally({required this.ready, required this.needed});
+
+  final int ready;
+  final int needed;
+
+  static const _strokes = [
+    (left: 6.0, top: 4.0, length: 50.0, turn: 0.035),
+    (left: 24.0, top: 4.0, length: 50.0, turn: -0.035),
+    (left: 42.0, top: 4.0, length: 50.0, turn: 0.05),
+    (left: 60.0, top: 4.0, length: 50.0, turn: -0.02),
+    (left: 34.0, top: -8.0, length: 74.0, turn: 1.08),
+  ];
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 96,
+    height: 58,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        for (final (index, stroke) in _strokes.take(needed).indexed)
+          Positioned(
+            left: stroke.left,
+            top: stroke.top,
+            child: Transform.rotate(
+              angle: stroke.turn,
+              child: Container(
+                width: 4,
+                height: stroke.length,
+                decoration: BoxDecoration(
+                  color: index < ready
+                      ? Palette.marker
+                      : Palette.sheet.withValues(alpha: 0.24),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+class _Waiting extends StatelessWidget {
+  const _Waiting({
+    required this.ready,
+    required this.needed,
+    required this.voice,
+  });
+
+  final int ready;
+  final int needed;
+  final Voice voice;
+
+  @override
+  Widget build(BuildContext context) {
+    final bloc = context.read<ListenBloc>();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _Tally(ready: ready, needed: needed),
+        ),
+        const SizedBox(height: 2),
+        Text(preparingLine(ready, needed), style: _written),
+        const SizedBox(height: 2),
+        Text(
+          'Đủ $needed câu là ${voice.label} đọc, để nghe liền mạch.',
+          style: _quiet,
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _PanelButton(
+              label: 'Tắt',
+              onTap: () => bloc.add(const ListenStopped()),
+            ),
+            _PanelButton(
+              label: 'Đổi giọng',
+              onTap: () => _chooseVoice(context),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _Player extends StatelessWidget {
   const _Player({
     required this.playing,
@@ -233,6 +353,24 @@ class _Player extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Flexible(
+              child: Text(
+                state.voice.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _written,
+              ),
+            ),
+            _PanelButton(
+              label: 'Đổi giọng',
+              onTap: () => _chooseVoice(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
         _Track(value: state.done),
         const SizedBox(height: 6),
         Row(
@@ -245,6 +383,7 @@ class _Player extends StatelessWidget {
             Text('còn ${durationLabel(left)}', style: _quiet),
           ],
         ),
+        const SizedBox(height: 4),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -263,7 +402,7 @@ class _Player extends StatelessWidget {
               style: IconButton.styleFrom(
                 backgroundColor: Palette.marker,
                 foregroundColor: Palette.ink,
-                minimumSize: const Size(56, 56),
+                minimumSize: const Size(60, 60),
               ),
               onPressed: () => bloc.add(const ListenPauseToggled()),
               icon: Icon(playing.paused ? Icons.play_arrow : Icons.pause),
@@ -279,61 +418,86 @@ class _Player extends StatelessWidget {
             ),
           ],
         ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: InkWell(
-                onTap: () => _chooseVoice(context),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(_voiceLine(state.voice), style: _quiet),
-                ),
-              ),
-            ),
-            _PanelButton(
-              label: 'Tắt',
-              onTap: () => bloc.add(const ListenStopped()),
-            ),
-          ],
+        Align(
+          alignment: Alignment.centerRight,
+          child: _PanelButton(
+            label: 'Tắt',
+            onTap: () => bloc.add(const ListenStopped()),
+          ),
         ),
       ],
     );
   }
+}
 
-  Future<void> _chooseVoice(BuildContext context) async {
-    final bloc = context.read<ListenBloc>();
-    final cloud = context.read<Speech>().cloudVoices();
-    final voice = await showModalBottomSheet<Voice>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: FutureBuilder<List<CloudVoice>>(
-            future: cloud,
-            builder: (context, snapshot) {
-              final cloudVoices = snapshot.data ?? const <CloudVoice>[];
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (cloudVoices.isNotEmpty) ...[
-                    const _VoiceHeading('Giọng qua mạng'),
-                    for (final voice in cloudVoices)
-                      _VoiceTile(voice: voice, chosen: bloc.state.voice),
-                  ],
-                  const _VoiceHeading('Trên máy'),
-                  for (final voice in DeviceVoice.values)
-                    _VoiceTile(voice: voice, chosen: bloc.state.voice),
+Future<void> _chooseVoice(BuildContext context) async {
+  final bloc = context.read<ListenBloc>();
+  final speech = context.read<Speech>();
+  final offer = (speech.cloudVoices(), speech.modelReady()).wait;
+  final voice = await showModalBottomSheet<Voice>(
+    context: context,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: FutureBuilder<(List<CloudVoice>, bool)>(
+          future: offer,
+          builder: (context, snapshot) {
+            final cloudVoices = snapshot.data?.$1 ?? const <CloudVoice>[];
+            final modelReady = snapshot.data?.$2 ?? true;
+            final chosen = bloc.state.voice;
+            final device = DeviceVoice.values;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Chọn giọng đọc',
+                  style: readingStyle(
+                    size: 16,
+                    weight: FontWeight.w600,
+                    color: Palette.ink,
+                  ),
+                ),
+                if (cloudVoices.isNotEmpty) ...[
+                  const _VoiceHeading('Giọng qua mạng, tính vào phút của gói'),
+                  for (final voice in cloudVoices)
+                    _CloudVoiceTile(voice: voice, chosen: chosen),
                 ],
-              );
-            },
-          ),
+                const _VoiceHeading('Trên máy, nghe không cần mạng'),
+                if (!modelReady)
+                  Text(
+                    'Tải một lần, 326 MB.',
+                    style: readingStyle(size: 13, color: Palette.muted),
+                  ),
+                for (var index = 0; index < device.length; index += 2)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DeviceVoiceTile(
+                          voice: device[index],
+                          chosen: chosen,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: index + 1 < device.length
+                            ? _DeviceVoiceTile(
+                                voice: device[index + 1],
+                                chosen: chosen,
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+              ],
+            );
+          },
         ),
       ),
-    );
-    if (voice != null) bloc.add(ListenVoiceChosen(voice));
-  }
+    ),
+  );
+  if (voice != null) bloc.add(ListenVoiceChosen(voice));
 }
 
 class _VoiceHeading extends StatelessWidget {
@@ -343,26 +507,67 @@ class _VoiceHeading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    padding: const EdgeInsets.only(top: 14, bottom: 2),
     child: Text(text, style: readingStyle(size: 13, color: Palette.muted)),
   );
 }
 
-class _VoiceTile extends StatelessWidget {
-  const _VoiceTile({required this.voice, required this.chosen});
+class _CloudVoiceTile extends StatelessWidget {
+  const _CloudVoiceTile({required this.voice, required this.chosen});
 
-  final Voice voice;
+  final CloudVoice voice;
   final Voice chosen;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-    title: Text(
-      voice.label,
-      style: readingStyle(
-        size: 16,
-        color: voice == chosen ? Palette.red : Palette.text,
+  Widget build(BuildContext context) {
+    final isChosen = voice == chosen;
+    final note = isChosen ? 'đang dùng' : _voiceNotes[voice.code];
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(voice),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Palette.rule)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                voice.label,
+                style: isChosen ? handStyle(size: 23) : readingStyle(size: 16),
+              ),
+            ),
+            if (note != null)
+              Text(note, style: readingStyle(size: 12.5, color: Palette.muted)),
+          ],
+        ),
       ),
-    ),
-    onTap: () => Navigator.of(context).pop(voice),
-  );
+    );
+  }
+}
+
+class _DeviceVoiceTile extends StatelessWidget {
+  const _DeviceVoiceTile({required this.voice, required this.chosen});
+
+  final DeviceVoice voice;
+  final Voice chosen;
+
+  @override
+  Widget build(BuildContext context) {
+    final isChosen = voice == chosen;
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(voice),
+      child: Container(
+        height: 44,
+        alignment: Alignment.centerLeft,
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Palette.rule)),
+        ),
+        child: Text(
+          voice.label,
+          style: isChosen ? handStyle(size: 21) : readingStyle(size: 15),
+        ),
+      ),
+    );
+  }
 }

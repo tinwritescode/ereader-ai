@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { TtsError, TtsGateway } from '../application/tts-gateway';
 import { CloudVoice } from '../domain/cloud-voice';
-import { VIENEU_REFERENCE_AUDIO } from './vieneu-reference';
+import { TRUNG_TIN_REFERENCE_AUDIO, HAT_DE_REFERENCE_AUDIO } from './vieneu-reference';
 
 const PREDICTIONS_URL = 'https://api.replicate.com/v1/predictions';
 // VieNeu-TTS v3 Turbo. Pinned so a new upload cannot change the voice under cached clips.
@@ -13,7 +13,13 @@ const HEADER_BYTES = 44;
 const FILTER = [-1, 0, 9, 16, 9, 0, -1];
 const FILTER_SUM = 32;
 
-export const VIENEU_VOICE: CloudVoice = { code: 'vieneu-clone', name: 'VieNeu', gender: 'female' };
+export const VIENEU_HAT_DE: CloudVoice = { code: 'vieneu-clone', name: 'Hạt Dẻ', gender: 'female' };
+export const TRUNG_TIN_VOICE: CloudVoice = { code: 'vieneu-trung-tin', name: 'Trung Tín', gender: 'male' };
+
+const REFERENCES: ReadonlyMap<string, string> = new Map([
+  [VIENEU_HAT_DE.code, HAT_DE_REFERENCE_AUDIO],
+  [TRUNG_TIN_VOICE.code, TRUNG_TIN_REFERENCE_AUDIO],
+]);
 
 export type VieneuOptions = {
   token: string;
@@ -69,7 +75,7 @@ function halveRate(source: Buffer): Buffer {
   return out;
 }
 
-/** VieNeu on Replicate, cloning the one reference clip we ship. */
+/** VieNeu on Replicate, cloning the reference clips we ship. */
 export class VieneuTtsGateway implements TtsGateway {
   private readonly fetch: typeof globalThis.fetch;
   private readonly pollIntervalMs: number;
@@ -82,15 +88,17 @@ export class VieneuTtsGateway implements TtsGateway {
   }
 
   async voices(): Promise<CloudVoice[]> {
-    return [VIENEU_VOICE];
+    return [VIENEU_HAT_DE, TRUNG_TIN_VOICE];
   }
 
-  async speak(text: string): Promise<Buffer> {
+  async speak(text: string, voiceCode: string): Promise<Buffer> {
+    const reference = REFERENCES.get(voiceCode);
+    if (reference === undefined) throw new TtsError('UPSTREAM_ERROR');
     const deadline = Date.now() + this.timeoutMs;
     const created = await this.prediction(PREDICTIONS_URL, deadline, {
       method: 'POST',
       headers: { 'content-type': 'application/json', prefer: `wait=${WAIT_SECONDS}` },
-      body: JSON.stringify({ version: MODEL_VERSION, input: { text, ref_audio: VIENEU_REFERENCE_AUDIO } }),
+      body: JSON.stringify({ version: MODEL_VERSION, input: { text, ref_audio: reference } }),
     });
     const audioUrl = await this.waitForAudio(created, deadline);
     const response = await this.call(audioUrl, deadline, { method: 'GET' });

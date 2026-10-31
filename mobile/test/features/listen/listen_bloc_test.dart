@@ -347,6 +347,22 @@ void main() {
       await bloc.close();
     });
 
+    test('choosing the same voice after a failure resumes there', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech, seven);
+      await settle();
+      speech.finishSentence();
+      await settle();
+      expect(playingText(bloc), 'Hai.');
+
+      speech.failOnce.add('Bảy.');
+      bloc.add(const ListenVoiceChosen(vieNeu));
+      await settle();
+      await settle();
+      expect(playingText(bloc), 'Hai.');
+      await bloc.close();
+    });
+
     test('a voice can be changed during the wait', () async {
       final gate = Completer<void>();
       final speech = FakeSpeech(ready: false)..synthesisGate = gate;

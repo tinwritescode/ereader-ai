@@ -200,10 +200,8 @@ void main() {
       tester.getTopLeft(find.text('Lùi một câu')).dy,
       greaterThan(tester.getBottomLeft(find.textContaining('Tôi thực sự')).dy),
     );
-    expect(
-      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
-      findsOneWidget,
-    );
+    expect(find.text('Diễm Trinh'), findsOneWidget);
+    expect(find.text('Đổi giọng'), findsOneWidget);
 
     await tester.tap(find.text('Tắt'));
     await tester.pumpAndSettle();
@@ -221,10 +219,7 @@ void main() {
     await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('Tải giọng đọc (326 MB), một lần. Sau đó nghe không cần mạng.'),
-      findsOneWidget,
-    );
+    expect(find.text('Tải giọng đọc (326 MB), một lần'), findsOneWidget);
     expect(speech.played, isEmpty);
 
     await tester.tap(find.text('Tải giọng đọc'));
@@ -240,17 +235,12 @@ void main() {
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
-    );
+    await tester.tap(find.text('Đổi giọng'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Đức An'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Giọng Đức An, chạy trên máy, không cần mạng'),
-      findsOneWidget,
-    );
+    expect(find.text('Đức An'), findsOneWidget);
   });
 
   testWidgets('a Vbee voice can be chosen from the player', (tester) async {
@@ -266,21 +256,65 @@ void main() {
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Giọng VieNeu, cần mạng'));
+    expect(find.text('VieNeu'), findsOneWidget);
+    await tester.tap(find.text('Đổi giọng'));
     await tester.pumpAndSettle();
-    expect(find.text('Trên máy'), findsOneWidget);
-    expect(find.text('Giọng qua mạng'), findsOneWidget);
+    expect(find.text('đang dùng'), findsOneWidget);
     expect(
-      tester.getTopLeft(find.text('Giọng qua mạng')).dy,
-      lessThan(tester.getTopLeft(find.text('Trên máy')).dy),
+      tester.getTopLeft(find.text('Giọng qua mạng, tính vào phút của gói')).dy,
+      lessThan(
+        tester.getTopLeft(find.text('Trên máy, nghe không cần mạng')).dy,
+      ),
     );
     await tester.ensureVisible(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Giọng HN - Ngọc Huyền, cần mạng'), findsOneWidget);
+    expect(find.text('HN - Ngọc Huyền'), findsOneWidget);
     expect(speech.synthesized.last.$2, vbee);
+  });
+
+  testWidgets('a cloud voice counts its sentences before it speaks', (
+    tester,
+  ) async {
+    const vieNeu = CloudVoice('vieneu-clone', 'VieNeu');
+    final held = Completer<void>();
+    final speech = FakeSpeech(cloud: [vieNeu])..synthesisGate = held;
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+    await showTools(tester);
+    await tester.tap(find.text('Nghe'));
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+    expect(find.textContaining('Đã có 0 trên'), findsOneWidget);
+    expect(find.textContaining('là VieNeu đọc'), findsOneWidget);
+
+    held.complete();
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(speech.played, isNotEmpty);
+    expect(find.text('Lùi một câu'), findsOneWidget);
+  });
+
+  testWidgets('out of minutes, the voice list is one tap away', (tester) async {
+    const vieNeu = CloudVoice('vieneu-clone', 'VieNeu');
+    final speech = FakeSpeech(
+      cloud: [vieNeu],
+      synthesisError: const SpeechException('VBEE_LIMIT'),
+    );
+    await pumpApp(tester, shelf: [loeb], speech: speech);
+    await openOriginalChapter(tester);
+    await showTools(tester);
+    await tester.tap(find.text('Nghe'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hết phút giọng qua mạng'), findsOneWidget);
+    expect(find.text('Thử lại'), findsNothing);
+    await tester.tap(find.text('Chọn giọng'));
+    await tester.pumpAndSettle();
+    expect(find.text('Chọn giọng đọc'), findsOneWidget);
   });
 
   testWidgets('listening from the length sheet starts by itself', (

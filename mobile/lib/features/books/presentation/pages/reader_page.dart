@@ -595,11 +595,7 @@ class _ReaderPageState extends State<ReaderPage> {
               ),
             ),
             if (listening)
-              ListenPanel(
-                blocks: loaded?.blocks ?? const [],
-                source: _source(state.option),
-                minutes: state.option.minutes,
-              )
+              ListenPanel(minutes: state.option.minutes)
             else
               const MiniPlayer(),
           ],

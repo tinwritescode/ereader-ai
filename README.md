@@ -122,8 +122,8 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
 | Vbee voices | Batch API, 2 to 10 seconds per sentence. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
-| Hạt Dẻ voice | From our OmniVoice service on Modal, through the backend. About 1 to 2 seconds per second of speech once awake; close to a minute when the service has gone to sleep. Counts against the same monthly minutes as Vbee | |
-| VieNeu voice | VieNeu-TTS on Replicate, cloned from one short reference clip shipped with the backend, through the backend. Replicate allows only 6 sentences a minute while the account holds under $5 of credit, which is too slow to listen to. Counts against the same monthly minutes as Vbee | |
+| Hạt Dẻ Modal voice | From our OmniVoice service on Modal, through the backend. About 1 to 2 seconds per second of speech once awake; close to a minute when the service has gone to sleep. Counts against the same monthly minutes as Vbee | |
+| VieNeu voices | VieNeu-TTS on Replicate, in the Hạt Dẻ and Trung Tín voices, cloned from short reference clips shipped with the backend. Replicate allows only 6 sentences a minute while the account holds under $5 of credit, which is too slow to listen to. Counts against the same monthly minutes as Vbee | |
 | Platforms | iOS 16 and later | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.
