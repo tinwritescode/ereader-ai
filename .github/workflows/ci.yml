@@ -54,7 +54,6 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
-      - run: npm run typecheck
       - run: npm run check:boundaries
       - run: npm test
       - run: npx playwright install --with-deps chromium webkit
@@ -62,6 +61,8 @@ jobs:
       - run: npm run build
         env:
           WEB_RUNTIME: react
+      # The build writes routeTree.gen.ts, which the types need.
+      - run: npm run typecheck
       - run: npm run e2e
       - run: npm run build
       - run: '! grep -rlE "TanStackDevtools|solid-primitives" .output'
