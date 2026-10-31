@@ -63,9 +63,11 @@ export function ContinueReading({ books }: { books: Book[] }) {
 /** The book page's way back to where this book was left. */
 export function ResumeLine({ book, chapters }: { book: Book; chapters: ChapterSummary[] }) {
   const spot = readingSpots.useValue()[book.bookId]
+  // The device keeps the name the chapter had when last read; the book may have been renamed since.
+  const label = chapters.find(({ chapterId }) => chapterId === spot?.chapterId)?.label ?? spot?.chapterLabel
   return spot ? (
     <Link className="primary" {...spotLink({ book, spot, chapters })}>
-      {`${goOnWord(spot)} ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}`}
+      {`${goOnWord(spot)} ${label}, còn ${durationLabel(spot.minutesLeft)}`}
     </Link>
   ) : null
 }

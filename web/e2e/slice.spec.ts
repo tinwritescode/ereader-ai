@@ -170,3 +170,13 @@ test('the ruler is dragged or walked with the arrow keys', async ({ page }) => {
   await page.mouse.up()
   await expect(original).not.toBeChecked()
 })
+
+test('front matter folds away above the chapters', async ({ page }) => {
+  await signIn(page)
+  await open(page, '/books/deep')
+  await expect(page.getByText('Deep Work').first()).toBeVisible()
+  await expect(page.locator('.row')).toHaveCount(3)
+  await page.getByRole('button', { name: /Phần đầu sách/ }).click()
+  await expect(page.locator('.row')).toHaveCount(4)
+  await expect(page.locator('.row').first()).toContainText('Giới thiệu')
+})

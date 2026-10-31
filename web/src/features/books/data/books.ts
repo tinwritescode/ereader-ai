@@ -17,7 +17,13 @@ export const BookWire = z
   .transform((book): Book => book)
 
 const ChapterWire = z
-  .object({ chapterId: z.string(), label: z.string(), subtitle: z.string().nullable(), minutes: z.int() })
+  .object({
+    chapterId: z.string(),
+    label: z.string(),
+    subtitle: z.string().nullable(),
+    kind: z.enum(['main', 'front']),
+    minutes: z.int(),
+  })
   .transform((chapter): ChapterSummary => chapter)
 
 const listBooks = createServerFn()

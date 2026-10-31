@@ -100,6 +100,8 @@ export function BookPage({
 }: { bookId: string } & Slots) {
   const { book, chapters } = useShelf(bookId)
   const [chosen, setChosen] = useState<ChapterSummary | null>(null)
+  const front = chapters.filter(({ kind }) => kind === 'front')
+  const [frontOpen, setFrontOpen] = useState(front.some(({ chapterId }) => chapterId === currentId))
   return (
     <>
       <div className="mb-line grid grid-cols-[68px_1fr] gap-3 md:grid-cols-[110px_1fr] md:gap-5">
@@ -113,8 +115,18 @@ export function BookPage({
           </div>
         </div>
       </div>
+      {front.length > 0 && (
+        <button
+          type="button"
+          className="hand min-h-11 text-[19px]/7"
+          aria-expanded={frontOpen}
+          onClick={() => setFrontOpen(!frontOpen)}
+        >
+          {`${frontOpen ? '⌄' : '›'} Phần đầu sách, ${front.length} mục`}
+        </button>
+      )}
       <ChapterList
-        chapters={chapters}
+        chapters={frontOpen ? chapters : chapters.filter(({ kind }) => kind === 'main')}
         currentId={currentId}
         onChoose={setChosen}
         markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}

@@ -2,7 +2,7 @@ export type Book = {
   bookId: string
   title: string
   author: string | null
-  /** The language the EPUB declares, e.g. "en"; null when it says none. */
+  /** The book's language, read from its text: "vi", or what the file declares, or "und" when unknown. */
   language: string | null
   hasCover: boolean
   chapterCount: number
@@ -15,12 +15,14 @@ export type ChapterSummary = {
   label: string
   /** The heading under the label, when the book has one. */
   subtitle: string | null
+  /** Front matter stands before the table of contents begins. */
+  kind: 'main' | 'front'
   minutes: number
 }
 
 export type TextBlock = { kind: 'heading' | 'paragraph'; text: string }
 
-/** Declared in a language other than Vietnamese, so it can be translated. */
+/** Not in Vietnamese, so it can be translated. */
 export function isForeign({ language }: Pick<Book, 'language'>): boolean {
   return language !== null && !language.toLowerCase().startsWith('vi')
 }

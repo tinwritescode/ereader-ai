@@ -38,6 +38,7 @@ const manyChapters = Array.from({ length: 400 }, (_, index) => ({
   index,
   label: `Chương ${index + 1}`,
   subtitle: null,
+  kind: 'main',
   wordCount: 1000,
   minutes: 12,
 }))
@@ -118,6 +119,16 @@ function fresh() {
 
 let state = fresh()
 
+const FRONT_MATTER = {
+  chapterId: 'deep-front',
+  index: 0,
+  label: 'Giới thiệu',
+  subtitle: null,
+  kind: 'front',
+  wordCount: 100,
+  minutes: 1,
+}
+
 const chapters = (bookId: string) =>
   bookId === 'long'
     ? manyChapters
@@ -126,6 +137,7 @@ const chapters = (bookId: string) =>
         index,
         label: `Chương ${name}`,
         subtitle: `Tên chương ${index + 1}`,
+        kind: 'main',
         wordCount: 1000,
         minutes: index === 2 ? 3 : 12,
       }))
@@ -342,7 +354,11 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return send(response, 202, book)
   }
   const bookChapters = /^\/books\/([^/]+)\/chapters$/.exec(path)
-  if (bookChapters?.[1]) return send(response, 200, { bookId: bookChapters[1], chapters: chapters(bookChapters[1]) })
+  if (bookChapters?.[1])
+    return send(response, 200, {
+      bookId: bookChapters[1],
+      chapters: [...(bookChapters[1] === 'deep' ? [FRONT_MATTER] : []), ...chapters(bookChapters[1])],
+    })
   const translationOfBook = /^\/books\/([^/]+)\/translation$/.exec(path)
   if (translationOfBook?.[1] && method === 'GET') {
     const bookId = translationOfBook[1]
