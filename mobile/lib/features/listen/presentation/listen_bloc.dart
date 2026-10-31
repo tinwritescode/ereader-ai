@@ -10,7 +10,11 @@ import '../domain/speech_plan.dart';
 
 const _rates = [1.0, 1.25, 1.5, 0.8];
 // Sentences made ready ahead of the one playing, so playback does not wait for the model.
-const _readAhead = 2;
+const _deviceReadAhead = 2;
+// Vbee takes seconds per sentence, so a thin buffer runs dry: keep a minute of speech ready.
+const _cloudReadAheadSeconds = 60.0;
+// Enough to outrun playback; the rest wait for a free slot.
+const _cloudRequests = 4;
 
 sealed class ListenStage {
   const ListenStage();
@@ -176,6 +180,9 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   List<SpokenSentence> _plan = const [];
   var _audio = <int, Future<Float32List>>{};
   Future<void> _modelQueue = Future.value();
+  // The sentence the voice is on while Vbee has more to fetch.
+  int? _playhead;
+  int _cloudRunning = 0;
   // Each run owns one generation; a newer one makes an older run stop by itself.
   int _generation = 0;
   int _current = 0;
@@ -191,6 +198,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       _blocks = event.blocks;
       _plan = planSpeech(_blocks);
       _audio = {};
+      _playhead = null;
     }
     if (_plan.isEmpty) return;
     _from = sentenceAt(_plan, event.block, event.offset);
@@ -239,11 +247,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       await _speech.setRate(state.rate);
       for (var index = from; index < _plan.length; index++) {
         final samples = _synthesized(index);
-        for (var ahead = 1; ahead <= _readAhead; ahead++) {
-          if (index + ahead < _plan.length) {
-            _synthesized(index + ahead).ignore();
-          }
-        }
+        _readAhead(index);
         final audio = await samples;
         if (_paused) await (_unpaused ??= Completer<void>()).future;
         if (generation != _generation) return;
@@ -261,14 +265,69 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     }
   }
 
-  /// The model runs one sentence at a time, whoever asks.
-  Future<Float32List> _synthesized(int index) => _audio[index] ??= () {
-    final text = _plan[index].text;
+  void _readAhead(int index) {
+    switch (state.voice) {
+      case DeviceVoice():
+        for (var ahead = 1; ahead <= _deviceReadAhead; ahead++) {
+          if (index + ahead < _plan.length) {
+            _synthesized(index + ahead).ignore();
+          }
+        }
+      case CloudVoice():
+        _playhead = index;
+        _fetchAhead();
+    }
+  }
+
+  /// Fills the minute after the playhead, nearest sentence first. Runs whenever
+  /// a request ends, so a free slot goes to whatever is needed by then.
+  void _fetchAhead() {
+    final playhead = _playhead;
     final voice = state.voice;
+    if (isClosed || playhead == null || voice is! CloudVoice) return;
+    // A faster rate spends the same audio in less time.
+    final seconds = _cloudReadAheadSeconds * state.rate;
+    final last = playhead + sentencesWithin(_plan, playhead, seconds);
+    for (var index = playhead + 1; index <= last; index++) {
+      if (_cloudRunning >= _cloudRequests) return;
+      if (!_audio.containsKey(index)) _fetch(index, voice);
+    }
+  }
+
+  Future<Float32List> _fetch(int index, CloudVoice voice) {
+    final audio = _audio;
+    _cloudRunning++;
+    final job = _speech.synthesize(_plan[index].text, voice);
+    job.then<void>(
+      (_) {
+        _cloudRunning--;
+        _fetchAhead();
+      },
+      onError: (Object _) {
+        _cloudRunning--;
+        // Not kept: the sentence is asked for again when the voice reaches it.
+        audio.remove(index);
+      },
+    );
+    return audio[index] = job;
+  }
+
+  Future<Float32List> _synthesized(int index) {
+    final kept = _audio[index];
+    if (kept != null) return kept;
+    return switch (state.voice) {
+      final CloudVoice voice => _fetch(index, voice),
+      final DeviceVoice voice => _audio[index] = _queued(index, voice),
+    };
+  }
+
+  /// The model runs one sentence at a time, whoever asks.
+  Future<Float32List> _queued(int index, DeviceVoice voice) {
+    final text = _plan[index].text;
     final job = _modelQueue.then((_) => _speech.synthesize(text, voice));
     _modelQueue = job.then<void>((_) {}, onError: (Object _) {});
     return job;
-  }();
+  }
 
   void _release() {
     final unpaused = _unpaused;
@@ -362,6 +421,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
 
   Future<void> _halt() async {
     _generation++;
+    _playhead = null;
     _release();
     _speech.cancelDownload();
     await _speech.stop();

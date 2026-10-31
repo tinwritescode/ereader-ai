@@ -19,6 +19,9 @@ class SpokenSentence {
   final String text;
 }
 
+// About what a Vietnamese voice reads in a second at normal speed.
+const _spokenCharactersPerSecond = 15;
+
 // A sentence ends at punctuation followed by a space or the end of the block,
 // so "1.000" stays whole.
 final _sentence = RegExp(r'.+?(?:[.!?…]+["”’)]*(?=\s|$)|$)', dotAll: true);
@@ -28,6 +31,17 @@ List<SpokenSentence> planSpeech(List<TextBlock> blocks) => [
     for (final match in _sentence.allMatches(block.text))
       ..._withinLimit(index, block.text, match.start, match.end),
 ];
+
+/// How many sentences after [from] it takes to fill [seconds] of speech.
+int sentencesWithin(List<SpokenSentence> plan, int from, double seconds) {
+  var characters = seconds * _spokenCharactersPerSecond;
+  var count = 0;
+  for (var index = from + 1; index < plan.length && characters > 0; index++) {
+    characters -= plan[index].text.length;
+    count++;
+  }
+  return count;
+}
 
 /// Position in [plan] of the sentence holding character [offset] of [block].
 int sentenceAt(List<SpokenSentence> plan, int block, int offset) {

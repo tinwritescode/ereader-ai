@@ -23,6 +23,14 @@ class FakeSpeech implements Speech {
   var stops = 0;
   Completer<void>? _playing;
 
+  /// Texts that fail once, like a brief network drop.
+  final failOnce = <String>{};
+
+  /// When set, each synthesis waits for it, like a slow Vbee call.
+  Completer<void>? synthesisGate;
+  var running = 0;
+  var mostAtOnce = 0;
+
   void finishSentence() => _playing?.complete();
 
   @override
@@ -49,6 +57,13 @@ class FakeSpeech implements Speech {
     final error = synthesisError;
     if (error != null) throw error;
     synthesized.add((text, voice));
+    running++;
+    if (running > mostAtOnce) mostAtOnce = running;
+    await synthesisGate?.future;
+    running--;
+    if (failOnce.remove(text)) {
+      throw const SpeechException('CLOUD_VOICE_FAILED');
+    }
     return Float32List.fromList([synthesized.length.toDouble()]);
   }
 

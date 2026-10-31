@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ereader_mobile/features/books/domain/entities/chapter.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_length.dart';
 import 'package:ereader_mobile/features/listen/domain/listen_source.dart';
@@ -148,6 +150,110 @@ void main() {
 
     expect(playingText(bloc), 'Một.');
     expect(speech.synthesized.first, ('Một.', vbee));
+    await bloc.close();
+  });
+
+  group('a Vbee voice', () {
+    const vbee = CloudVoice('code', 'Vbee');
+    // 150 characters read for about 10 seconds.
+    final long = List.filled(30, ' ').indexed.map((e) {
+      return 'Câu ${e.$1.toString().padLeft(2, '0')} ${'chữ ' * 36}'
+          .trimRight();
+    }).toList();
+    final chapter = [
+      for (final sentence in long)
+        TextBlock(TextBlockKind.paragraph, '$sentence.'),
+    ];
+
+    Future<ListenBloc> listen(FakeSpeech speech) async {
+      final bloc = ListenBloc(speech)
+        ..add(const ListenVoiceChosen(vbee))
+        ..add(ListenRequested(chapter, source: source));
+      await settle();
+      return bloc;
+    }
+
+    test('keeps a minute of audio ready, not the whole chapter', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech);
+      await settle();
+      await settle();
+
+      expect(speech.synthesized.length, inInclusiveRange(7, 9));
+      await bloc.close();
+    });
+
+    test('keeps the minute full as sentences are read', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech);
+      await settle();
+      final before = speech.synthesized.length;
+
+      speech.finishSentence();
+      await settle();
+      await settle();
+
+      expect(speech.synthesized.length, before + 1);
+      await bloc.close();
+    });
+
+    test('fetches a few sentences at once, never all of them', () async {
+      final gate = Completer<void>();
+      final speech = FakeSpeech(ready: false)..synthesisGate = gate;
+      final bloc = await listen(speech);
+      await settle();
+
+      expect(speech.mostAtOnce, 4);
+
+      gate.complete();
+      await settle();
+      await settle();
+      await settle();
+
+      expect(speech.mostAtOnce, 4);
+      expect(playingText(bloc), startsWith('Câu 00'));
+      await bloc.close();
+    });
+
+    test('a faster rate reads further ahead', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech);
+      await settle();
+      final atNormal = speech.synthesized.length;
+
+      bloc.add(const ListenRateCycled());
+      bloc.add(const ListenRateCycled());
+      await settle();
+      speech.finishSentence();
+      await settle();
+      await settle();
+
+      expect(speech.synthesized.length, greaterThan(atNormal + 1));
+      await bloc.close();
+    });
+
+    test('a sentence that failed ahead of time is asked for again', () async {
+      final speech = FakeSpeech(ready: false)..failOnce.add(chapter[1].text);
+      final bloc = await listen(speech);
+      await settle();
+
+      speech.finishSentence();
+      await settle();
+      await settle();
+
+      expect(playingText(bloc), startsWith('Câu 01'));
+      await bloc.close();
+    });
+  });
+
+  test('a device voice still prepares two sentences, one at a time', () async {
+    final speech = FakeSpeech();
+    final bloc = ListenBloc(speech)
+      ..add(const ListenRequested(blocks, source: source));
+    await settle();
+
+    expect(speech.synthesized, hasLength(3));
+    expect(speech.mostAtOnce, 1);
     await bloc.close();
   });
 

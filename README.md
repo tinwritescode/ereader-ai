@@ -121,7 +121,7 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 | Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
-| Vbee voices | Batch API, 2 to 10 seconds per sentence, read ahead. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
+| Vbee voices | Batch API, 2 to 10 seconds per sentence. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
 | Platforms | iOS 16 and later | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.

@@ -121,7 +121,7 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 | Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
-| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu, tạo trước vài câu. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
+| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
