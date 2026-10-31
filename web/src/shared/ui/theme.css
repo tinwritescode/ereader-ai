@@ -1,4 +1,5 @@
-@import 'tailwindcss';
+/* Only src: the build's own output differs between its client and server passes. */
+@import 'tailwindcss' source('../..');
 
 @font-face {
   font-family: Literata;
