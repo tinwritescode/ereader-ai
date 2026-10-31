@@ -268,14 +268,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Trên máy'), findsOneWidget);
-    expect(find.text('Vbee, cần mạng'), findsOneWidget);
+    expect(find.text('Giọng qua mạng'), findsOneWidget);
     await tester.ensureVisible(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Giọng HN - Ngọc Huyền của Vbee, cần mạng'),
+      find.text('Giọng HN - Ngọc Huyền, cần mạng'),
       findsOneWidget,
     );
     expect(speech.synthesized.last.$2, vbee);

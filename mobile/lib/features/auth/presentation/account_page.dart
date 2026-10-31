@@ -52,7 +52,7 @@ class _AccountPageState extends State<AccountPage> {
           share: account.digestsUsed / limits.monthlyDigests,
         ),
         _Meter(
-          name: 'Giọng Vbee',
+          name: 'Giọng qua mạng',
           detail:
               '${account.vbeeMinutesUsed} trên ${limits.monthlyVbeeMinutes} phút, $resets',
           share: account.vbeeMinutesUsed / limits.monthlyVbeeMinutes,

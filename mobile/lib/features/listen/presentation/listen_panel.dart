@@ -13,15 +13,15 @@ String _failure(String code) => switch (code) {
     'Chưa tải được giọng đọc. Kiểm tra mạng rồi thử lại.',
   'VOICE_DOWNLOAD_CORRUPT' => 'File giọng đọc bị lỗi. Hãy tải lại.',
   'CLOUD_VOICE_FAILED' =>
-    'Chưa gọi được giọng Vbee. Kiểm tra mạng, hoặc chọn giọng trên máy.',
+    'Chưa gọi được giọng qua mạng. Kiểm tra mạng, hoặc chọn giọng trên máy.',
   'VBEE_LIMIT' =>
-    'Hết phút giọng Vbee tháng này. Chọn giọng trên máy để nghe tiếp.',
+    'Hết phút giọng qua mạng tháng này. Chọn giọng trên máy để nghe tiếp.',
   _ => 'Chưa đọc được đoạn này.',
 };
 
 String _voiceLine(Voice voice) => switch (voice) {
   DeviceVoice(:final label) => 'Giọng $label, chạy trên máy, không cần mạng',
-  CloudVoice(:final label) => 'Giọng $label của Vbee, cần mạng',
+  CloudVoice(:final label) => 'Giọng $label, cần mạng',
 };
 
 String _rateLabel(double rate) =>
@@ -315,7 +315,7 @@ class _Player extends StatelessWidget {
                   for (final voice in DeviceVoice.values)
                     _VoiceTile(voice: voice, chosen: bloc.state.voice),
                   if (cloudVoices.isNotEmpty) ...[
-                    const _VoiceHeading('Vbee, cần mạng'),
+                    const _VoiceHeading('Giọng qua mạng'),
                     for (final voice in cloudVoices)
                       _VoiceTile(voice: voice, chosen: bloc.state.voice),
                   ],

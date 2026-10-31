@@ -149,7 +149,7 @@ void main() {
     await openAccount(tester);
     await tester.tap(find.text('Xem các gói'));
     await tester.pumpAndSettle();
-    expect(find.text('1.500 phút Vbee mỗi tháng'), findsOneWidget);
+    expect(find.text('1.500 phút giọng qua mạng mỗi tháng'), findsOneWidget);
     expect(find.text('đang dùng'), findsOneWidget);
 
     await tester.tap(find.text('Yêu cầu nâng gói').first);

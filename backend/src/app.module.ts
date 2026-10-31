@@ -13,6 +13,9 @@ import { DigestService } from './modules/ai-reading/application/digest.service';
 import { DigestController } from './modules/ai-reading/presentation/digest.controller';
 import { InMemorySpeechClipIndex } from './modules/speech/application/speech-clip-index';
 import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgres.speech-clip-index';
+import { RoutedTtsGateway } from './modules/speech/application/routed-tts-gateway';
+import { TtsGateway } from './modules/speech/application/tts-gateway';
+import { OmnivoiceTtsGateway, omnivoiceOptionsFromEnv } from './modules/speech/infrastructure/omnivoice.tts-gateway';
 import { VbeeTtsGateway, vbeeOptionsFromEnv } from './modules/speech/infrastructure/vbee.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
@@ -23,6 +26,12 @@ import { storageFromEnv } from './shared/storage/storage-config';
 const storage = storageFromEnv(process.env);
 const vbee = vbeeOptionsFromEnv(process.env);
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
+
+const omnivoice = omnivoiceOptionsFromEnv(process.env);
+const ttsProviders: TtsGateway[] = [
+  ...(omnivoice ? [new OmnivoiceTtsGateway(omnivoice)] : []),
+  ...(vbee ? [new VbeeTtsGateway(vbee)] : []),
+];
 
 @Module({
   imports: [
@@ -36,7 +45,7 @@ const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env
       store: pool ? new PostgresBookStore(pool) : new InMemoryBookStore(),
     }),
     SpeechModule.register({
-      tts: vbee ? new VbeeTtsGateway(vbee) : null,
+      tts: ttsProviders.length > 0 ? new RoutedTtsGateway(ttsProviders) : null,
       storage,
       index: pool ? new PostgresSpeechClipIndex(pool) : new InMemorySpeechClipIndex(),
     }),

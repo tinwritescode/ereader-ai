@@ -77,7 +77,7 @@ class _PlanCard extends StatelessWidget {
           for (final line in [
             '${_count(limits.books)} cuốn sách',
             '${_count(limits.monthlyDigests)} chương AI mỗi tháng',
-            '${_count(limits.monthlyVbeeMinutes)} phút Vbee mỗi tháng',
+            '${_count(limits.monthlyVbeeMinutes)} phút giọng qua mạng mỗi tháng',
           ])
             Text(line, style: readingStyle(size: 14, height: 1.6)),
           if (requested)
