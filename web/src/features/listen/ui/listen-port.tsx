@@ -122,10 +122,9 @@ function ListenBar({
           case 'off':
             return (
               <>
-                <button type="button" className="pl" aria-label="Nghe" onClick={onStart}>
-                  ▶
+                <button type="button" className="listen-go" title="Nghe từ đoạn đang đọc" onClick={onStart}>
+                  Nghe
                 </button>
-                <span className="quiet">Nghe từ đoạn đang đọc</span>
                 {state.voice && voiceButton}
               </>
             )

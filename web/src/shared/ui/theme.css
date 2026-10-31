@@ -659,6 +659,7 @@ h1 {
 }
 .top > button {
   min-height: 44px;
+  padding: 0;
   color: var(--ink);
 }
 .vs {
@@ -668,6 +669,7 @@ h1 {
 }
 .vs button {
   min-height: 36px;
+  padding: 0;
 }
 .vs [aria-pressed='true'] {
   color: var(--red);
@@ -695,7 +697,8 @@ h1 {
 }
 .margin-line u {
   position: sticky;
-  top: 60vh;
+  /* Below the margin's tools, however short the window. */
+  top: max(60vh, 380px);
   display: block;
   width: max-content;
   margin-left: -34px;
@@ -855,7 +858,8 @@ mark {
   right: auto;
   left: 0;
   bottom: auto;
-  top: 320px;
+  /* Under the margin's tools: back link, one line per version, Aa. */
+  top: calc(84px + 36px * var(--versions) + 44px);
   width: calc(var(--m) - 42px);
   padding: 0 0 0 14px;
   flex-direction: column;
@@ -865,21 +869,10 @@ mark {
   color: var(--ink);
   border-radius: 0;
 }
-.dock.off .pl {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  margin: 0;
-  background: #2a1f6e;
-  color: #fff;
-}
-.night .dock.off .pl {
-  background: #fbe36b;
-  color: #2a1f6e;
-}
-.dock.off .quiet {
-  color: var(--muted);
-  text-align: right;
+.dock .listen-go {
+  padding: 0;
+  font: 21px/28px var(--hand);
+  color: var(--ink);
 }
 .dock.off .tools-open {
   width: auto;
@@ -1316,6 +1309,7 @@ td .ink-link {
     left: -14px;
   }
   .margin-line u {
+    top: 60vh;
     margin-left: -24px;
     font-size: 18px;
   }

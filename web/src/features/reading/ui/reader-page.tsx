@@ -218,9 +218,10 @@ export function ReaderPage({
   }
   const original = options.find(({ length }) => length === 'original')
   const heading = chapterHeading(chapter)
-  const style: CSSProperties & Record<'--text-size' | '--line-height', string> = {
+  const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions', string> = {
     '--text-size': `${TEXT_SIZES[look.size]}px`,
     '--line-height': `${LINE_SPACINGS[look.spacing]}`,
+    '--versions': `${options.length}`,
   }
 
   return (
