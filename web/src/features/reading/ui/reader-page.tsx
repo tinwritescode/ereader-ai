@@ -1,4 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router'
+import { m } from 'motion/react'
 import { useDebouncedCallback } from '@tanstack/react-pacer'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
@@ -20,6 +21,9 @@ import { useChapterText } from './use-chapter-text'
 const SAVE_SPOT_MS = 500
 const END_SLACK_PX = 24
 const TOP_BAR_PX = 60
+// The margin's tools on a wide window, the bar across the top on a narrow one.
+const TOOLS =
+  'sticky top-0 z-10 flex h-13 items-center justify-between gap-3 border-b border-rule bg-paper px-3 font-hand text-[21px]/7 whitespace-nowrap text-muted md:fixed md:left-0 md:h-auto md:w-[calc(var(--m)-42px)] md:flex-col md:items-end md:justify-start md:gap-0 md:border-0 md:bg-transparent md:pt-line md:pr-0 md:pl-3.5'
 
 /** What the listening feature lends the page. */
 export type ReaderVoice = {
@@ -225,12 +229,19 @@ export function ReaderPage({
   }
 
   return (
-    <div className={`reader ${look.paper === 'night' ? 'night' : ''}`} style={style}>
-      <div className="top">
-        <Link to="/books/$bookId" params={{ bookId: book.bookId }}>
+    <div
+      className={`reader flex min-h-dvh flex-col bg-paper text-text [--col:620px] [--m:40px] md:[--m:max(150px,calc((100vw-var(--dock,0px)-var(--col))/2))] lg:has-data-docked:[--dock:300px] ${look.paper === 'night' ? 'night' : ''}`}
+      style={style}
+    >
+      <div className={TOOLS}>
+        <Link className="text-ink no-underline md:leading-14" to="/books/$bookId" params={{ bookId: book.bookId }}>
           ‹ Mục lục
         </Link>
-        <div className="vs" role="group" aria-label="Bản đọc">
+        <div
+          className="flex gap-2.5 text-[18px] md:flex-col md:items-end md:gap-0 md:text-[21px] [&_button]:min-h-9 [&_button[aria-pressed=true]]:text-red"
+          role="group"
+          aria-label="Bản đọc"
+        >
           {options.map((entry) => (
             <button
               key={entry.length}
@@ -242,18 +253,21 @@ export function ReaderPage({
             </button>
           ))}
         </div>
-        <button type="button" aria-label="Trang giấy" onClick={() => setShowLook(true)}>
+        <button type="button" className="min-h-11 text-ink" aria-label="Trang giấy" onClick={() => setShowLook(true)}>
           Aa
         </button>
       </div>
-      <div className="pg">
-        <div className="pg-column">
-          <div className="margin-line" aria-hidden="true">
-            <i style={{ height: `${read * 100}%` }} />
-            <u>{`${left}'`}</u>
+      <div className="relative flex-1 pt-line pr-6 pb-60 pl-(--m) lg:pb-40">
+        <div className="relative max-w-(--col)">
+          <div
+            className="absolute -top-line -bottom-60 -left-3.5 w-[3px] bg-rose md:-left-7.5 lg:-bottom-40"
+            aria-hidden="true"
+          >
+            <i className="block bg-red" style={{ height: `${read * 100}%` }} />
+            <u className="sticky top-[60vh] -ml-6 block w-max font-hand text-[18px]/7 text-red no-underline md:top-[max(60vh,380px)] md:-ml-8.5 md:text-[22px]">{`${left}'`}</u>
           </div>
           {offer && (
-            <div className="offer">
+            <div className="sticky top-3 z-5 mb-3.5 flex flex-wrap items-center gap-2 rounded-md border-[1.5px] border-ink bg-sheet px-3.5 py-2.5 text-sm">
               <span>Lần trước bạn đọc đến</span>
               <Button quiet onClick={() => setOffer(null)}>
                 Đọc từ đầu
@@ -270,7 +284,7 @@ export function ReaderPage({
             </div>
           )}
           {heading.number && <p className="soft">{heading.number}</p>}
-          <h1 className="chapter-title">{heading.title}</h1>
+          <h1 className="mb-1 text-2xl/8">{heading.title}</h1>
           {option.length !== 'original' && (
             <p className="soft">{option.length === 'vietnamese' ? 'AI dịch từ bản gốc' : 'AI viết lại từ bản gốc'}</p>
           )}
@@ -284,8 +298,8 @@ export function ReaderPage({
             })}
           />
           {blocks && (
-            <div className="finished">
-              <p className="hand">{`Xong ${chapterName(chapter)}`}</p>
+            <div className="mt-8 flex flex-col gap-1.5">
+              <p className="hand origin-left -rotate-2 text-3xl">{`Xong ${chapterName(chapter)}`}</p>
               <p className="soft">
                 {next
                   ? `Tiếp theo là ${chapterName(next)}, dài ${durationLabel(next.minutes)}.`
@@ -309,7 +323,13 @@ export function ReaderPage({
         </div>
       </div>
       {picked && blocks && (
-        <div className="pick" style={{ left: picked.x, top: picked.y }}>
+        <m.div
+          className="fixed z-15 flex -translate-y-[calc(100%+8px)] rounded-[14px] bg-plum text-[15px] font-semibold text-white [&_button]:min-h-11 [&_button]:px-3.5 [&_button]:whitespace-nowrap"
+          style={{ left: picked.x, top: picked.y }}
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.14 }}
+        >
           <button
             type="button"
             onClick={() => {
@@ -319,10 +339,10 @@ export function ReaderPage({
           >
             Nghe từ câu này
           </button>
-          <button type="button" className="pick-close" aria-label="Đóng" onClick={clearPicked}>
+          <button type="button" className="text-butter" aria-label="Đóng" onClick={clearPicked}>
             ×
           </button>
-        </div>
+        </m.div>
       )}
       {showLook && <LookSheet onClose={() => setShowLook(false)} />}
       {bar?.(blocks, option, topBlock)}
@@ -333,7 +353,7 @@ export function ReaderPage({
 function DigestLimit({ onOriginal, onClose }: { onOriginal: (() => void) | undefined; onClose: () => void }) {
   return (
     <Sheet title="Hết lượt rút gọn tháng này" onClose={onClose}>
-      <h2 className="hand">Hết lượt rút gọn tháng này</h2>
+      <h2 className="sheet-call">Hết lượt rút gọn tháng này</h2>
       <p>Bạn đã dùng hết lượt của gói này.</p>
       <Button onClick={onOriginal}>Đọc bản gốc</Button>
       <Link className="ink-link" to="/plans">
@@ -378,7 +398,7 @@ function ReaderBody({
       return (
         <>
           {translationNotice}
-          <div className="text faded">
+          <div className="text faded reading-text opacity-55">
             {text.blocks.map((block, index) => (
               <Block key={index} block={block} index={index} marked={null} />
             ))}
@@ -387,7 +407,7 @@ function ReaderBody({
       )
     case 'loaded':
       return (
-        <div className="text">
+        <div className="text reading-text">
           {text.blocks.map((block, index) => (
             <Block key={index} block={block} index={index} marked={voice.marked} />
           ))}

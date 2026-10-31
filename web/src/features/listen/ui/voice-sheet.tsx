@@ -15,7 +15,7 @@ export function VoiceSheet({
   const { data: voices = [] } = useQuery(voicesQuery())
   return (
     <Sheet title="Chọn giọng đọc" onClose={onClose}>
-      <h2>Chọn giọng đọc</h2>
+      <h2 className="sheet-heading">Chọn giọng đọc</h2>
       <p className="soft">Giọng qua mạng, tính vào phút của gói</p>
       <div role="radiogroup" aria-label="Giọng đọc">
         {voices.map((voice) => (

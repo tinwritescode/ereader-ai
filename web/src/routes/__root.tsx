@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { Devtools } from '~/shared/ui/devtools'
 import { Hydrated } from '~/shared/ui/hydrated'
+import { MotionRoot } from '~/shared/ui/motion'
 import { NoticeProvider } from '~/shared/ui/notice'
 import themeCss from '~/shared/ui/theme.css?url'
 import { PageFailed, PageMissing } from './-page-states'
@@ -11,7 +12,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Sổ đọc' },
+      { title: 'eReader' },
     ],
     links: [{ rel: 'stylesheet', href: themeCss }],
   }),
@@ -23,9 +24,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         <HeadContent />
       </head>
       <body>
-        <NoticeProvider>
-          <Outlet />
-        </NoticeProvider>
+        <MotionRoot>
+          <NoticeProvider>
+            <Outlet />
+          </NoticeProvider>
+        </MotionRoot>
         <Hydrated />
         <Devtools />
         <Scripts />

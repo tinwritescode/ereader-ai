@@ -41,10 +41,8 @@ export function TranslationNotice({
     none: 'Dịch cả sách ở trang sách.',
   }[turn]
   return (
-    <div className="notice-box">
-      <p className="hand" style={{ fontSize: 22 }}>
-        {title}
-      </p>
+    <div className="mb-4.5 rounded-xl border border-rule bg-sheet px-3.5 py-3">
+      <p className="hand text-[22px]">{title}</p>
       <p className="soft">{text}</p>
       <Button quiet onClick={onOriginal}>
         Đọc bản gốc
@@ -111,7 +109,7 @@ export function PrepareChapter({
       </button>
       {open && (
         <Sheet title="Tạo giọng đọc cả chương" onClose={() => setOpen(false)}>
-          <h2 className="hand">Tạo giọng đọc cả chương</h2>
+          <h2 className="sheet-call">Tạo giọng đọc cả chương</h2>
           <p className="soft">Audio làm sẵn, lúc nghe không phải chờ.</p>
           <p className="soft">{`Khoảng ${durationLabel(source.option.minutes)} giọng, còn ${left} phút tháng này. Huỷ thì trả lại phần chưa tạo.`}</p>
           <Button disabled={create.isPending} onClick={() => create.mutate()}>

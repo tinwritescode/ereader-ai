@@ -66,27 +66,38 @@ export function LibraryPage({
         setDragging(false)
         choose(event.dataTransfer.files[0])
       }}
-      style={{ minHeight: '70dvh' }}
+      className="min-h-[70dvh]"
     >
       <h1>Thư viện</h1>
       {continueReading}
       {books.length === 0 && <p className="soft">Chưa có sách nào. Thêm một file EPUB để bắt đầu đọc.</p>}
-      <div className="covers">
+      <div className="grid grid-cols-2 gap-x-3.5 gap-y-line md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-x-4.5">
         {books.map((book) => (
-          <Link key={book.bookId} className="book-tile" to="/books/$bookId" params={{ bookId: book.bookId }}>
+          <Link
+            key={book.bookId}
+            className="block min-w-0 no-underline"
+            to="/books/$bookId"
+            params={{ bookId: book.bookId }}
+          >
             <BookCover book={book} />
-            <b className="tile-title">{book.title}</b>
-            <div className="cap">
+            <b className="mt-2.5 line-clamp-2 text-sm/5 font-semibold text-ink">{book.title}</b>
+            <div className="text-[12.5px]/4.5 wrap-anywhere text-muted [&_.hand]:text-[17px]/5">
               {book.author}
               <div>{captionOf(book)}</div>
             </div>
           </Link>
         ))}
         <div>
-          <button type="button" className="add-book" onClick={() => input.current?.click()}>
-            <i aria-hidden="true">+</i>
+          <button
+            type="button"
+            className="flex aspect-[1/1.48] w-full flex-col items-center justify-center rounded-[2px_5px_5px_2px] border-[1.5px] border-dashed border-ink p-3.5 text-[13px]/4.5 font-semibold text-ink"
+            onClick={() => input.current?.click()}
+          >
+            <i className="font-hand text-[34px]/9 not-italic" aria-hidden="true">
+              +
+            </i>
             Thêm sách EPUB
-            <small>hoặc kéo file vào đây</small>
+            <small className="text-xs font-normal text-muted">hoặc kéo file vào đây</small>
           </button>
           <input
             ref={input}
@@ -103,7 +114,11 @@ export function LibraryPage({
         </div>
       </div>
       <UploadNote upload={upload} />
-      {dragging && <div className="drop-veil">Thả sách vào đây</div>}
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-30 grid place-items-center border-[3px] border-dashed border-ink bg-[rgb(246_245_252/0.92)] font-hand text-[32px] text-ink">
+          Thả sách vào đây
+        </div>
+      )}
     </div>
   )
 }
@@ -115,14 +130,14 @@ function UploadNote({ upload }: { upload: Upload }) {
     case 'uploading':
       return (
         <p
-          className="upload-note"
+          className="mt-3 text-sm"
           role="status"
         >{`${upload.fileName}: Đang tải lên, ${Math.round(upload.share * 100)}%`}</p>
       )
     case 'failed':
       return (
         <p
-          className="upload-note failure"
+          className="failure mt-3"
           role="alert"
         >{`${upload.fileName}: Không thêm được. ${errorMessage(upload.code)}`}</p>
       )

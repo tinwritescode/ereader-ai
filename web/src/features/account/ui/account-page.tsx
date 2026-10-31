@@ -7,18 +7,22 @@ import { useAccount } from './with-account'
 
 function Meter({ name, used, limit, detail }: { name: string; used: number; limit: number; detail: string }) {
   return (
-    <div className="meter">
-      <b>{name}</b>
+    <div className="my-3.5 max-w-120">
+      <b className="block text-sm font-semibold text-ink">{name}</b>
       <span
+        className="my-1 block h-3.5 overflow-hidden rounded-[3px] border border-ruler-edge bg-ruler"
         role="meter"
         aria-label={name}
         aria-valuemin={0}
         aria-valuemax={limit}
         aria-valuenow={Math.min(used, limit)}
       >
-        <i style={{ width: `${limit === 0 ? 0 : Math.min(100, (used * 100) / limit)}%` }} />
+        <i
+          className="block h-full bg-red"
+          style={{ width: `${limit === 0 ? 0 : Math.min(100, (used * 100) / limit)}%` }}
+        />
       </span>
-      <small>{detail}</small>
+      <small className="text-[12.5px] text-muted">{detail}</small>
     </div>
   )
 }
@@ -32,7 +36,7 @@ export function AccountPage({ booksCount }: { booksCount: number }) {
     <>
       <h1>Tài khoản</h1>
       <p className="soft">{account.email}</p>
-      <p className="hand" style={{ fontSize: 24, margin: '10px 0' }}>{`Gói ${planLabel(account.plan)}`}</p>
+      <p className="hand my-2.5 text-2xl">{`Gói ${planLabel(account.plan)}`}</p>
       <Meter
         name="Sách trong thư viện"
         used={booksCount}
@@ -52,7 +56,7 @@ export function AccountPage({ booksCount }: { booksCount: number }) {
         detail={`${account.voiceMinutesUsed} trên ${limits.monthlyVoiceMinutes} phút, ${resets}`}
       />
       <p className="soft">Đọc bản gốc không giới hạn.</p>
-      <div style={{ maxWidth: 480, display: 'flex', flexDirection: 'column', gap: 6, marginTop: 16 }}>
+      <div className="mt-4 flex max-w-120 flex-col items-start gap-1.5">
         <Link className="primary" to="/plans">
           Xem các gói
         </Link>

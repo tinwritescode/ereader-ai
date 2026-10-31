@@ -27,22 +27,24 @@ export function PlansPage() {
   return (
     <>
       <h1>Các gói</h1>
-      <div style={{ marginTop: 16 }}>
+      <div className="mt-4">
         {PLAN_NAMES.map((plan) => {
           const current = plan === account.plan
           return (
             <section
               key={plan}
-              className={`plan-card ${current ? 'current' : ''}`}
+              className={`mb-3.5 max-w-120 rounded-md border-[1.5px] bg-sheet p-3 ${current ? 'border-red' : 'border-ink'}`}
               aria-label={`Gói ${planLabel(plan)}`}
             >
-              <header>
+              <header className="flex justify-between text-lg font-semibold text-ink">
                 {planLabel(plan)}
                 {current && <span className="hand">đang dùng</span>}
               </header>
-              <ul>
+              <ul className="mb-2">
                 {planLines(account.plans[plan]).map((line) => (
-                  <li key={line}>{line}</li>
+                  <li className="text-sm/[1.6]" key={line}>
+                    {line}
+                  </li>
                 ))}
               </ul>
               {isHigher(plan, account.plan) &&

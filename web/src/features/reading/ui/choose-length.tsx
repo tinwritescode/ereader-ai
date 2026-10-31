@@ -66,7 +66,7 @@ export function ChooseLength({
 
   return (
     <Sheet title="Chọn độ dài" onClose={onClose}>
-      <h2>{`${chapter.label} dài ${durationLabel(chapter.minutes)}`}</h2>
+      <h2 className="sheet-heading">{`${chapter.label} dài ${durationLabel(chapter.minutes)}`}</h2>
       <p className="soft">Kéo thước tới thời gian bạn có.</p>
       <Ruler
         label="Độ dài"
@@ -85,7 +85,7 @@ export function ChooseLength({
         onChoose={(id) => setSelected(ruler.find(({ length }) => length === id) ?? selected)}
       />
       {canTranslate && (
-        <label className="check">
+        <label className="flex min-h-11 items-center gap-2">
           <input type="checkbox" checked={vietnamese} onChange={(event) => setVietnamese(event.target.checked)} />
           Tiếng Việt
         </label>

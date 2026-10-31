@@ -39,10 +39,10 @@ export function LookSheet({ onClose }: { onClose: () => void }) {
         onChoose={(id) => change({ spacing: SPACINGS.find((spacing) => spacing === id) ?? look.spacing })}
       />
       <b>Trang giấy</b>
-      <div className="paper-choice">
+      <div className="flex gap-2.5 [&_button]:min-h-16 [&_button]:flex-1 [&_button]:rounded-[14px] [&_button]:border-[1.5px] [&_button]:border-rule [&_button]:px-3.5 [&_button]:py-2.25 [&_button]:text-left [&_button]:text-sm [&_button[aria-pressed=true]]:border-2 [&_button[aria-pressed=true]]:border-red [&_small]:block [&_small]:text-xs [&_small]:opacity-75">
         <button
           type="button"
-          className="day"
+          className="bg-[#f6f5fc] text-pencil"
           aria-pressed={look.paper === 'day'}
           onClick={() => change({ paper: 'day' })}
         >
@@ -51,7 +51,7 @@ export function LookSheet({ onClose }: { onClose: () => void }) {
         </button>
         <button
           type="button"
-          className="dark"
+          className="bg-night text-night-text"
           aria-pressed={look.paper === 'night'}
           onClick={() => change({ paper: 'night' })}
         >

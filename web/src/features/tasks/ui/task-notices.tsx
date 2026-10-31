@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { m } from 'motion/react'
 import { useEffect } from 'react'
 import { z } from 'zod'
 import { useNotice } from '~/shared/ui/notice'
@@ -14,7 +15,17 @@ const seenFinishes = createStored({ key: 'tasks.seen', schema: z.array(z.string(
 export function TasksCount() {
   const { data = [] } = useQuery(tasksQuery())
   const active = data.filter(isActive).length
-  return active > 0 ? <span className="count">{active}</span> : null
+  return active > 0 ? (
+    <m.span
+      key={active}
+      className="mr-0.5 inline-block size-7 rounded-full bg-marker text-center leading-7 text-plum"
+      initial={{ scale: 0.6 }}
+      animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+    >
+      {active}
+    </m.span>
+  ) : null
 }
 
 /** Tells the reader once about each task that finished or stopped, wherever they are. */

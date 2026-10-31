@@ -5,7 +5,7 @@ import { Button } from '~/shared/ui/button'
 export function PageFailed({ error }: { error: unknown }) {
   const router = useRouter()
   return (
-    <div className="sign-in">
+    <div className="centred-page">
       <p className="failure">{`Không mở được trang này. ${errorMessage(codeOf(error))}`}</p>
       <Button onClick={() => void router.invalidate()}>Thử lại</Button>
       <Link className="ink-link" to="/">
@@ -17,7 +17,7 @@ export function PageFailed({ error }: { error: unknown }) {
 
 export function PageMissing() {
   return (
-    <div className="sign-in">
+    <div className="centred-page">
       <p className="soft">Không tìm thấy trang này.</p>
       <Link className="primary" to="/">
         Về thư viện

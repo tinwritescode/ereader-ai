@@ -1,3 +1,4 @@
+import { m } from 'motion/react'
 import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from 'react'
 import { nearestStop, stepStop } from './ruler-stops'
 
@@ -6,7 +7,9 @@ const INSET_PX = 30
 
 export type RulerStop = { id: string; fraction: number; label: ReactNode; name?: string }
 
-const placedAt = (fraction: number): CSSProperties & { '--at': string } => ({ '--at': `${fraction}` })
+const placedAt = (fraction: number): CSSProperties & { '--at': number } => ({ '--at': fraction })
+
+const AT = 'absolute left-[calc(30px+(100%-60px)*var(--at))]'
 
 const STEPS: Record<string, 1 | -1> = { ArrowRight: 1, ArrowUp: 1, ArrowDown: -1, ArrowLeft: -1 }
 
@@ -42,7 +45,7 @@ export function Ruler({
   const selected = stops.find(({ id }) => id === selectedId)
   return (
     <div
-      className="ruler"
+      className="relative mt-4.5 mb-2.5 h-21 cursor-pointer touch-pan-y select-none rounded-md border border-ruler-edge bg-ruler text-pencil"
       role="radiogroup"
       aria-label={label}
       tabIndex={-1}
@@ -56,9 +59,16 @@ export function Ruler({
       }}
     >
       {ticks.map((tick) => (
-        <span key={tick} className="tick" style={placedAt(tick)} />
+        <span key={tick} className={`top-0 h-3.5 w-px bg-pencil ${AT}`} style={placedAt(tick)} />
       ))}
-      {selected && <span className="pin" style={placedAt(selected.fraction)} />}
+      {selected && (
+        <m.span
+          className={`-top-3 -ml-2 border-8 border-t-12 border-b-0 border-transparent border-t-pen ${AT}`}
+          initial={false}
+          animate={{ '--at': selected.fraction }}
+          transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+        />
+      )}
       {stops.map(({ id, fraction, label: stopLabel, name }) => (
         <button
           key={id}
@@ -67,6 +77,7 @@ export function Ruler({
           aria-checked={id === selectedId}
           aria-label={name}
           tabIndex={id === selectedId ? 0 : -1}
+          className={`top-5 -ml-7.5 min-h-11 w-15 text-center font-hand text-[21px]/none text-pencil aria-checked:text-[25px] aria-checked:text-pen [&_small]:block [&_small]:font-read [&_small]:text-[11.5px]/[1.3] [&_small]:text-pencil ${AT}`}
           style={placedAt(fraction)}
           onClick={() => onChoose(id)}
         >

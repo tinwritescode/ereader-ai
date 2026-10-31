@@ -1,4 +1,5 @@
 import { redact } from '@tanstack/redact/vite'
+import tailwindcss from '@tailwindcss/vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import react from '@vitejs/plugin-react'
 import { nitro } from 'nitro/vite'
@@ -11,5 +12,5 @@ export default defineConfig({
   server: { port: 3000 },
   resolve: { tsconfigPaths: true },
   ssr: useRedact ? { noExternal: true } : {},
-  plugins: [tanstackStart(), nitro(), react(), ...(useRedact ? [redact()] : [])],
+  plugins: [tailwindcss(), tanstackStart(), nitro(), react(), ...(useRedact ? [redact()] : [])],
 })

@@ -1,4 +1,5 @@
 import { useHotkey } from '@tanstack/react-hotkeys'
+import { m } from 'motion/react'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/book'
@@ -11,6 +12,12 @@ import type { ListenSource, ListenState } from '../domain/controller'
 import { useListenState, useListening } from './listen-provider'
 import { VoiceSheet } from './voice-sheet'
 import { failureWords, preparingLine, rateLabel } from './words'
+
+const DOCK =
+  'fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-t-3xl bg-plum px-5.5 pt-3.5 pb-4.5 text-sm text-white lg:top-0 lg:left-auto lg:w-75 lg:content-start lg:items-stretch lg:rounded-l-3xl lg:rounded-tr-none lg:p-6 [&_.ink-link]:px-0 [&_.ink-link]:text-inherit [&_button]:min-h-11'
+const START =
+  'fixed inset-x-0 bottom-0 z-20 flex min-h-15.5 items-center gap-3 border-t border-rule bg-paper py-2 pr-4 pl-(--m) text-ink md:right-auto md:bottom-auto md:top-[calc(84px+36px*var(--versions)+44px)] md:min-h-0 md:w-[calc(var(--m)-42px)] md:flex-col md:items-end md:gap-0 md:border-0 md:bg-transparent md:p-0'
+const QUIET = 'text-[13px] text-white/72'
 
 type Marked = { block: number; start: number; end: number } | null
 export type PrepareJob = { source: ListenSource; voiceCode: string; sentences: string[] }
@@ -107,22 +114,44 @@ function ListenBar({
   const [choosing, setChoosing] = useState(false)
   const stage = here ? state.stage : { kind: 'off' as const }
   const playing = stage.kind === 'playing'
+  const docked = stage.kind !== 'off'
   useHotkey('Space', () => controller.togglePause(), { enabled: playing, preventDefault: true })
   useHotkey('ArrowLeft', () => controller.skip(-1), { enabled: playing })
   useHotkey('ArrowRight', () => controller.skip(1), { enabled: playing })
   const voiceButton = (
-    <button type="button" className="tools-open" onClick={() => setChoosing(true)} aria-label="Đổi giọng">
+    <button
+      type="button"
+      className={
+        docked ? 'w-full min-h-11 text-left font-hand text-[25px]/7.5 text-butter' : 'font-hand text-[19px]/7 text-ink'
+      }
+      onClick={() => setChoosing(true)}
+      aria-label="Đổi giọng"
+    >
       {state.voice?.name ?? 'Chọn giọng'}
     </button>
   )
   return (
-    <div className={`dock ${stage.kind}`} role="region" aria-label="Nghe">
+    <m.div
+      key={docked ? 'docked' : 'start'}
+      data-docked={docked || undefined}
+      className={docked ? DOCK : START}
+      role="region"
+      aria-label="Nghe"
+      initial={docked ? { opacity: 0, x: 40 } : false}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+    >
       {(() => {
         switch (stage.kind) {
           case 'off':
             return (
               <>
-                <button type="button" className="listen-go" title="Nghe từ đoạn đang đọc" onClick={onStart}>
+                <button
+                  type="button"
+                  className="min-h-11 font-hand text-[21px]/7 text-ink"
+                  title="Nghe từ đoạn đang đọc"
+                  onClick={onStart}
+                >
                   Nghe
                 </button>
                 {state.voice && voiceButton}
@@ -132,7 +161,7 @@ function ListenBar({
             return (
               <>
                 <span>{preparingLine(stage)}</span>
-                <span className="quiet">
+                <span className={QUIET}>
                   {stage.slow
                     ? 'Lượt đầu sau khi nghỉ mất khoảng một phút, các câu sau đọc ngay.'
                     : stage.needed > 0 &&
@@ -148,16 +177,16 @@ function ListenBar({
             return (
               <>
                 {voiceButton}
-                <span className="track" aria-hidden="true">
-                  <i style={{ width: `${state.done * 100}%` }} />
+                <span className="mt-2 block h-[3px] w-full bg-[rgb(246_245_252/0.28)]" aria-hidden="true">
+                  <i className="block h-[3px] bg-butter" style={{ width: `${state.done * 100}%` }} />
                 </span>
-                <div className="where" aria-live="off">
+                <div className="flex w-full justify-between text-[13px]/6.5 text-white/72" aria-live="off">
                   <span>{`Câu ${stage.index + 1} trên ${stage.total}`}</span>
                   <span>{`còn ${durationLabel(left)}`}</span>
                 </div>
                 <button
                   type="button"
-                  className="pl"
+                  className="h-12 flex-[0_0_48px] rounded-full bg-butter text-base text-plum lg:mx-[calc(50%-36px)] lg:my-3.5 lg:h-15 lg:flex-[0_0_60px]"
                   aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'}
                   onClick={controller.togglePause}
                 >
@@ -184,7 +213,7 @@ function ListenBar({
             return (
               <>
                 <span role="alert">
-                  <b>{title}</b> <span className="quiet">{text}</span>
+                  <b>{title}</b> <span className={QUIET}>{text}</span>
                 </span>
                 <Button quiet onClick={controller.retry}>
                   Thử lại
@@ -207,6 +236,6 @@ function ListenBar({
       {choosing && (
         <VoiceSheet current={state.voice} onChoose={controller.chooseVoice} onClose={() => setChoosing(false)} />
       )}
-    </div>
+    </m.div>
   )
 }

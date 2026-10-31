@@ -29,15 +29,19 @@ function PlanForm({ account }: { account: ManagedAccount }) {
         event.preventDefault()
         void form.handleSubmit()
       }}
-      style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}
+      className="flex flex-wrap items-center gap-2"
     >
       <form.Field name="plan">
         {(field) => (
-          <fieldset className="segments" style={{ border: 0, padding: 0 }}>
+          <fieldset className="inline-flex overflow-hidden rounded-lg border border-rule">
             <legend className="sr-only">{`Gói của ${account.email}`}</legend>
             {PLAN_NAMES.map((plan) => (
-              <label key={plan}>
+              <label
+                key={plan}
+                className="flex min-h-9 min-w-11 cursor-pointer items-center justify-center px-2.5 py-1.5 text-[13px] has-checked:bg-plum has-checked:text-white has-focus-visible:outline-2 has-focus-visible:-outline-offset-2 has-focus-visible:outline-red"
+              >
                 <input
+                  className="absolute opacity-0"
                   type="radio"
                   name={`plan-${account.id}`}
                   value={plan}
@@ -88,7 +92,7 @@ export function AdminPage() {
   return (
     <>
       <h1>Quản trị</h1>
-      <table>
+      <table className="max-md:[&_td]:block max-md:[&_td]:border-0 max-md:[&_td]:py-0.5 max-md:[&_thead]:sr-only max-md:[&_tr]:block max-md:[&_tr]:border-b max-md:[&_tr]:border-rule max-md:[&_tr]:py-2.5">
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>

@@ -10,6 +10,7 @@ import type { Voice } from '~/features/listen/domain/controller'
 import { Button } from '~/shared/ui/button'
 import { useNotice } from '~/shared/ui/notice'
 import { Sheet } from '~/shared/ui/sheet'
+import { Track } from '~/shared/ui/track'
 import {
   chaptersWithin,
   failureText,
@@ -40,17 +41,28 @@ function WholeBookRow({
     case 'hidden':
       return null
     case 'done':
-      return <p className="whole soft">{words.finished}</p>
+      return (
+        <p className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted soft">
+          {words.finished}
+        </p>
+      )
     case 'open':
       return (
-        <button type="button" className="whole" onClick={onOffer}>
+        <button
+          type="button"
+          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted"
+          onClick={onOffer}
+        >
           {words.title}
           <small>{words.note}</small>
         </button>
       )
     case 'locked':
       return (
-        <Link className="whole" to="/plans" style={{ color: 'var(--muted)' }}>
+        <Link
+          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted text-muted!"
+          to="/plans"
+        >
           {words.title}
           <small>gói Max</small>
         </Link>
@@ -58,20 +70,21 @@ function WholeBookRow({
     case 'underWay': {
       const { task } = offer
       return (
-        <Link className="whole" to="/tasks">
+        <Link
+          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted"
+          to="/tasks"
+        >
           {task.position !== null
             ? `${words.waiting}, thứ ${task.position} trong hàng`
             : `${words.doing}, chương ${task.done} trên ${task.total}`}
-          <span className="track" aria-hidden="true">
-            <i style={{ width: `${task.percent}%` }} />
-          </span>
+          <Track percent={task.percent} />
           <small>{`${task.percent}%`}</small>
         </Link>
       )
     }
     case 'stopped':
       return (
-        <div className="whole stopped">
+        <div className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted text-red!">
           {`${words.named}, bị dừng ở ${offer.task.percent}%`}
           <small>{failureText(offer.task.code)}</small>
           <Button quiet onClick={() => onResume(offer.task)}>
@@ -120,7 +133,7 @@ function TranslateSheet({
   )
   return (
     <Sheet title="Dịch cả sách sang tiếng Việt" onClose={onClose}>
-      <h2 className="hand">Dịch cả sách sang tiếng Việt</h2>
+      <h2 className="sheet-call">Dịch cả sách sang tiếng Việt</h2>
       <p>
         {start
           ? `AI dịch ${book.chapterCount} chương, bắt đầu từ ${start.chapterLabel} tới hết, rồi quay lại các chương trước.`
@@ -192,7 +205,7 @@ function VoiceBookSheet({
   if (standing.skipped > 0) {
     return (
       <Sheet title="Sách này cần bản tiếng Việt trước" onClose={onClose}>
-        <h2 className="hand">Sách này cần bản tiếng Việt trước</h2>
+        <h2 className="sheet-call">Sách này cần bản tiếng Việt trước</h2>
         <p>{`Giọng đọc chỉ đọc tiếng Việt. Sách có ${standing.chapters + standing.skipped} chương, mới dịch xong ${standing.chapters} chương.`}</p>
         <p className="soft">
           {standing.chapters > 0
@@ -219,7 +232,7 @@ function VoiceBookSheet({
   }
   return (
     <Sheet title="Tạo giọng đọc cả sách" onClose={onClose}>
-      <h2 className="hand">Tạo giọng đọc cả sách</h2>
+      <h2 className="sheet-call">Tạo giọng đọc cả sách</h2>
       <p className="soft">Audio làm sẵn, lúc nghe không phải chờ.</p>
       {create}
       <p className="soft">
@@ -268,7 +281,7 @@ export function WholeBookRows({
   })
   const voiceOffer = voiceOfferFor({ allowed: limits.chapterVoice, standing: voice.data ?? null })
   return (
-    <div>
+    <div className="flex flex-wrap items-center gap-x-6.5 gap-y-2">
       <WholeBookRow
         offer={translateOffer}
         words={{
@@ -305,6 +318,10 @@ export function WholeBookRows({
   )
 }
 
+// In the margin when there is room; too long for the phone's, so it stays on the row there.
+const MARK =
+  'font-hand text-[18px] whitespace-nowrap text-red not-italic md:absolute md:left-0 md:w-(--m) md:pr-2.25 md:pl-3 md:text-right md:text-[22px]/7 md:whitespace-normal'
+
 /** A chapter row's note on translation or voice, or the given fallback. */
 export function ChapterMark({
   bookId,
@@ -320,5 +337,5 @@ export function ChapterMark({
   const mark =
     (translation.data && translationMark({ chapterId, ...translation.data })) ??
     (voice.data ? voiceMark({ chapterId, task: voice.data.task }) : null)
-  return mark ? <em>{mark}</em> : fallback
+  return mark ? <em className={MARK}>{mark}</em> : fallback
 }

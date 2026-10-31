@@ -32,15 +32,18 @@ function leadOf(spot: ReadingSpot): string {
 /** Brings the reader back with the very words they stopped on. */
 function ContinueCard({ book, spot }: { book: Book; spot: ReadingSpot }) {
   return (
-    <section className="continue" aria-label="Đọc tiếp">
+    <section
+      className="mb-line grid grid-cols-1 items-center gap-x-7 gap-y-2 rounded-md border-[1.5px] border-ink bg-sheet px-4 py-3 md:grid-cols-[1fr_auto]"
+      aria-label="Đọc tiếp"
+    >
       <div>
-        <p className="said">{leadOf(spot)}</p>
+        <p className="hand text-[20px]/6.5">{leadOf(spot)}</p>
         {spot.quote && (
-          <p className="quote">
+          <p className="line-clamp-3 max-w-[62ch] text-base/6.5">
             <mark>{spot.quote.trim()}</mark>
           </p>
         )}
-        <p className="where">{`${book.title}, ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}`}</p>
+        <p className="text-[12.5px]/5.5 text-muted">{`${book.title}, ${spot.chapterLabel}, còn ${durationLabel(spot.minutesLeft)}`}</p>
       </div>
       <Link className="primary" aria-label={`${goOnWord(spot)} ${book.title}`} {...spotLink({ book, spot })}>
         {goOnWord(spot)}
