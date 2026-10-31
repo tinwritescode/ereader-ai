@@ -172,9 +172,11 @@ export class ListenController<Clip> {
         this.fetchAhead()
         if (index === from || !this.ready.has(index)) await this.buffer(generation, index)
         const audio = await clip
+        if (generation !== this.generation) return
+        // Shown before waiting: a pause that lands between sentences must leave a way to go on.
+        this.reached(index)
         if (this.paused) await new Promise<void>((resolve) => (this.unpause = resolve))
         if (generation !== this.generation) return
-        this.reached(index)
         await speaker.play(audio)
         if (generation !== this.generation) return
         this.audio.delete(index)
