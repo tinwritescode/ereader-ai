@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { AnimatePresence, m } from 'motion/react'
+import { PlayGlyph } from '~/shared/ui/play-glyph'
 import { useListenState, useListening } from './listen-provider'
 
 /** Keeps the voice in reach on every page but its own chapter. */
@@ -27,8 +28,13 @@ export function MiniPlayer() {
           transition={{ duration: 0.2, ease: 'easeOut' }}
         >
           {stage.kind === 'playing' && (
-            <button type="button" aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'} onClick={controller.togglePause}>
-              {stage.paused ? '▶' : '❚❚'}
+            <button
+              type="button"
+              className="grid place-items-center"
+              aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'}
+              onClick={controller.togglePause}
+            >
+              <PlayGlyph playing={!stage.paused} />
             </button>
           )}
           <Link

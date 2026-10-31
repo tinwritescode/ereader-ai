@@ -1,5 +1,6 @@
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { m } from 'motion/react'
+import { PlayGlyph } from '~/shared/ui/play-glyph'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/book'
@@ -148,12 +149,13 @@ function ListenBar({
               <>
                 <button
                   type="button"
-                  className="min-h-11 font-hand text-[21px]/7 text-ink"
-                  title="Nghe từ đoạn đang đọc"
+                  className="grid size-11 flex-none place-items-center rounded-full bg-plum text-white in-[.night]:bg-butter in-[.night]:text-plum"
+                  aria-label="Nghe"
                   onClick={onStart}
                 >
-                  Nghe
+                  <PlayGlyph />
                 </button>
+                <span className="text-[13px]/4.5 text-muted md:mt-1 md:text-right">Nghe từ đoạn đang đọc</span>
                 {state.voice && voiceButton}
               </>
             )
@@ -186,11 +188,11 @@ function ListenBar({
                 </div>
                 <button
                   type="button"
-                  className="h-12 flex-[0_0_48px] rounded-full bg-butter text-base text-plum lg:mx-[calc(50%-36px)] lg:my-3.5 lg:h-15 lg:flex-[0_0_60px]"
+                  className="grid h-12 flex-[0_0_48px] place-items-center rounded-full bg-butter text-base text-plum lg:mx-[calc(50%-36px)] lg:my-3.5 lg:h-15 lg:flex-[0_0_60px]"
                   aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'}
                   onClick={controller.togglePause}
                 >
-                  {stage.paused ? '▶' : '❚❚'}
+                  <PlayGlyph playing={!stage.paused} />
                 </button>
                 <button type="button" aria-label="Lùi một câu" onClick={() => controller.skip(-1)}>
                   ‹ Lùi

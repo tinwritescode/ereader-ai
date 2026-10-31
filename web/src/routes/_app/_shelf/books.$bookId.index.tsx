@@ -6,13 +6,17 @@ import { WithVoices } from '~/features/listen/ui/with-voices'
 import { ChooseLength } from '~/features/reading/ui/choose-length'
 import { ResumeLine, WithStartChapter } from '~/features/reading/ui/spots'
 import { ChapterMark, WholeBookRows } from '~/features/tasks/ui/whole-book'
+import { pageTitle } from '~/shared/ui/page-title'
 
 export const Route = createFileRoute('/_app/_shelf/books/$bookId/')({
-  loader: ({ context, params }) =>
-    Promise.all([
+  loader: async ({ context, params }) => {
+    const [books] = await Promise.all([
       context.queryClient.ensureQueryData(booksQuery()),
       context.queryClient.ensureQueryData(chaptersQuery(params.bookId)),
-    ]),
+    ])
+    return { bookTitle: books.find(({ bookId }) => bookId === params.bookId)?.title ?? '' }
+  },
+  head: ({ loaderData }) => ({ meta: [{ title: pageTitle(loaderData?.bookTitle ?? '') }] }),
   component: BookRoute,
 })
 

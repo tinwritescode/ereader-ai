@@ -10,6 +10,19 @@ const CHAPTER = '/books/deep/chapters/deep-1?length=original&minutes=12'
 // Linux WebKit in CI has no audio clock, so clips end at once and the mark outruns these checks.
 const noAudioClock = (browserName: string) => browserName === 'webkit' && process.platform === 'linux'
 
+test('the round listen button holds its icon in the middle', async ({ page }) => {
+  await signIn(page)
+  await open(page, CHAPTER)
+  const button = page.getByRole('button', { name: 'Nghe', exact: true })
+  const outer = await button.boundingBox()
+  const inner = await button.locator('svg').boundingBox()
+  if (!outer || !inner) throw new Error('listen button not laid out')
+  expect(outer.width).toBe(outer.height)
+  expect(Math.abs(outer.x + outer.width / 2 - (inner.x + inner.width / 2))).toBeLessThan(0.5)
+  expect(Math.abs(outer.y + outer.height / 2 - (inner.y + inner.height / 2))).toBeLessThan(0.5)
+  await expect(page.getByText('Nghe từ đoạn đang đọc')).toBeVisible()
+})
+
 test.describe('listening', () => {
   test.skip(({ browserName }) => noAudioClock(browserName), 'needs real playback time')
 

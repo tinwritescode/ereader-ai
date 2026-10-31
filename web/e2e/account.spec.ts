@@ -96,3 +96,16 @@ test.describe('fit and access', () => {
     expect(await page.locator('.reader').evaluate((node) => getComputedStyle(node).transitionDuration)).toMatch(/^0s/)
   })
 })
+
+test('each page names itself in the title', async ({ page }) => {
+  await open(page, '/login')
+  await expect(page).toHaveTitle('eReader: đọc và nghe sách theo thời gian bạn có')
+  await signIn(page)
+  await expect(page).toHaveTitle('Thư viện – eReader')
+  await open(page, '/tasks')
+  await expect(page).toHaveTitle('Tác vụ – eReader')
+  await open(page, '/books/deep')
+  await expect(page).toHaveTitle('Deep Work – eReader')
+  await open(page, '/books/deep/chapters/deep-1?length=original&minutes=12')
+  await expect(page).toHaveTitle('Chương Một, Deep Work – eReader')
+})
