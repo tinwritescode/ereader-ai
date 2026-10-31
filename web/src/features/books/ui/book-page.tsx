@@ -9,9 +9,23 @@ import { useShelf } from './with-book'
 
 const ROW_HEIGHT = 46
 
-export type LengthChoice = { book: Book; chapters: ChapterSummary[]; chapter: ChapterSummary; top: number; onClose: () => void }
+export type LengthChoice = {
+  book: Book
+  chapters: ChapterSummary[]
+  chapter: ChapterSummary
+  top: number
+  onClose: () => void
+}
 
-function ChapterList({ chapters, onChoose, markOf }: { chapters: ChapterSummary[]; onChoose: (chapter: ChapterSummary, top: number) => void; markOf: (chapter: ChapterSummary, fallback: ReactNode) => ReactNode }) {
+function ChapterList({
+  chapters,
+  onChoose,
+  markOf,
+}: {
+  chapters: ChapterSummary[]
+  onChoose: (chapter: ChapterSummary, top: number) => void
+  markOf: (chapter: ChapterSummary, fallback: ReactNode) => ReactNode
+}) {
   const list = useRef<HTMLDivElement>(null)
   const virtual = useWindowVirtualizer({
     count: chapters.length,
@@ -31,7 +45,13 @@ function ChapterList({ chapters, onChoose, markOf }: { chapters: ChapterSummary[
             key={chapter.chapterId}
             type="button"
             className="row"
-            style={{ position: 'absolute', top: 0, left: 0, height: ROW_HEIGHT, transform: `translateY(${start - virtual.options.scrollMargin}px)` }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              height: ROW_HEIGHT,
+              transform: `translateY(${start - virtual.options.scrollMargin}px)`,
+            }}
             onClick={(event) => onChoose(chapter, event.currentTarget.getBoundingClientRect().top)}
           >
             <span>{number ? `${number}. ${title}` : title}</span>
@@ -63,9 +83,14 @@ export function BookPage({ bookId, chooseLength, aside, resume, markOf }: { book
         <h1>{book.title}</h1>
         <p className="soft">{[book.author, `${book.chapterCount} chương`].filter(Boolean).join(', ')}</p>
         {resume?.(book, chapters)}
-        <ChapterList chapters={chapters} onChoose={(chapter, top) => setChosen({ chapter, top })} markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)} />
+        <ChapterList
+          chapters={chapters}
+          onChoose={(chapter, top) => setChosen({ chapter, top })}
+          markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}
+        />
       </div>
-      {chosen && chooseLength({ book, chapters, chapter: chosen.chapter, top: chosen.top, onClose: () => setChosen(null) })}
+      {chosen &&
+        chooseLength({ book, chapters, chapter: chosen.chapter, top: chosen.top, onClose: () => setChosen(null) })}
     </div>
   )
 }

@@ -4,7 +4,15 @@ import type { z } from 'zod'
 type Stored<T> = { read: () => T; write: (value: T) => void; useValue: () => T }
 
 /** A value kept on this device, read through its schema. */
-export function createStored<Schema extends z.ZodType>({ key, schema, fallback }: { key: string; schema: Schema; fallback: z.output<Schema> }): Stored<z.output<Schema>> {
+export function createStored<Schema extends z.ZodType>({
+  key,
+  schema,
+  fallback,
+}: {
+  key: string
+  schema: Schema
+  fallback: z.output<Schema>
+}): Stored<z.output<Schema>> {
   let raw: string | null = null
   let value = fallback
   const listeners = new Set<() => void>()

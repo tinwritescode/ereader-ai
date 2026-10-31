@@ -25,7 +25,15 @@ export function spokenMinutes(sentences: readonly string[]): number {
 }
 
 /** How many sentences after `from` it takes to fill `seconds` of speech. */
-export function sentencesWithin({ plan, from, seconds }: { plan: readonly SpokenSentence[]; from: number; seconds: number }): number {
+export function sentencesWithin({
+  plan,
+  from,
+  seconds,
+}: {
+  plan: readonly SpokenSentence[]
+  from: number
+  seconds: number
+}): number {
   let characters = seconds * SPOKEN_CHARS_PER_SECOND
   let count = 0
   for (const sentence of plan.slice(from + 1)) {
@@ -37,20 +45,39 @@ export function sentencesWithin({ plan, from, seconds }: { plan: readonly Spoken
 }
 
 /** Position in the plan of the sentence holding character `offset` of `block`. */
-export function sentenceAt({ plan, block, offset }: { plan: readonly SpokenSentence[]; block: number; offset: number }): number {
+export function sentenceAt({
+  plan,
+  block,
+  offset,
+}: {
+  plan: readonly SpokenSentence[]
+  block: number
+  offset: number
+}): number {
   const first = plan.findIndex((sentence) => sentence.block === block)
   if (first < 0) return 0
   const last = plan.findLastIndex((sentence) => sentence.block === block && sentence.start <= offset)
   return last < 0 ? first : last
 }
 
-function withinLimit({ block, text, from, to }: { block: number; text: string; from: number; to: number }): SpokenSentence[] {
+function withinLimit({
+  block,
+  text,
+  from,
+  to,
+}: {
+  block: number
+  text: string
+  from: number
+  to: number
+}): SpokenSentence[] {
   const pieces: SpokenSentence[] = []
   let start = from
   while (start < to) {
     while (start < to && SPACE.test(text.charAt(start))) start += 1
     if (start === to) break
-    const end = to - start <= MAX_SENTENCE_CHARACTERS ? to : cutBefore({ text, start, limit: start + MAX_SENTENCE_CHARACTERS })
+    const end =
+      to - start <= MAX_SENTENCE_CHARACTERS ? to : cutBefore({ text, start, limit: start + MAX_SENTENCE_CHARACTERS })
     const piece = text.slice(start, end).replace(TRAILING_SPACE, '')
     if (piece.length > 0) pieces.push({ block, start, end: start + piece.length, text: piece })
     start = end

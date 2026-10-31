@@ -20,7 +20,8 @@ export function useChapterText({ chapterId, option }: { chapterId: string; optio
   const translated = useQuery({
     ...translatedQuery(chapterId),
     enabled: length === 'vietnamese',
-    refetchInterval: (query) => (query.state.error && codeOf(query.state.error) === 'TRANSLATION_NOT_READY' ? TRANSLATION_POLL_MS : false),
+    refetchInterval: (query) =>
+      query.state.error && codeOf(query.state.error) === 'TRANSLATION_NOT_READY' ? TRANSLATION_POLL_MS : false,
   })
   const digest = useQuery({ ...shortenedQuery({ chapterId, minutes }), enabled: shortened })
 

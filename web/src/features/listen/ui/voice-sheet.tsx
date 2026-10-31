@@ -3,7 +3,15 @@ import { Sheet } from '~/shared/ui/sheet'
 import type { Voice } from '../domain/controller'
 import { voicesQuery } from '../data/speech'
 
-export function VoiceSheet({ current, onChoose, onClose }: { current: Voice | null; onChoose: (voice: Voice) => void; onClose: () => void }) {
+export function VoiceSheet({
+  current,
+  onChoose,
+  onClose,
+}: {
+  current: Voice | null
+  onChoose: (voice: Voice) => void
+  onClose: () => void
+}) {
   const { data: voices = [] } = useQuery(voicesQuery())
   return (
     <Sheet title="Chọn giọng đọc" onClose={onClose}>

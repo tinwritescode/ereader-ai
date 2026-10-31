@@ -7,7 +7,12 @@ export function BookCover({ book }: { book: Book }) {
   if (book.hasCover && !broken) {
     return (
       <span className="cover">
-        <img src={`/api/covers/${encodeURIComponent(book.bookId)}`} alt="" loading="lazy" onError={() => setBroken(true)} />
+        <img
+          src={`/api/covers/${encodeURIComponent(book.bookId)}`}
+          alt=""
+          loading="lazy"
+          onError={() => setBroken(true)}
+        />
       </span>
     )
   }

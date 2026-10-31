@@ -21,7 +21,9 @@ const getOriginal = createServerFn()
 const getTranslated = createServerFn()
   .middleware([authMiddleware])
   .validator(ChapterInput)
-  .handler(({ context, data: { chapterId } }) => context.backend.json({ path: `${path(chapterId)}/translation`, schema: Blocks }))
+  .handler(({ context, data: { chapterId } }) =>
+    context.backend.json({ path: `${path(chapterId)}/translation`, schema: Blocks }),
+  )
 
 const getShortened = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])

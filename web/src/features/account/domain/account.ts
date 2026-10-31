@@ -32,7 +32,9 @@ export type Account = {
 }
 
 /** One line of the super admin's list. */
-export type ManagedAccount = Pick<Account, 'email' | 'isSuperAdmin' | 'plan' | 'requestedPlan' | 'digestsUsed'> & { id: string }
+export type ManagedAccount = Pick<Account, 'email' | 'isSuperAdmin' | 'plan' | 'requestedPlan' | 'digestsUsed'> & {
+  id: string
+}
 
 export const limitsOf = ({ plan, plans }: Pick<Account, 'plan' | 'plans'>): PlanLimits => plans[plan]
 
@@ -61,7 +63,11 @@ export function planLines(limits: PlanLimits): string[] {
   ]
 }
 
-export function adminNote({ isSuperAdmin, requestedPlan, digestsUsed }: Pick<ManagedAccount, 'isSuperAdmin' | 'requestedPlan' | 'digestsUsed'>): string {
+export function adminNote({
+  isSuperAdmin,
+  requestedPlan,
+  digestsUsed,
+}: Pick<ManagedAccount, 'isSuperAdmin' | 'requestedPlan' | 'digestsUsed'>): string {
   if (isSuperAdmin) return 'super admin'
   if (requestedPlan) return `muốn lên ${planLabel(requestedPlan)}`
   return `${digestsUsed} chương AI tháng này`

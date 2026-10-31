@@ -41,7 +41,9 @@ export type ListenState = {
   source: ListenSource | null
 }
 
-export type Heard = { kind: 'sentence'; source: ListenSource; sentence: SpokenSentence; done: number } | { kind: 'finished'; source: ListenSource }
+export type Heard =
+  | { kind: 'sentence'; source: ListenSource; sentence: SpokenSentence; done: number }
+  | { kind: 'finished'; source: ListenSource }
 
 export type ListenChoice = { voiceCode: string; rate: number }
 

@@ -16,7 +16,10 @@ describe('lengthOptionsFor', () => {
   })
 
   it('never goes under two minutes', () => {
-    expect(lengthOptionsFor({ chapterMinutes: 5, vietnamese: false }).at(-1)).toEqual({ length: 'keyPoints', minutes: 2 })
+    expect(lengthOptionsFor({ chapterMinutes: 5, vietnamese: false }).at(-1)).toEqual({
+      length: 'keyPoints',
+      minutes: 2,
+    })
   })
 
   it('puts the translation after the original', () => {
@@ -51,13 +54,20 @@ describe('the spot read last', () => {
   const spot = nextChapterSpot({ chapterId: 'c', chapterLabel: 'Chương Một', minutes: 5, listened: false })
 
   it('is the one recorded last, among books still on the shelf', () => {
-    const spots = withSpot({ spots: withSpot({ spots: { a: spot, b: spot }, bookId: 'a', spot }), bookId: 'gone', spot })
+    const spots = withSpot({
+      spots: withSpot({ spots: { a: spot, b: spot }, bookId: 'a', spot }),
+      bookId: 'gone',
+      spot,
+    })
     expect(latestSpot({ spots, bookIds: ['a', 'b'] })?.bookId).toBe('a')
     expect(latestSpot({ spots: {}, bookIds: ['a'] })).toBeNull()
   })
 
   it('gives a whole version the chapter length', () => {
-    expect(wholeLength({ search: { length: 'original', minutes: 0 }, chapterMinutes: 12 })).toEqual({ length: 'original', minutes: 12 })
+    expect(wholeLength({ search: { length: 'original', minutes: 0 }, chapterMinutes: 12 })).toEqual({
+      length: 'original',
+      minutes: 12,
+    })
     expect(wholeLength({ search: { length: 'shortened', minutes: 6 }, chapterMinutes: 12 })).toBeNull()
   })
 })

@@ -24,12 +24,17 @@ async function send(path: string, init: RequestInit): Promise<Response> {
   }
 }
 
-const jsonInit = (body: unknown) => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+const jsonInit = (body: unknown) => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify(body),
+})
 
 function tokensFrom(body: unknown): Tokens {
   if (typeof body === 'object' && body !== null && 'accessToken' in body && 'refreshToken' in body) {
     const { accessToken, refreshToken } = body
-    if (typeof accessToken === 'string' && typeof refreshToken === 'string') return { access: accessToken, refresh: refreshToken }
+    if (typeof accessToken === 'string' && typeof refreshToken === 'string')
+      return { access: accessToken, refresh: refreshToken }
   }
   throw new BackendFailure('UNEXPECTED_RESPONSE')
 }
@@ -79,7 +84,10 @@ export async function authedResponse(path: string, init: RequestInit = {}): Prom
 }
 
 /** For a body that can be read only once: renews, and leaves the retry to the caller. */
-export async function authedOnce(path: string, init: RequestInit): Promise<{ kind: 'sent'; response: Response } | { kind: 'expired' }> {
+export async function authedOnce(
+  path: string,
+  init: RequestInit,
+): Promise<{ kind: 'sent'; response: Response } | { kind: 'expired' }> {
   const tokens = readTokens()
   if (!tokens) throw signedOut()
   const response = await send(path, withBearer(init, tokens.access))
@@ -88,11 +96,18 @@ export async function authedOnce(path: string, init: RequestInit): Promise<{ kin
   return { kind: 'expired' }
 }
 
-type JsonCall<Schema extends z.ZodType> = { path: string; method?: 'GET' | 'POST' | 'PATCH'; body?: unknown; schema: Schema }
+type JsonCall<Schema extends z.ZodType> = {
+  path: string
+  method?: 'GET' | 'POST' | 'PATCH'
+  body?: unknown
+  schema: Schema
+}
 type EmptyCall = { path: string; method: 'POST' | 'PATCH' | 'DELETE'; body?: unknown }
 
 function initOf({ method = 'GET', body }: { method?: string; body?: unknown }): RequestInit {
-  return body === undefined ? { method } : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
+  return body === undefined
+    ? { method }
+    : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
 }
 
 export const backend = {

@@ -13,11 +13,20 @@ export function MiniPlayer() {
   return (
     <div className="bar" role="region" aria-label="Đang nghe">
       {stage.kind === 'playing' && (
-        <button type="button" className="pl" aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'} onClick={controller.togglePause}>
+        <button
+          type="button"
+          className="pl"
+          aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'}
+          onClick={controller.togglePause}
+        >
           {stage.paused ? '▶' : '❚❚'}
         </button>
       )}
-      <Link to="/books/$bookId/chapters/$chapterId" params={{ bookId: source.bookId, chapterId: source.chapterId }} search={source.option}>
+      <Link
+        to="/books/$bookId/chapters/$chapterId"
+        params={{ bookId: source.bookId, chapterId: source.chapterId }}
+        search={source.option}
+      >
         <b>{source.bookTitle}</b> <span className="quiet">{`${source.chapterLabel}, ${state.voice?.name ?? ''}`}</span>
       </Link>
       <button type="button" className="ink-link" onClick={controller.stop}>

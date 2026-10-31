@@ -15,7 +15,13 @@ export type PendingSignIn = z.infer<typeof PendingSignIn>
 
 /** Never reachable from page JS, and sent on top-level returns from WorkOS. */
 function cookieOptions(maxAge: number) {
-  return { httpOnly: true, secure: config().WEB_INSECURE_COOKIES === undefined, sameSite: 'lax', path: '/', maxAge } as const
+  return {
+    httpOnly: true,
+    secure: config().WEB_INSECURE_COOKIES === undefined,
+    sameSite: 'lax',
+    path: '/',
+    maxAge,
+  } as const
 }
 
 export function readTokens(): Tokens | null {

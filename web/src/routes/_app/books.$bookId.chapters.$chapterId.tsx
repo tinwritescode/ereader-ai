@@ -12,7 +12,10 @@ export const Route = createFileRoute('/_app/books/$bookId/chapters/$chapterId')(
   validateSearch: ReaderSearch,
   loaderDeps: ({ search }) => ({ search }),
   loader: async ({ context, params, deps: { search } }) => {
-    const [, chapters] = await Promise.all([context.queryClient.ensureQueryData(booksQuery()), context.queryClient.ensureQueryData(chaptersQuery(params.bookId))])
+    const [, chapters] = await Promise.all([
+      context.queryClient.ensureQueryData(booksQuery()),
+      context.queryClient.ensureQueryData(chaptersQuery(params.bookId)),
+    ])
     const chapter = chapters.find(({ chapterId }) => chapterId === params.chapterId)
     const fixed = chapter && wholeLength({ search, chapterMinutes: chapter.minutes })
     if (fixed) throw redirect({ to: '/books/$bookId/chapters/$chapterId', params, search: fixed, replace: true })
@@ -25,7 +28,12 @@ export const Route = createFileRoute('/_app/books/$bookId/chapters/$chapterId')(
         {(shelf) => (
           <WithAccount>
             {(account) => (
-              <ListenPort {...shelf} chapterId={chapterId} option={search} prepare={(job) => <PrepareChapter account={account} {...job} />}>
+              <ListenPort
+                {...shelf}
+                chapterId={chapterId}
+                option={search}
+                prepare={(job) => <PrepareChapter account={account} {...job} />}
+              >
                 {(port) => (
                   <ReaderPage
                     {...shelf}
@@ -33,7 +41,9 @@ export const Route = createFileRoute('/_app/books/$bookId/chapters/$chapterId')(
                     search={search}
                     voice={port.voice}
                     bar={port.bar}
-                    translationNotice={({ onOriginal }) => <TranslationNotice bookId={bookId} chapterId={chapterId} onOriginal={onOriginal} />}
+                    translationNotice={({ onOriginal }) => (
+                      <TranslationNotice bookId={bookId} chapterId={chapterId} onOriginal={onOriginal} />
+                    )}
                   />
                 )}
               </ListenPort>

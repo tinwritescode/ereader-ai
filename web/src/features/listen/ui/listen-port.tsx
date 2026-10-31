@@ -90,7 +90,19 @@ export function ListenPort({
   return children(port)
 }
 
-function ListenBar({ here, state, minutes, onStart, prepare }: { here: boolean; state: ListenState; minutes: number; onStart: () => void; prepare: (voiceCode: string) => ReactNode }) {
+function ListenBar({
+  here,
+  state,
+  minutes,
+  onStart,
+  prepare,
+}: {
+  here: boolean
+  state: ListenState
+  minutes: number
+  onStart: () => void
+  prepare: (voiceCode: string) => ReactNode
+}) {
   const { controller } = useListening()
   const [choosing, setChoosing] = useState(false)
   const stage = here ? state.stage : { kind: 'off' as const }
@@ -124,7 +136,8 @@ function ListenBar({ here, state, minutes, onStart, prepare }: { here: boolean; 
                 <span className="quiet">
                   {stage.slow
                     ? 'Lượt đầu sau khi nghỉ mất khoảng một phút, các câu sau đọc ngay.'
-                    : stage.needed > 0 && `Đủ ${stage.needed} câu là ${state.voice?.name ?? ''} đọc, để nghe liền mạch.`}
+                    : stage.needed > 0 &&
+                      `Đủ ${stage.needed} câu là ${state.voice?.name ?? ''} đọc, để nghe liền mạch.`}
                 </span>
                 <Button quiet onClick={controller.stop}>
                   Tắt
@@ -135,7 +148,12 @@ function ListenBar({ here, state, minutes, onStart, prepare }: { here: boolean; 
             const left = Math.ceil(minutes * (1 - state.done))
             return (
               <>
-                <button type="button" className="pl" aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'} onClick={controller.togglePause}>
+                <button
+                  type="button"
+                  className="pl"
+                  aria-label={stage.paused ? 'Đọc tiếp' : 'Tạm dừng'}
+                  onClick={controller.togglePause}
+                >
                   {stage.paused ? '▶' : '❚❚'}
                 </button>
                 <button type="button" aria-label="Lùi một câu" onClick={() => controller.skip(-1)}>
@@ -148,7 +166,10 @@ function ListenBar({ here, state, minutes, onStart, prepare }: { here: boolean; 
                 <span className="track" aria-hidden="true">
                   <i style={{ width: `${state.done * 100}%` }} />
                 </span>
-                <span className="quiet" aria-live="off">{`Câu ${stage.index + 1} trên ${stage.total}, còn ${durationLabel(left)}`}</span>
+                <span
+                  className="quiet"
+                  aria-live="off"
+                >{`Câu ${stage.index + 1} trên ${stage.total}, còn ${durationLabel(left)}`}</span>
                 <button type="button" aria-label={`Tốc độ ${rateLabel(state.rate)}`} onClick={controller.cycleRate}>
                   {rateLabel(state.rate)}
                 </button>
@@ -184,7 +205,9 @@ function ListenBar({ here, state, minutes, onStart, prepare }: { here: boolean; 
           }
         }
       })()}
-      {choosing && <VoiceSheet current={state.voice} onChoose={controller.chooseVoice} onClose={() => setChoosing(false)} />}
+      {choosing && (
+        <VoiceSheet current={state.voice} onChoose={controller.chooseVoice} onClose={() => setChoosing(false)} />
+      )}
     </div>
   )
 }

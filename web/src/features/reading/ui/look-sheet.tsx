@@ -14,7 +14,15 @@ export function LookSheet({ onClose }: { onClose: () => void }) {
       <b>Cỡ chữ</b>
       <div className="ruler" role="radiogroup" aria-label="Cỡ chữ">
         {SIZES.map((size, index) => (
-          <button key={size} type="button" role="radio" aria-checked={look.size === size} aria-label={`Chữ cỡ ${index + 1}`} style={{ fontSize: TEXT_SIZES[size] + index * 2 }} onClick={() => change({ size })}>
+          <button
+            key={size}
+            type="button"
+            role="radio"
+            aria-checked={look.size === size}
+            aria-label={`Chữ cỡ ${index + 1}`}
+            style={{ fontSize: TEXT_SIZES[size] + index * 2 }}
+            onClick={() => change({ size })}
+          >
             A
           </button>
         ))}
@@ -22,18 +30,34 @@ export function LookSheet({ onClose }: { onClose: () => void }) {
       <b>Giãn dòng</b>
       <div className="ruler" role="radiogroup" aria-label="Giãn dòng">
         {SPACINGS.map((spacing) => (
-          <button key={spacing} type="button" role="radio" aria-checked={look.spacing === spacing} onClick={() => change({ spacing })}>
+          <button
+            key={spacing}
+            type="button"
+            role="radio"
+            aria-checked={look.spacing === spacing}
+            onClick={() => change({ spacing })}
+          >
             <small>{SPACING_NAMES[spacing]}</small>
           </button>
         ))}
       </div>
       <b>Trang giấy</b>
       <div className="paper-choice">
-        <button type="button" className="day" aria-pressed={look.paper === 'day'} onClick={() => change({ paper: 'day' })}>
+        <button
+          type="button"
+          className="day"
+          aria-pressed={look.paper === 'day'}
+          onClick={() => change({ paper: 'day' })}
+        >
           Giấy
           <small>Ban ngày</small>
         </button>
-        <button type="button" className="dark" aria-pressed={look.paper === 'night'} onClick={() => change({ paper: 'night' })}>
+        <button
+          type="button"
+          className="dark"
+          aria-pressed={look.paper === 'night'}
+          onClick={() => change({ paper: 'night' })}
+        >
           Đêm
           <small>Giảm chói khi tối</small>
         </button>

@@ -10,7 +10,14 @@ import type { Voice } from '~/features/listen/domain/controller'
 import { Button } from '~/shared/ui/button'
 import { useNotice } from '~/shared/ui/notice'
 import { Sheet } from '~/shared/ui/sheet'
-import { chaptersWithin, failureText, translateOfferFor, translationMark, voiceMark, voiceOfferFor } from '../domain/task'
+import {
+  chaptersWithin,
+  failureText,
+  translateOfferFor,
+  translationMark,
+  voiceMark,
+  voiceOfferFor,
+} from '../domain/task'
 import type { WholeBookOffer, WholeBookTask } from '../domain/task'
 import { bookVoiceQuery, translateBook, translationQuery, voiceBook } from '../data/tasks'
 import { useTaskActions } from './use-task-actions'
@@ -18,7 +25,17 @@ import { useTaskActions } from './use-task-actions'
 type Words = { title: string; note: string; doing: string; waiting: string; named: string; finished: string }
 export type StartChapter = { chapterId: string; chapterLabel: string } | null
 
-function WholeBookRow({ offer, words, onOffer, onResume }: { offer: WholeBookOffer; words: Words; onOffer: () => void; onResume: (task: WholeBookTask) => void }) {
+function WholeBookRow({
+  offer,
+  words,
+  onOffer,
+  onResume,
+}: {
+  offer: WholeBookOffer
+  words: Words
+  onOffer: () => void
+  onResume: (task: WholeBookTask) => void
+}) {
   switch (offer.kind) {
     case 'hidden':
       return null
@@ -42,7 +59,9 @@ function WholeBookRow({ offer, words, onOffer, onResume }: { offer: WholeBookOff
       const { task } = offer
       return (
         <Link className="whole" to="/tasks">
-          {task.position !== null ? `${words.waiting}, thứ ${task.position} trong hàng` : `${words.doing}, chương ${task.done} trên ${task.total}`}
+          {task.position !== null
+            ? `${words.waiting}, thứ ${task.position} trong hàng`
+            : `${words.doing}, chương ${task.done} trên ${task.total}`}
           <span className="track" aria-hidden="true">
             <i style={{ width: `${task.percent}%` }} />
           </span>
@@ -82,10 +101,23 @@ function useStart<Input>(run: (input: Input) => Promise<unknown>, started: strin
   })
 }
 
-function TranslateSheet({ book, account, start, onClose }: { book: Book; account: Account; start: StartChapter; onClose: () => void }) {
+function TranslateSheet({
+  book,
+  account,
+  start,
+  onClose,
+}: {
+  book: Book
+  account: Account
+  start: StartChapter
+  onClose: () => void
+}) {
   const monthly = limitsOf(account).monthlyBookTranslations
   const left = monthly - account.bookTranslationsUsed
-  const translate = useStart(() => translateBook({ data: { bookId: book.bookId, startChapterId: start?.chapterId ?? null } }), `Đang dịch ${book.title}. Xong sẽ báo.`)
+  const translate = useStart(
+    () => translateBook({ data: { bookId: book.bookId, startChapterId: start?.chapterId ?? null } }),
+    `Đang dịch ${book.title}. Xong sẽ báo.`,
+  )
   return (
     <Sheet title="Dịch cả sách sang tiếng Việt" onClose={onClose}>
       <h2 className="hand">Dịch cả sách sang tiếng Việt</h2>
@@ -112,14 +144,29 @@ function TranslateSheet({ book, account, start, onClose }: { book: Book; account
   )
 }
 
-function VoiceBookSheet({ book, account, start, voices, onClose }: { book: Book; account: Account; start: StartChapter; voices: Voice[]; onClose: () => void }) {
+function VoiceBookSheet({
+  book,
+  account,
+  start,
+  voices,
+  onClose,
+}: {
+  book: Book
+  account: Account
+  start: StartChapter
+  voices: Voice[]
+  onClose: () => void
+}) {
   const { data: standing } = useQuery(bookVoiceQuery(book.bookId))
   const [voiceCode, setVoiceCode] = useState(voices[0]?.code ?? '')
   const voice = useStart(
     () => voiceBook({ data: { bookId: book.bookId, voiceCode, startChapterId: start?.chapterId ?? null } }),
     `Đang tạo giọng đọc ${book.title}. Xong sẽ báo.`,
   )
-  const goTranslate = useStart(() => translateBook({ data: { bookId: book.bookId, startChapterId: start?.chapterId ?? null } }), `Đang dịch ${book.title}. Xong sẽ báo.`)
+  const goTranslate = useStart(
+    () => translateBook({ data: { bookId: book.bookId, startChapterId: start?.chapterId ?? null } }),
+    `Đang dịch ${book.title}. Xong sẽ báo.`,
+  )
   if (!standing) return null
   const left = Math.max(0, limitsOf(account).monthlyVoiceMinutes - account.voiceMinutesUsed)
   const enough = left >= standing.minutes
@@ -127,7 +174,14 @@ function VoiceBookSheet({ book, account, start, voices, onClose }: { book: Book;
     <>
       <div role="radiogroup" aria-label="Giọng đọc">
         {voices.map((entry) => (
-          <button key={entry.code} type="button" role="radio" className="voice-row" aria-checked={entry.code === voiceCode} onClick={() => setVoiceCode(entry.code)}>
+          <button
+            key={entry.code}
+            type="button"
+            role="radio"
+            className="voice-row"
+            aria-checked={entry.code === voiceCode}
+            onClick={() => setVoiceCode(entry.code)}
+          >
             {entry.name}
             {entry.code === voiceCode && <small>đang chọn</small>}
           </button>
@@ -140,10 +194,17 @@ function VoiceBookSheet({ book, account, start, voices, onClose }: { book: Book;
       <Sheet title="Sách này cần bản tiếng Việt trước" onClose={onClose}>
         <h2 className="hand">Sách này cần bản tiếng Việt trước</h2>
         <p>{`Giọng đọc chỉ đọc tiếng Việt. Sách có ${standing.chapters + standing.skipped} chương, mới dịch xong ${standing.chapters} chương.`}</p>
-        <p className="soft">{standing.chapters > 0 ? 'Tạo giọng cho các chương đã dịch, hoặc dịch nốt rồi tạo giọng sau.' : 'Dịch sách trước rồi tạo giọng sau.'}</p>
+        <p className="soft">
+          {standing.chapters > 0
+            ? 'Tạo giọng cho các chương đã dịch, hoặc dịch nốt rồi tạo giọng sau.'
+            : 'Dịch sách trước rồi tạo giọng sau.'}
+        </p>
         {standing.chapters > 0 && create}
         {standing.chapters > 0 && (
-          <Button disabled={voice.isPending || !voiceCode} onClick={() => voice.mutate(undefined, { onSuccess: onClose })}>
+          <Button
+            disabled={voice.isPending || !voiceCode}
+            onClick={() => voice.mutate(undefined, { onSuccess: onClose })}
+          >
             {`Tạo giọng ${standing.chapters} chương đã dịch`}
           </Button>
         )}
@@ -183,13 +244,28 @@ function VoiceBookSheet({ book, account, start, voices, onClose }: { book: Book;
 }
 
 /** The book page's lines about translating and voicing the whole book. */
-export function WholeBookRows({ book, account, start, voices }: { book: Book; account: Account; start: StartChapter; voices: Voice[] }) {
+export function WholeBookRows({
+  book,
+  account,
+  start,
+  voices,
+}: {
+  book: Book
+  account: Account
+  start: StartChapter
+  voices: Voice[]
+}) {
   const translation = useQuery(translationQuery(book.bookId))
   const voice = useQuery(bookVoiceQuery(book.bookId))
   const { resume } = useTaskActions()
   const [open, setOpen] = useState<'translate' | 'voice' | null>(null)
   const limits = limitsOf(account)
-  const translateOffer = translateOfferFor({ foreign: isForeign(book), chapterCount: book.chapterCount, monthly: limits.monthlyBookTranslations, standing: translation.data ?? null })
+  const translateOffer = translateOfferFor({
+    foreign: isForeign(book),
+    chapterCount: book.chapterCount,
+    monthly: limits.monthlyBookTranslations,
+    standing: translation.data ?? null,
+  })
   const voiceOffer = voiceOfferFor({ allowed: limits.chapterVoice, standing: voice.data ?? null })
   return (
     <div>
@@ -219,17 +295,30 @@ export function WholeBookRows({ book, account, start, voices }: { book: Book; ac
         onOffer={() => setOpen('voice')}
         onResume={resume}
       />
-      {open === 'translate' && <TranslateSheet book={book} account={account} start={start} onClose={() => setOpen(null)} />}
-      {open === 'voice' && <VoiceBookSheet book={book} account={account} start={start} voices={voices} onClose={() => setOpen(null)} />}
+      {open === 'translate' && (
+        <TranslateSheet book={book} account={account} start={start} onClose={() => setOpen(null)} />
+      )}
+      {open === 'voice' && (
+        <VoiceBookSheet book={book} account={account} start={start} voices={voices} onClose={() => setOpen(null)} />
+      )}
     </div>
   )
 }
 
 /** A chapter row's note on translation or voice, or the given fallback. */
-export function ChapterMark({ bookId, chapterId, fallback }: { bookId: string; chapterId: string; fallback: React.ReactNode }) {
+export function ChapterMark({
+  bookId,
+  chapterId,
+  fallback,
+}: {
+  bookId: string
+  chapterId: string
+  fallback: React.ReactNode
+}) {
   const translation = useQuery(translationQuery(bookId))
   const voice = useQuery(bookVoiceQuery(bookId))
   const mark =
-    (translation.data && translationMark({ chapterId, ...translation.data })) ?? (voice.data ? voiceMark({ chapterId, task: voice.data.task }) : null)
+    (translation.data && translationMark({ chapterId, ...translation.data })) ??
+    (voice.data ? voiceMark({ chapterId, task: voice.data.task }) : null)
   return mark ? <em>{mark}</em> : fallback
 }

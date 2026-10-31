@@ -6,13 +6,20 @@ import type { ReadingSpot } from '../domain/spot'
 import { readingSpots } from './stores'
 
 function GoOn({ book, spot, chapters }: { book: Book; spot: ReadingSpot; chapters?: ChapterSummary[] }) {
-  const minutes = spot.option?.minutes ?? chapters?.find((chapter) => chapter.chapterId === spot.chapterId)?.minutes ?? spot.minutesLeft
+  const minutes =
+    spot.option?.minutes ??
+    chapters?.find((chapter) => chapter.chapterId === spot.chapterId)?.minutes ??
+    spot.minutesLeft
   return (
     <Link
       className="go"
       to="/books/$bookId/chapters/$chapterId"
       params={{ bookId: book.bookId, chapterId: spot.chapterId }}
-      search={{ ...(spot.option ?? { length: 'original', minutes }), resume: true, ...(spot.listened ? { listen: true } : {}) }}
+      search={{
+        ...(spot.option ?? { length: 'original', minutes }),
+        resume: true,
+        ...(spot.listened ? { listen: true } : {}),
+      }}
     >
       <span>
         {spot.listened ? 'Nghe tiếp ' : 'Đọc tiếp '}
@@ -48,6 +55,12 @@ export function useStartChapter(bookId: string): { chapterId: string; chapterLab
 }
 
 /** Hands the chapter the reader is on to other features' pages. */
-export function WithStartChapter({ bookId, children }: { bookId: string; children: (start: { chapterId: string; chapterLabel: string } | null) => React.ReactNode }) {
+export function WithStartChapter({
+  bookId,
+  children,
+}: {
+  bookId: string
+  children: (start: { chapterId: string; chapterLabel: string } | null) => React.ReactNode
+}) {
   return children(useStartChapter(bookId))
 }

@@ -38,12 +38,32 @@ function versionName({ length, minutes }: LengthOption): string {
   return length === 'keyPoints' ? 'ý chính' : `${minutes} phút`
 }
 
-function savedSpotFor({ spot, chapterId, option, blocks }: { spot: ReadingSpot | undefined; chapterId: string; option: LengthOption; blocks: TextBlock[] }): ReadingSpot | null {
+function savedSpotFor({
+  spot,
+  chapterId,
+  option,
+  blocks,
+}: {
+  spot: ReadingSpot | undefined
+  chapterId: string
+  option: LengthOption
+  blocks: TextBlock[]
+}): ReadingSpot | null {
   if (!spot?.option || spot.chapterId !== chapterId || !sameOption(spot.option, option)) return null
   return (spot.block > 0 || spot.offset > 0) && spot.block < blocks.length ? spot : null
 }
 
-function Block({ block, index, marked, onPick }: { block: TextBlock; index: number; marked: ReaderVoice['marked']; onPick?: (block: number) => void }) {
+function Block({
+  block,
+  index,
+  marked,
+  onPick,
+}: {
+  block: TextBlock
+  index: number
+  marked: ReaderVoice['marked']
+  onPick?: (block: number) => void
+}) {
   const Tag = block.kind === 'heading' ? 'h2' : 'p'
   if (marked?.block !== index) {
     return (
@@ -111,7 +131,10 @@ export function ReaderPage({
   const look = readingLook.useValue()
   const [showLook, setShowLook] = useState(false)
   const [picked, setPicked] = useState<number | null>(null)
-  const option = useMemo<LengthOption>(() => ({ length: search.length, minutes: search.minutes }), [search.length, search.minutes])
+  const option = useMemo<LengthOption>(
+    () => ({ length: search.length, minutes: search.minutes }),
+    [search.length, search.minutes],
+  )
   const index = chapters.findIndex((chapter) => chapter.chapterId === chapterId)
   const chapter = chapters[index]
   const next = chapters[index + 1]
@@ -132,7 +155,16 @@ export function ReaderPage({
   const remember = useCallback(() => {
     if (offer || !blocks || !chapter || voice.heardHere(option)) return
     if (finished()) {
-      if (next) recordSpot({ bookId: book.bookId, spot: nextChapterSpot({ chapterId: next.chapterId, chapterLabel: chapterName(next), minutes: next.minutes, listened: false }) })
+      if (next)
+        recordSpot({
+          bookId: book.bookId,
+          spot: nextChapterSpot({
+            chapterId: next.chapterId,
+            chapterLabel: chapterName(next),
+            minutes: next.minutes,
+            listened: false,
+          }),
+        })
       else clearSpot(book.bookId)
       return
     }
@@ -210,7 +242,12 @@ export function ReaderPage({
         <Link to="/books/$bookId" params={{ bookId: book.bookId }}>{`‹ ${book.title}, ${chapterName(chapter)}`}</Link>
         <div className="vs" role="group" aria-label="Bản đọc">
           {options.map((entry) => (
-            <button key={entry.length} type="button" aria-pressed={sameOption(entry, option)} onClick={() => choose(entry)}>
+            <button
+              key={entry.length}
+              type="button"
+              aria-pressed={sameOption(entry, option)}
+              onClick={() => choose(entry)}
+            >
               {versionName(entry)}
             </button>
           ))}
@@ -244,18 +281,27 @@ export function ReaderPage({
           )}
           {heading.number && <p className="soft">{heading.number}</p>}
           <h1 className="chapter-title">{heading.title}</h1>
-          {option.length !== 'original' && <p className="soft">{option.length === 'vietnamese' ? 'AI dịch từ bản gốc' : 'AI viết lại từ bản gốc'}</p>}
+          {option.length !== 'original' && (
+            <p className="soft">{option.length === 'vietnamese' ? 'AI dịch từ bản gốc' : 'AI viết lại từ bản gốc'}</p>
+          )}
           <ReaderBody
             text={text}
             voice={voice}
             onOriginal={original ? () => choose(original) : undefined}
             onPick={bar && !voice.heardHere(option) ? setPicked : undefined}
-            translationNotice={translationNotice?.({ chapterId, onOriginal: () => (original ? choose(original) : undefined) })}
+            translationNotice={translationNotice?.({
+              chapterId,
+              onOriginal: () => (original ? choose(original) : undefined),
+            })}
           />
           {blocks && (
             <div className="finished">
               <p className="hand">{`Xong ${chapterName(chapter)}`}</p>
-              <p className="soft">{next ? `Tiếp theo là ${chapterName(next)}, dài ${durationLabel(next.minutes)}.` : 'Đây là chương cuối.'}</p>
+              <p className="soft">
+                {next
+                  ? `Tiếp theo là ${chapterName(next)}, dài ${durationLabel(next.minutes)}.`
+                  : 'Đây là chương cuối.'}
+              </p>
               {next && (
                 <Link
                   className="primary"
@@ -274,7 +320,10 @@ export function ReaderPage({
         </div>
       </div>
       {picked !== null && blocks && (
-        <div className="offer" style={{ position: 'fixed', top: 'auto', bottom: 76, left: '50%', transform: 'translateX(-50%)' }}>
+        <div
+          className="offer"
+          style={{ position: 'fixed', top: 'auto', bottom: 76, left: '50%', transform: 'translateX(-50%)' }}
+        >
           <Button
             quiet
             onClick={() => {
@@ -324,7 +373,9 @@ function ReaderBody({
   const [limitClosed, setLimitClosed] = useState(false)
   switch (text.kind) {
     case 'loading':
-      return <p className="soft">{text.shortening ? 'AI đang rút gọn chương, thường mất 15–30 giây.' : 'Đang mở chương…'}</p>
+      return (
+        <p className="soft">{text.shortening ? 'AI đang rút gọn chương, thường mất 15–30 giây.' : 'Đang mở chương…'}</p>
+      )
     case 'failed':
       return (
         <>
@@ -334,7 +385,9 @@ function ReaderBody({
               Thử lại
             </Button>
           </p>
-          {text.code === 'DIGEST_LIMIT' && !limitClosed && <DigestLimit onOriginal={onOriginal} onClose={() => setLimitClosed(true)} />}
+          {text.code === 'DIGEST_LIMIT' && !limitClosed && (
+            <DigestLimit onOriginal={onOriginal} onClose={() => setLimitClosed(true)} />
+          )}
         </>
       )
     case 'untranslated':

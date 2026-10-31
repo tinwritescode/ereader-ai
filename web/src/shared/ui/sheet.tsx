@@ -4,7 +4,17 @@ import type { CSSProperties, ReactNode } from 'react'
 const sheetTop = (top: number): CSSProperties & { '--sheet-top': string } => ({ '--sheet-top': `${top}px` })
 
 /** A popover beside what opened it on a wide page, a sheet from the bottom on a phone. */
-export function Sheet({ title, top, onClose, children }: { title: string; top?: number; onClose: () => void; children: ReactNode }) {
+export function Sheet({
+  title,
+  top,
+  onClose,
+  children,
+}: {
+  title: string
+  top?: number
+  onClose: () => void
+  children: ReactNode
+}) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const node = dialog.current

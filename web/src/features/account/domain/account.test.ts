@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { adminNote, countLabel, isHigher, planLines, resetLabel } from './account'
 
-const limits = { books: 3, monthlyDigests: 1500, monthlyVoiceMinutes: 30, chapterVoice: false, monthlyBookTranslations: 0 }
+const limits = {
+  books: 3,
+  monthlyDigests: 1500,
+  monthlyVoiceMinutes: 30,
+  chapterVoice: false,
+  monthlyBookTranslations: 0,
+}
 
 describe('words about plans', () => {
   it('writes thousands the Vietnamese way', () => {
@@ -12,7 +18,9 @@ describe('words about plans', () => {
 
   it('lists only what the plan has', () => {
     expect(planLines(limits)).toEqual(['3 cuốn sách', '1.500 chương AI mỗi tháng', '30 phút giọng qua mạng mỗi tháng'])
-    expect(planLines({ ...limits, chapterVoice: true, monthlyBookTranslations: 3 })).toContain('Dịch 3 cuốn sách sang tiếng Việt mỗi tháng')
+    expect(planLines({ ...limits, chapterVoice: true, monthlyBookTranslations: 3 })).toContain(
+      'Dịch 3 cuốn sách sang tiếng Việt mỗi tháng',
+    )
   })
 
   it('reads the reset day', () => {

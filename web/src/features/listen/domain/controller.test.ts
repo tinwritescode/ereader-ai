@@ -7,7 +7,14 @@ const VOICES: Voice[] = [
   { code: 'one', name: 'Một', gender: 'female' },
   { code: 'two', name: 'Hai', gender: 'male' },
 ]
-const source: ListenSource = { bookId: 'b', bookTitle: 'Sách', chapterId: 'c', chapterLabel: 'Chương Một', option: { length: 'original', minutes: 10 }, next: null }
+const source: ListenSource = {
+  bookId: 'b',
+  bookTitle: 'Sách',
+  chapterId: 'c',
+  chapterLabel: 'Chương Một',
+  option: { length: 'original', minutes: 10 },
+  next: null,
+}
 const SENTENCES = ['Câu một.', 'Câu hai.', 'Câu ba.', 'Câu bốn.', 'Câu năm.', 'Câu sáu.', 'Câu bảy.']
 const blocks: TextBlock[] = [{ kind: 'paragraph', text: SENTENCES.join(' ') }]
 
@@ -51,7 +58,19 @@ function setup({ failing = new Set<string>(), held = false }: { failing?: Set<st
     finish?.()
     await flush()
   }
-  return { controller, played, asked, heard, log, holds, finishClip, start: async (block = 0, offset = 0) => { controller.request({ blocks, source, block, offset }); await flush() } }
+  return {
+    controller,
+    played,
+    asked,
+    heard,
+    log,
+    holds,
+    finishClip,
+    start: async (block = 0, offset = 0) => {
+      controller.request({ blocks, source, block, offset })
+      await flush()
+    },
+  }
 }
 
 const useTimers = () => {
@@ -208,7 +227,14 @@ describe('listening', () => {
   it('has nothing to read without a voice', async () => {
     useTimers()
     const controller = new ListenController<string>({
-      speaker: { synthesize: async () => '', play: async () => {}, pause: async () => {}, resume: async () => {}, stop: async () => {}, setRate: async () => {} },
+      speaker: {
+        synthesize: async () => '',
+        play: async () => {},
+        pause: async () => {},
+        resume: async () => {},
+        stop: async () => {},
+        setRate: async () => {},
+      },
       voices: async () => [],
       choice: { load: () => null, save: () => {} },
       onHeard: () => {},

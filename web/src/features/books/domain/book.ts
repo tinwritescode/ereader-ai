@@ -39,7 +39,10 @@ const TITLE_JOINT = /^[\s:.,–—-]+/
  * What a chapter is called, whichever way round the book stores it: some put "Chương Một" over a
  * title, others "Quy luật 1" under "QUY LUẬT 1 ĐỨNG THẲNG".
  */
-export function chapterHeading({ label, subtitle }: Pick<ChapterSummary, 'label' | 'subtitle'>): { number: string | null; title: string } {
+export function chapterHeading({ label, subtitle }: Pick<ChapterSummary, 'label' | 'subtitle'>): {
+  number: string | null
+  title: string
+} {
   const named = label.trim()
   const under = subtitle?.trim()
   if (!under) return { number: null, title: displayTitle(named) }

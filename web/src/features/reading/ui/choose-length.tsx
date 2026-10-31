@@ -20,7 +20,18 @@ function chosenLabel({ length, minutes }: LengthOption): string {
   return `${lengthName(length)}${whole ? '' : ' còn'} ${durationLabel(minutes)}`
 }
 
-export function ChooseLength({ book, chapter, top, onClose }: { book: Book; chapters: ChapterSummary[]; chapter: ChapterSummary; top: number; onClose: () => void }) {
+export function ChooseLength({
+  book,
+  chapter,
+  top,
+  onClose,
+}: {
+  book: Book
+  chapters: ChapterSummary[]
+  chapter: ChapterSummary
+  top: number
+  onClose: () => void
+}) {
   const navigate = useNavigate()
   const options = lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) })
   // The translation is as long as the original, so it is a switch, not a stop on the ruler.
@@ -28,7 +39,8 @@ export function ChooseLength({ book, chapter, top, onClose }: { book: Book; chap
   const translation = options.find(({ length }) => length === 'vietnamese')
   const remembered: ReadingLength = lastLength.useValue()
   const [selected, setSelected] = useState(
-    ruler.find(({ length }) => length === remembered || (remembered === 'vietnamese' && length === 'original')) ?? ruler[0],
+    ruler.find(({ length }) => length === remembered || (remembered === 'vietnamese' && length === 'original')) ??
+      ruler[0],
   )
   const [vietnamese, setVietnamese] = useState(remembered === 'vietnamese')
   if (!selected) return null
@@ -50,7 +62,13 @@ export function ChooseLength({ book, chapter, top, onClose }: { book: Book; chap
       <p className="soft">Kéo thước tới thời gian bạn có.</p>
       <div className="ruler" role="radiogroup" aria-label="Độ dài">
         {ruler.toReversed().map((option) => (
-          <button key={option.length} type="button" role="radio" aria-checked={sameOption(option, selected)} onClick={() => setSelected(option)}>
+          <button
+            key={option.length}
+            type="button"
+            role="radio"
+            aria-checked={sameOption(option, selected)}
+            onClick={() => setSelected(option)}
+          >
             {`${option.minutes}'`}
             <small>{lengthName(option.length)}</small>
           </button>

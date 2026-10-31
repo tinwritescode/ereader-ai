@@ -5,9 +5,30 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 const PORT = Number(process.env['STUB_PORT'] ?? 4010)
 const PLANS = {
-  free: { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 1, chapterVoice: false, monthlyBookTranslations: 0 },
-  plus: { books: 30, monthlyDigests: 100, monthlyVbeeMinutes: 300, maxFileBytes: 1, chapterVoice: false, monthlyBookTranslations: 0 },
-  max: { books: 200, monthlyDigests: 500, monthlyVbeeMinutes: 1500, maxFileBytes: 1, chapterVoice: true, monthlyBookTranslations: 3 },
+  free: {
+    books: 3,
+    monthlyDigests: 10,
+    monthlyVbeeMinutes: 30,
+    maxFileBytes: 1,
+    chapterVoice: false,
+    monthlyBookTranslations: 0,
+  },
+  plus: {
+    books: 30,
+    monthlyDigests: 100,
+    monthlyVbeeMinutes: 300,
+    maxFileBytes: 1,
+    chapterVoice: false,
+    monthlyBookTranslations: 0,
+  },
+  max: {
+    books: 200,
+    monthlyDigests: 500,
+    monthlyVbeeMinutes: 1500,
+    maxFileBytes: 1,
+    chapterVoice: true,
+    monthlyBookTranslations: 3,
+  },
 }
 
 type Task = Record<string, unknown> & { id: string; state: string; progress: number }
@@ -21,7 +42,14 @@ const manyChapters = Array.from({ length: 400 }, (_, index) => ({
   minutes: 12,
 }))
 
-const bookOf = (bookId: string, title: string, author: string | null, language: string | null, chapterCount: number, hasCover = false) => ({
+const bookOf = (
+  bookId: string,
+  title: string,
+  author: string | null,
+  language: string | null,
+  chapterCount: number,
+  hasCover = false,
+) => ({
   bookId,
   status: 'ready',
   title,
@@ -68,8 +96,22 @@ function fresh() {
     ],
     tasks: { voice: [] as Task[], translation: [] as Task[], book: [] as Task[] },
     accounts: [
-      { id: 'a1', email: 'reader@example.com', role: 'user', plan: 'free', requestedPlan: 'plus', usage: { digests: 2, vbeeSeconds: 0, bookTranslations: 0 } },
-      { id: 'a2', email: 'boss@example.com', role: 'super_admin', plan: 'max', requestedPlan: null, usage: { digests: 9, vbeeSeconds: 0, bookTranslations: 0 } },
+      {
+        id: 'a1',
+        email: 'reader@example.com',
+        role: 'user',
+        plan: 'free',
+        requestedPlan: 'plus',
+        usage: { digests: 2, vbeeSeconds: 0, bookTranslations: 0 },
+      },
+      {
+        id: 'a2',
+        email: 'boss@example.com',
+        role: 'super_admin',
+        plan: 'max',
+        requestedPlan: null,
+        usage: { digests: 9, vbeeSeconds: 0, bookTranslations: 0 },
+      },
     ],
   }
 }
@@ -91,7 +133,10 @@ const chapters = (bookId: string) =>
 const blocks = (chapterId: string) => [
   { kind: 'heading', text: `Đầu chương ${chapterId}` },
   { kind: 'paragraph', text: `Câu thứ nhất của ${chapterId}. Câu thứ hai rất ngắn. Câu thứ ba kết thúc đoạn.` },
-  ...Array.from({ length: 40 }, (_, index) => ({ kind: 'paragraph', text: `Đoạn ${index + 1} kể tiếp câu chuyện. Nó có hai câu.` })),
+  ...Array.from({ length: 40 }, (_, index) => ({
+    kind: 'paragraph',
+    text: `Đoạn ${index + 1} kể tiếp câu chuyện. Nó có hai câu.`,
+  })),
 ]
 
 /** A short tone, so a browser has something real to decode and finish. */
@@ -117,7 +162,10 @@ function wav(seconds = 0.35): Buffer {
   return out
 }
 
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+)
 
 const body = (request: IncomingMessage) =>
   new Promise<Buffer>((resolve) => {
@@ -152,7 +200,11 @@ function advance(tasks: Task[]): void {
   }
 }
 
-function wholeBookTask(kind: 'bookTranslation' | 'bookVoice', bookId: string, voice: { code: string; name: string } | null): Task {
+function wholeBookTask(
+  kind: 'bookTranslation' | 'bookVoice',
+  bookId: string,
+  voice: { code: string; name: string } | null,
+): Task {
   const book = state.books.find((entry) => entry.bookId === bookId)
   const id = `task-${kind}-${bookId}-${Date.now()}`
   return {
@@ -204,11 +256,19 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return send(response, 204)
   }
   if (path === '/__stub/state') {
-    return send(response, 200, { refreshCalls: state.refreshCalls, speechCalls: state.speechCalls, uploads: state.uploads, requestedPlan: state.requestedPlan, accounts: state.accounts })
+    return send(response, 200, {
+      refreshCalls: state.refreshCalls,
+      speechCalls: state.speechCalls,
+      uploads: state.uploads,
+      requestedPlan: state.requestedPlan,
+      accounts: state.accounts,
+    })
   }
   if (path === '/__stub/task') {
     const task = await json<Task>()
-    state.tasks[task['kind'] === 'chapterVoice' ? 'voice' : task['kind'] === 'bookVoice' ? 'book' : 'translation'].push(task)
+    state.tasks[task['kind'] === 'chapterVoice' ? 'voice' : task['kind'] === 'bookVoice' ? 'book' : 'translation'].push(
+      task,
+    )
     return send(response, 204)
   }
   if (path === '/user_management/authorize') {
@@ -299,7 +359,12 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   const voiceOfBook = /^\/books\/([^/]+)\/voice$/.exec(path)
   if (voiceOfBook?.[1] && method === 'GET') {
     const bookId = voiceOfBook[1]
-    return send(response, 200, { chapters: 3, skipped: 0, minutes: 34, task: state.tasks.book.findLast((task) => task['bookId'] === bookId) ?? null })
+    return send(response, 200, {
+      chapters: 3,
+      skipped: 0,
+      minutes: 34,
+      task: state.tasks.book.findLast((task) => task['bookId'] === bookId) ?? null,
+    })
   }
   if (voiceOfBook?.[1] && method === 'POST') {
     const { voiceCode } = await json<{ voiceCode: string }>()
@@ -320,10 +385,25 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   if (digest?.[1] && method === 'POST') {
     if (state.digestFails) return send(response, 429, { code: state.digestFails })
     const { targetMinutes } = await json<{ targetMinutes: number }>()
-    return send(response, 200, { cacheKey: 'x', targetWords: 100, content: `Bản ${targetMinutes} phút của ${digest[1]}.\n\nĐoạn thứ hai.`, cached: false })
+    return send(response, 200, {
+      cacheKey: 'x',
+      targetWords: 100,
+      content: `Bản ${targetMinutes} phút của ${digest[1]}.\n\nĐoạn thứ hai.`,
+      cached: false,
+    })
   }
   const chapter = /^\/chapters\/([^/]+)$/.exec(path)
-  if (chapter?.[1]) return send(response, 200, { chapterId: chapter[1], bookId: 'x', index: 0, label: 'x', subtitle: null, wordCount: 1, minutes: 1, blocks: blocks(chapter[1]) })
+  if (chapter?.[1])
+    return send(response, 200, {
+      chapterId: chapter[1],
+      bookId: 'x',
+      index: 0,
+      label: 'x',
+      subtitle: null,
+      wordCount: 1,
+      minutes: 1,
+      blocks: blocks(chapter[1]),
+    })
   if (path === '/speech/voices') return send(response, 200, { voices: VOICES })
   if (path === '/speech' && method === 'POST') {
     const { text } = await json<{ text: string }>()
@@ -335,7 +415,20 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   }
   if (path === '/speech/tasks' && method === 'POST') {
     const job = await json<Record<string, unknown> & { sentences: string[] }>()
-    const task: Task = { ...job, id: `task-chapter-${Date.now()}`, kind: 'chapterVoice', voiceName: 'Hạt Dẻ', state: 'running', code: null, done: 1, total: job.sentences.length, position: null, progress: 0, createdAt: new Date().toISOString(), finishedAt: null }
+    const task: Task = {
+      ...job,
+      id: `task-chapter-${Date.now()}`,
+      kind: 'chapterVoice',
+      voiceName: 'Hạt Dẻ',
+      state: 'running',
+      code: null,
+      done: 1,
+      total: job.sentences.length,
+      position: null,
+      progress: 0,
+      createdAt: new Date().toISOString(),
+      finishedAt: null,
+    }
     state.tasks.voice.push(task)
     return send(response, 200, task)
   }
@@ -361,7 +454,8 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       state.tasks[list] = state.tasks[list].filter((entry) => entry.id !== task[2])
       return send(response, 204)
     }
-    if (task[3] === 'first' && found) found['current'] = { chapterId: (await json<{ chapterId: string }>()).chapterId, percent: 0 }
+    if (task[3] === 'first' && found)
+      found['current'] = { chapterId: (await json<{ chapterId: string }>()).chapterId, percent: 0 }
     if (task[3] === 'resume' && found) {
       found['state'] = 'running'
       found['code'] = null

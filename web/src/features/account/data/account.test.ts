@@ -1,7 +1,14 @@
 import { expect, it } from 'vitest'
 import { AccountWire } from './account'
 
-const limits = { books: 3, monthlyDigests: 10, monthlyVbeeMinutes: 30, maxFileBytes: 1, chapterVoice: false, monthlyBookTranslations: 0 }
+const limits = {
+  books: 3,
+  monthlyDigests: 10,
+  monthlyVbeeMinutes: 30,
+  maxFileBytes: 1,
+  chapterVoice: false,
+  monthlyBookTranslations: 0,
+}
 
 it('turns the wire into an account, leaving provider names behind', () => {
   const account = AccountWire.parse({

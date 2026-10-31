@@ -31,7 +31,9 @@ export async function coverResponse(id: string): Promise<Response> {
 export async function speechResponse(request: Request): Promise<Response> {
   try {
     const body = await request.text()
-    return streamed(await authedResponse('/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body }))
+    return streamed(
+      await authedResponse('/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body }),
+    )
   } catch (error) {
     return failed(error)
   }
@@ -40,7 +42,8 @@ export async function speechResponse(request: Request): Promise<Response> {
 /** The file goes straight through, so it can be sent once; on an expired token the browser sends it again. */
 export async function uploadResponse(request: Request): Promise<Response> {
   const type = request.headers.get('content-type')
-  if (!type?.startsWith('multipart/form-data') || !request.body) return Response.json({ code: 'FILE_REQUIRED' }, { status: 400 })
+  if (!type?.startsWith('multipart/form-data') || !request.body)
+    return Response.json({ code: 'FILE_REQUIRED' }, { status: 400 })
   try {
     const init: RequestInit & { duplex: 'half' } = {
       method: 'POST',

@@ -7,8 +7,13 @@ export const stub = {
   expire: () => fetch(`${STUB}/__stub/expire`, { method: 'POST' }),
   set: (values: object) => fetch(`${STUB}/__stub/set`, { method: 'POST', body: JSON.stringify(values) }),
   task: (task: object) => fetch(`${STUB}/__stub/task`, { method: 'POST', body: JSON.stringify(task) }),
-  state: async (): Promise<{ refreshCalls: number; speechCalls: string[]; uploads: string[]; requestedPlan: string | null; accounts: { id: string; plan: string }[] }> =>
-    (await fetch(`${STUB}/__stub/state`)).json(),
+  state: async (): Promise<{
+    refreshCalls: number
+    speechCalls: string[]
+    uploads: string[]
+    requestedPlan: string | null
+    accounts: { id: string; plan: string }[]
+  }> => (await fetch(`${STUB}/__stub/state`)).json(),
 }
 
 export const hydrated = (page: Page) => page.locator('html[data-app-ready]').waitFor({ state: 'attached' })

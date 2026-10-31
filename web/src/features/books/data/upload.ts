@@ -29,12 +29,18 @@ const codeFrom = ({ status, body }: Answer): string => {
 }
 
 /** Puts an EPUB on the shelf. An expired token consumes the stream, so the file goes again once. */
-export async function uploadEpub({ file, onProgress }: { file: File; onProgress: (share: number) => void }): Promise<Book> {
+export async function uploadEpub({
+  file,
+  onProgress,
+}: {
+  file: File
+  onProgress: (share: number) => void
+}): Promise<Book> {
   const first = await post({ file, onProgress })
-  const answer = first.status === 401 && codeFrom(first) === 'SESSION_RENEWED' ? await post({ file, onProgress }) : first
+  const answer =
+    first.status === 401 && codeFrom(first) === 'SESSION_RENEWED' ? await post({ file, onProgress }) : first
   if (answer.status < 200 || answer.status >= 300) throw new Error(codeFrom(answer))
   const book = BookWire.safeParse(answer.body)
   if (!book.success) throw new Error('UNEXPECTED_RESPONSE')
   return book.data
 }
-

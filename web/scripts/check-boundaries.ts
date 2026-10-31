@@ -120,7 +120,9 @@ export function violationsIn({ path, code }: { path: string; code: string }): Vi
   const from = layerOf(path)
   const specifiers = [
     ...module.staticImports.map((entry) => entry.moduleRequest.value),
-    ...module.staticExports.flatMap((entry) => entry.entries.flatMap(({ moduleRequest }) => (moduleRequest ? [moduleRequest.value] : []))),
+    ...module.staticExports.flatMap((entry) =>
+      entry.entries.flatMap(({ moduleRequest }) => (moduleRequest ? [moduleRequest.value] : [])),
+    ),
     ...module.dynamicImports.flatMap(({ moduleRequest }) => {
       const literal = /^['"`](.+)['"`]$/.exec(code.slice(moduleRequest.start, moduleRequest.end))
       return literal?.[1] ? [literal[1]] : []
@@ -131,13 +133,15 @@ export function violationsIn({ path, code }: { path: string; code: string }): Vi
   for (const specifier of new Set(specifiers)) {
     const target = targetOf(path, specifier)
     if (target === null) {
-      if (from.kind === 'feature' && from.part === 'domain' && !isTest && !DOMAIN_PACKAGES.has(specifier)) report('domain-purity', specifier)
+      if (from.kind === 'feature' && from.part === 'domain' && !isTest && !DOMAIN_PACKAGES.has(specifier))
+        report('domain-purity', specifier)
       continue
     }
     const rule = importRule(from, layerOf(target))
     if (rule) report(rule, specifier)
   }
-  if (from.kind === 'feature' && from.part === 'domain' && !isTest) browserUses(program).forEach((name) => report('domain-purity', name))
+  if (from.kind === 'feature' && from.part === 'domain' && !isTest)
+    browserUses(program).forEach((name) => report('domain-purity', name))
   typeViolations(program).forEach(({ rule, detail }) => report(rule, detail))
   return found
 }

@@ -64,7 +64,11 @@ export function turnOf(task: WholeBookTask, chapterId: string): ChapterTurn {
   return task.waiting.includes(chapterId) ? 'later' : 'none'
 }
 
-export function translationMark({ chapterId, translated, task }: { chapterId: string } & BookTranslation): string | null {
+export function translationMark({
+  chapterId,
+  translated,
+  task,
+}: { chapterId: string } & BookTranslation): string | null {
   if (translated.includes(chapterId)) return 'đã dịch'
   if (!task) return null
   const turn = turnOf(task, chapterId)
@@ -97,7 +101,17 @@ function offerOfTask(task: WholeBookTask | null): WholeBookOffer | null {
 }
 
 /** `monthly` is the plan's book translations a month; `standing` is null until loaded. */
-export function translateOfferFor({ foreign, chapterCount, monthly, standing }: { foreign: boolean; chapterCount: number; monthly: number; standing: BookTranslation | null }): WholeBookOffer {
+export function translateOfferFor({
+  foreign,
+  chapterCount,
+  monthly,
+  standing,
+}: {
+  foreign: boolean
+  chapterCount: number
+  monthly: number
+  standing: BookTranslation | null
+}): WholeBookOffer {
   if (!foreign) return { kind: 'hidden' }
   const ofTask = offerOfTask(standing?.task ?? null)
   if (ofTask) return ofTask
@@ -114,14 +128,25 @@ export function voiceOfferFor({ allowed, standing }: { allowed: boolean; standin
 }
 
 /** About how many of `chapters` the `left` minutes pay for. */
-export function chaptersWithin({ chapters, minutes, left }: { chapters: number; minutes: number; left: number }): number {
+export function chaptersWithin({
+  chapters,
+  minutes,
+  left,
+}: {
+  chapters: number
+  minutes: number
+  left: number
+}): number {
   return left >= minutes ? chapters : Math.floor((chapters * left) / minutes)
 }
 
 const finishOf = (task: LongTask) => `${task.id}:${task.state}:${task.finishedAt ?? ''}`
 
 /** Finishes not told yet, and what is then known as told. */
-export function freshFinishes({ tasks, seen }: { tasks: readonly LongTask[]; seen: readonly string[] }): { fresh: LongTask[]; seen: string[] } {
+export function freshFinishes({ tasks, seen }: { tasks: readonly LongTask[]; seen: readonly string[] }): {
+  fresh: LongTask[]
+  seen: string[]
+} {
   const known = new Set(seen)
   const fresh = tasks.filter((task) => !isActive(task) && !known.has(finishOf(task)))
   return { fresh, seen: [...seen, ...fresh.map(finishOf)] }
@@ -133,11 +158,23 @@ export function noticeOf(task: LongTask): { text: string; action: string } {
   const words = (() => {
     switch (task.kind) {
       case 'chapterVoice':
-        return { done: `Đã tạo xong giọng đọc ${task.chapterLabel}.`, halted: `Dừng tạo giọng đọc ${task.chapterLabel} ở ${percent}%.`, open: 'Nghe ngay' }
+        return {
+          done: `Đã tạo xong giọng đọc ${task.chapterLabel}.`,
+          halted: `Dừng tạo giọng đọc ${task.chapterLabel} ở ${percent}%.`,
+          open: 'Nghe ngay',
+        }
       case 'bookVoice':
-        return { done: `Đã tạo xong giọng đọc ${task.bookTitle}.`, halted: `Dừng tạo giọng đọc ${task.bookTitle} ở ${percent}%.`, open: 'Nghe ngay' }
+        return {
+          done: `Đã tạo xong giọng đọc ${task.bookTitle}.`,
+          halted: `Dừng tạo giọng đọc ${task.bookTitle} ở ${percent}%.`,
+          open: 'Nghe ngay',
+        }
       case 'bookTranslation':
-        return { done: `Đã dịch xong ${task.bookTitle}.`, halted: `Dừng dịch ${task.bookTitle} ở ${percent}%.`, open: 'Đọc ngay' }
+        return {
+          done: `Đã dịch xong ${task.bookTitle}.`,
+          halted: `Dừng dịch ${task.bookTitle} ở ${percent}%.`,
+          open: 'Đọc ngay',
+        }
       default: {
         const _exhaustive: never = task
         return _exhaustive
@@ -153,18 +190,40 @@ export function failureText(code: string | null): string {
   return code === 'TRANSLATE_FAILED' ? 'Không kết nối được tới máy dịch' : 'Không kết nối được tới máy đọc'
 }
 
-export type TaskRow = { kind: string; name: string; progress: string; percent: number; stoppedNote: string; failure: string }
+export type TaskRow = {
+  kind: string
+  name: string
+  progress: string
+  percent: number
+  stoppedNote: string
+  failure: string
+}
 
 export function rowOf(task: LongTask): TaskRow {
   const percent = percentOf(task)
   const words = (() => {
     switch (task.kind) {
       case 'chapterVoice':
-        return { kind: `Tạo giọng đọc, ${task.voiceName}`, name: `${task.chapterLabel}, ${task.bookTitle}`, progress: `Câu ${task.done} trên ${task.total}`, stoppedNote: `Bị dừng ở ${percent}%, phần đã làm vẫn còn` }
+        return {
+          kind: `Tạo giọng đọc, ${task.voiceName}`,
+          name: `${task.chapterLabel}, ${task.bookTitle}`,
+          progress: `Câu ${task.done} trên ${task.total}`,
+          stoppedNote: `Bị dừng ở ${percent}%, phần đã làm vẫn còn`,
+        }
       case 'bookTranslation':
-        return { kind: 'Dịch cả sách', name: task.bookTitle, progress: `Chương ${task.done} trên ${task.total}`, stoppedNote: `Dịch cả sách, bị dừng ở ${percent}%` }
+        return {
+          kind: 'Dịch cả sách',
+          name: task.bookTitle,
+          progress: `Chương ${task.done} trên ${task.total}`,
+          stoppedNote: `Dịch cả sách, bị dừng ở ${percent}%`,
+        }
       case 'bookVoice':
-        return { kind: `Tạo giọng cả sách, ${task.voiceName}`, name: task.bookTitle, progress: `Chương ${task.done} trên ${task.total}`, stoppedNote: `Tạo giọng cả sách, bị dừng ở ${percent}%` }
+        return {
+          kind: `Tạo giọng cả sách, ${task.voiceName}`,
+          name: task.bookTitle,
+          progress: `Chương ${task.done} trên ${task.total}`,
+          stoppedNote: `Tạo giọng cả sách, bị dừng ở ${percent}%`,
+        }
       default: {
         const _exhaustive: never = task
         return _exhaustive
@@ -172,7 +231,12 @@ export function rowOf(task: LongTask): TaskRow {
     }
   })()
   const queued = task.state === 'queued' && task.position !== null
-  return { ...words, kind: queued ? `${words.kind}, thứ ${task.position} trong hàng` : words.kind, percent, failure: failureText(task.code) }
+  return {
+    ...words,
+    kind: queued ? `${words.kind}, thứ ${task.position} trong hàng` : words.kind,
+    percent,
+    failure: failureText(task.code),
+  }
 }
 
 export type TaskGroup = 'running' | 'queued' | 'finished'

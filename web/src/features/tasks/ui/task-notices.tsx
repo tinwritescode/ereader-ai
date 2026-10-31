@@ -34,7 +34,10 @@ export function TaskNotices() {
       return navigate({
         to: '/books/$bookId/chapters/$chapterId',
         params: { bookId: task.bookId, chapterId: task.chapterId },
-        search: task.minutes === null ? { length: 'original', minutes: 0, listen: true } : { length: 'shortened', minutes: task.minutes, listen: true },
+        search:
+          task.minutes === null
+            ? { length: 'original', minutes: 0, listen: true }
+            : { length: 'shortened', minutes: task.minutes, listen: true },
       })
     }
     for (const task of fresh) {

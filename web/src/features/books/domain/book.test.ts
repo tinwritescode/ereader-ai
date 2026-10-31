@@ -18,15 +18,24 @@ describe('chapter names', () => {
   })
 
   it('reads a number over a title', () => {
-    expect(chapterHeading({ label: 'Chương Một', subtitle: 'Ngày chọn người' })).toEqual({ number: 'Chương Một', title: 'Ngày chọn người' })
+    expect(chapterHeading({ label: 'Chương Một', subtitle: 'Ngày chọn người' })).toEqual({
+      number: 'Chương Một',
+      title: 'Ngày chọn người',
+    })
   })
 
   it('splits a title that repeats its number', () => {
-    expect(chapterHeading({ label: 'Quy luật 1', subtitle: 'QUY LUẬT 1 ĐỨNG THẲNG' })).toEqual({ number: 'Quy luật 1', title: 'Đứng thẳng' })
+    expect(chapterHeading({ label: 'Quy luật 1', subtitle: 'QUY LUẬT 1 ĐỨNG THẲNG' })).toEqual({
+      number: 'Quy luật 1',
+      title: 'Đứng thẳng',
+    })
   })
 
   it('treats a repeated heading as one title', () => {
-    expect(chapterHeading({ label: 'Mở đầu', subtitle: 'MỞ ĐẦU' })).toEqual({ number: null, title: 'MỞ ĐẦU'.toLowerCase().replace('m', 'M') })
+    expect(chapterHeading({ label: 'Mở đầu', subtitle: 'MỞ ĐẦU' })).toEqual({
+      number: null,
+      title: 'MỞ ĐẦU'.toLowerCase().replace('m', 'M'),
+    })
   })
 
   it('names a chapter by its number when it has one', () => {

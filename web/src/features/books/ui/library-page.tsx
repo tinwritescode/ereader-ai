@@ -8,13 +8,22 @@ import type { Book } from '../domain/book'
 import { codeOf, errorMessage } from '../domain/words'
 import { BookCover } from './book-cover'
 
-type Upload = { kind: 'none' } | { kind: 'uploading'; fileName: string; share: number } | { kind: 'failed'; fileName: string; code: string }
+type Upload =
+  | { kind: 'none' }
+  | { kind: 'uploading'; fileName: string; share: number }
+  | { kind: 'failed'; fileName: string; code: string }
 
 function hasFiles(event: React.DragEvent): boolean {
   return event.dataTransfer.types.includes('Files')
 }
 
-export function LibraryPage({ continueReading, captionOf }: { continueReading: ReactNode; captionOf: (book: Book) => ReactNode }) {
+export function LibraryPage({
+  continueReading,
+  captionOf,
+}: {
+  continueReading: ReactNode
+  captionOf: (book: Book) => ReactNode
+}) {
   const { data: books } = useSuspenseQuery(booksQuery())
   const queryClient = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
@@ -27,7 +36,10 @@ export function LibraryPage({ continueReading, captionOf }: { continueReading: R
     onMutate: (file) => setUpload({ kind: 'uploading', fileName: file.name, share: 0 }),
     onSuccess: (book) => {
       // Importing the same file again returns the existing book; keep one entry per book.
-      queryClient.setQueryData(booksQuery().queryKey, (all) => [book, ...(all ?? []).filter((entry) => entry.bookId !== book.bookId)])
+      queryClient.setQueryData(booksQuery().queryKey, (all) => [
+        book,
+        ...(all ?? []).filter((entry) => entry.bookId !== book.bookId),
+      ])
       void queryClient.invalidateQueries({ queryKey: ['me'] })
       setUpload({ kind: 'none' })
     },
@@ -99,9 +111,19 @@ function UploadNote({ upload }: { upload: Upload }) {
     case 'none':
       return null
     case 'uploading':
-      return <p className="upload-note" role="status">{`${upload.fileName}: Đang tải lên, ${Math.round(upload.share * 100)}%`}</p>
+      return (
+        <p
+          className="upload-note"
+          role="status"
+        >{`${upload.fileName}: Đang tải lên, ${Math.round(upload.share * 100)}%`}</p>
+      )
     case 'failed':
-      return <p className="upload-note failure" role="alert">{`${upload.fileName}: Không thêm được. ${errorMessage(upload.code)}`}</p>
+      return (
+        <p
+          className="upload-note failure"
+          role="alert"
+        >{`${upload.fileName}: Không thêm được. ${errorMessage(upload.code)}`}</p>
+      )
     default: {
       const _exhaustive: never = upload
       return _exhaustive

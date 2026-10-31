@@ -37,7 +37,13 @@ function PlanForm({ account }: { account: ManagedAccount }) {
             <legend className="sr-only">{`Gói của ${account.email}`}</legend>
             {PLAN_NAMES.map((plan) => (
               <label key={plan}>
-                <input type="radio" name={`plan-${account.id}`} value={plan} checked={field.state.value === plan} onChange={() => field.handleChange(plan)} />
+                <input
+                  type="radio"
+                  name={`plan-${account.id}`}
+                  value={plan}
+                  checked={field.state.value === plan}
+                  onChange={() => field.handleChange(plan)}
+                />
                 {planLabel(plan)}
               </label>
             ))}
@@ -47,7 +53,12 @@ function PlanForm({ account }: { account: ManagedAccount }) {
       <form.Subscribe selector={(state) => [state.isDirty, state.isSubmitting] as const}>
         {([dirty, submitting]) =>
           dirty && (
-            <button type="submit" className="ink-link" disabled={submitting} aria-label={`Lưu gói của ${account.email}`}>
+            <button
+              type="submit"
+              className="ink-link"
+              disabled={submitting}
+              aria-label={`Lưu gói của ${account.email}`}
+            >
               Lưu
             </button>
           )
@@ -59,8 +70,16 @@ function PlanForm({ account }: { account: ManagedAccount }) {
 
 const columns = column.columns([
   column.accessor('email', { header: 'Email' }),
-  column.display({ id: 'note', header: 'Ghi chú', cell: ({ row: { original } }) => <span className="soft">{adminNote(original)}</span> }),
-  column.display({ id: 'plan', header: 'Gói', cell: ({ row: { original } }) => <PlanForm key={original.plan} account={original} /> }),
+  column.display({
+    id: 'note',
+    header: 'Ghi chú',
+    cell: ({ row: { original } }) => <span className="soft">{adminNote(original)}</span>,
+  }),
+  column.display({
+    id: 'plan',
+    header: 'Gói',
+    cell: ({ row: { original } }) => <PlanForm key={original.plan} account={original} />,
+  }),
 ])
 
 export function AdminPage() {

@@ -7,7 +7,8 @@ const SILENT_SAMPLES = RATE / 10
 /** A tenth of a second of silence: playing it inside a tap lets later clips play without one (Safari). */
 function silence(): string {
   const wav = new DataView(new ArrayBuffer(44 + SILENT_SAMPLES * 2))
-  const text = (at: number, value: string) => [...value].forEach((letter, index) => wav.setUint8(at + index, letter.charCodeAt(0)))
+  const text = (at: number, value: string) =>
+    [...value].forEach((letter, index) => wav.setUint8(at + index, letter.charCodeAt(0)))
   text(0, 'RIFF')
   wav.setUint32(4, 36 + SILENT_SAMPLES * 2, true)
   text(8, 'WAVEfmt ')

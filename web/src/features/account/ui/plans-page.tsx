@@ -31,7 +31,11 @@ export function PlansPage() {
         {PLAN_NAMES.map((plan) => {
           const current = plan === account.plan
           return (
-            <section key={plan} className={`plan-card ${current ? 'current' : ''}`} aria-label={`Gói ${planLabel(plan)}`}>
+            <section
+              key={plan}
+              className={`plan-card ${current ? 'current' : ''}`}
+              aria-label={`Gói ${planLabel(plan)}`}
+            >
               <header>
                 {planLabel(plan)}
                 {current && <span className="hand">đang dùng</span>}

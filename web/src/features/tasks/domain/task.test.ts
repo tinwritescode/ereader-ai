@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { chaptersWithin, failureText, freshFinishes, noticeOf, rowOf, translateOfferFor, translationMark, turnOf, voiceOfferFor } from './task'
+import {
+  chaptersWithin,
+  failureText,
+  freshFinishes,
+  noticeOf,
+  rowOf,
+  translateOfferFor,
+  translationMark,
+  turnOf,
+  voiceOfferFor,
+} from './task'
 import type { BookTranslationTask, BookVoiceTask, ChapterVoiceTask } from './task'
 
-const base = { bookId: 'b', bookTitle: 'Sách', code: null, position: null, createdAt: '2026-10-01T00:00:00Z', finishedAt: null }
+const base = {
+  bookId: 'b',
+  bookTitle: 'Sách',
+  code: null,
+  position: null,
+  createdAt: '2026-10-01T00:00:00Z',
+  finishedAt: null,
+}
 const translation = (over: Partial<BookTranslationTask> = {}): BookTranslationTask => ({
   ...base,
   id: 't',
@@ -58,18 +75,43 @@ describe('chapters in a whole-book task', () => {
 
 describe('whole-book offers', () => {
   it('offers translation only for a foreign book on a plan that has it', () => {
-    expect(translateOfferFor({ foreign: false, chapterCount: 3, monthly: 3, standing: null })).toEqual({ kind: 'hidden' })
-    expect(translateOfferFor({ foreign: true, chapterCount: 3, monthly: 0, standing: null })).toEqual({ kind: 'locked' })
+    expect(translateOfferFor({ foreign: false, chapterCount: 3, monthly: 3, standing: null })).toEqual({
+      kind: 'hidden',
+    })
+    expect(translateOfferFor({ foreign: true, chapterCount: 3, monthly: 0, standing: null })).toEqual({
+      kind: 'locked',
+    })
     expect(translateOfferFor({ foreign: true, chapterCount: 3, monthly: 3, standing: null })).toEqual({ kind: 'open' })
-    expect(translateOfferFor({ foreign: true, chapterCount: 2, monthly: 3, standing: { translated: ['a', 'b'], task: null } })).toEqual({ kind: 'done' })
+    expect(
+      translateOfferFor({
+        foreign: true,
+        chapterCount: 2,
+        monthly: 3,
+        standing: { translated: ['a', 'b'], task: null },
+      }),
+    ).toEqual({ kind: 'done' })
   })
 
   it('follows a task under way or stopped before anything else', () => {
     const task = translation({ state: 'stopped' })
-    expect(translateOfferFor({ foreign: true, chapterCount: 3, monthly: 0, standing: { translated: [], task } })).toEqual({ kind: 'stopped', task })
-    expect(voiceOfferFor({ allowed: false, standing: { chapters: 3, skipped: 0, minutes: 30, task: bookVoice() } }).kind).toBe('underWay')
-    expect(voiceOfferFor({ allowed: true, standing: { chapters: 3, skipped: 0, minutes: 30, task: bookVoice({ state: 'done' }) } })).toEqual({ kind: 'done' })
-    expect(voiceOfferFor({ allowed: true, standing: { chapters: 3, skipped: 1, minutes: 30, task: bookVoice({ state: 'done' }) } })).toEqual({ kind: 'open' })
+    expect(
+      translateOfferFor({ foreign: true, chapterCount: 3, monthly: 0, standing: { translated: [], task } }),
+    ).toEqual({ kind: 'stopped', task })
+    expect(
+      voiceOfferFor({ allowed: false, standing: { chapters: 3, skipped: 0, minutes: 30, task: bookVoice() } }).kind,
+    ).toBe('underWay')
+    expect(
+      voiceOfferFor({
+        allowed: true,
+        standing: { chapters: 3, skipped: 0, minutes: 30, task: bookVoice({ state: 'done' }) },
+      }),
+    ).toEqual({ kind: 'done' })
+    expect(
+      voiceOfferFor({
+        allowed: true,
+        standing: { chapters: 3, skipped: 1, minutes: 30, task: bookVoice({ state: 'done' }) },
+      }),
+    ).toEqual({ kind: 'open' })
   })
 
   it('counts how many chapters the minutes left pay for', () => {
@@ -96,15 +138,26 @@ describe('finishes the reader is told about', () => {
   it('words a notice as the app does', () => {
     expect(noticeOf(chapterVoice())).toEqual({ text: 'Đã tạo xong giọng đọc Chương Một.', action: 'Nghe ngay' })
     expect(noticeOf(translation({ state: 'done' }))).toEqual({ text: 'Đã dịch xong Sách.', action: 'Đọc ngay' })
-    expect(noticeOf(bookVoice({ state: 'stopped', percent: 36 }))).toEqual({ text: 'Dừng tạo giọng đọc Sách ở 36%.', action: 'Xem tác vụ' })
+    expect(noticeOf(bookVoice({ state: 'stopped', percent: 36 }))).toEqual({
+      text: 'Dừng tạo giọng đọc Sách ở 36%.',
+      action: 'Xem tác vụ',
+    })
   })
 })
 
 describe('a task row', () => {
   it('says what, how far and why it stopped', () => {
-    expect(rowOf(chapterVoice({ state: 'running', done: 2 }))).toMatchObject({ kind: 'Tạo giọng đọc, Hạt Dẻ', name: 'Chương Một, Sách', progress: 'Câu 2 trên 4', percent: 50 })
+    expect(rowOf(chapterVoice({ state: 'running', done: 2 }))).toMatchObject({
+      kind: 'Tạo giọng đọc, Hạt Dẻ',
+      name: 'Chương Một, Sách',
+      progress: 'Câu 2 trên 4',
+      percent: 50,
+    })
     expect(rowOf(translation({ state: 'queued', position: 1 })).kind).toBe('Dịch cả sách, thứ 1 trong hàng')
-    expect(rowOf(bookVoice({ state: 'stopped', code: 'VOICE_LIMIT', percent: 36 }))).toMatchObject({ stoppedNote: 'Tạo giọng cả sách, bị dừng ở 36%', failure: 'Hết phút giọng qua mạng' })
+    expect(rowOf(bookVoice({ state: 'stopped', code: 'VOICE_LIMIT', percent: 36 }))).toMatchObject({
+      stoppedNote: 'Tạo giọng cả sách, bị dừng ở 36%',
+      failure: 'Hết phút giọng qua mạng',
+    })
     expect(failureText('TRANSLATE_FAILED')).toBe('Không kết nối được tới máy dịch')
     expect(failureText('X')).toBe('Không kết nối được tới máy đọc')
   })

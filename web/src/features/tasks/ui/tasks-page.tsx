@@ -15,7 +15,12 @@ function TaskAction({ task }: { task: LongTask }) {
   if (task.state === 'done') return null
   const stopped = task.state === 'stopped'
   return (
-    <button type="button" className="ink-link" aria-label={`${stopped ? 'Chạy tiếp' : 'Huỷ'} ${rowOf(task).name}`} onClick={() => (stopped ? actions.resume(task) : actions.cancel(task))}>
+    <button
+      type="button"
+      className="ink-link"
+      aria-label={`${stopped ? 'Chạy tiếp' : 'Huỷ'} ${rowOf(task).name}`}
+      onClick={() => (stopped ? actions.resume(task) : actions.cancel(task))}
+    >
       {stopped ? 'Chạy tiếp' : 'Huỷ'}
     </button>
   )

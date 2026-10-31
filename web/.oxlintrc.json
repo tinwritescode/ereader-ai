@@ -12,7 +12,10 @@
     // The design's radios and regions are styled buttons and divs, kept whole by their roles.
     "jsx-a11y/prefer-tag-over-role": "off",
     // Table cells take their text from FlexRender, which the rule cannot see through.
-    "jsx-a11y/control-has-associated-label": ["error", { "ignoreElements": ["audio", "canvas", "embed", "input", "textarea", "tr", "video", "td", "th"] }],
+    "jsx-a11y/control-has-associated-label": [
+      "error",
+      { "ignoreElements": ["audio", "canvas", "embed", "input", "textarea", "tr", "video", "td", "th"] }
+    ],
     // The side-effect import that keeps a module out of the browser bundle.
     "import/no-unassigned-import": ["warn", { "allow": ["**/server-only"] }],
     // The unused name that proves a switch is exhaustive.

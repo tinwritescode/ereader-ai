@@ -3,7 +3,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 import { TaskState, isActive } from '../domain/task'
-import type { BookTranslation, BookTranslationTask, BookVoice, BookVoiceTask, ChapterVoiceTask, LongTask } from '../domain/task'
+import type {
+  BookTranslation,
+  BookTranslationTask,
+  BookVoice,
+  BookVoiceTask,
+  ChapterVoiceTask,
+  LongTask,
+} from '../domain/task'
 
 const POLL_MS = 4000
 
@@ -45,15 +52,27 @@ const ChapterVoiceWire = z
     total: z.int(),
   })
   .transform((task): ChapterVoiceTask => task)
-const TranslationWire = z.object({ ...WholeBook, kind: z.literal('bookTranslation') }).transform((task): BookTranslationTask => task)
+const TranslationWire = z
+  .object({ ...WholeBook, kind: z.literal('bookTranslation') })
+  .transform((task): BookTranslationTask => task)
 const BookVoiceWire = z
-  .object({ ...WholeBook, kind: z.literal('bookVoice'), voiceCode: z.string(), voiceName: z.string(), voiced: z.array(z.string()) })
+  .object({
+    ...WholeBook,
+    kind: z.literal('bookVoice'),
+    voiceCode: z.string(),
+    voiceName: z.string(),
+    voiced: z.array(z.string()),
+  })
   .transform((task): BookVoiceTask => task)
 
 export const TaskWire = z.union([ChapterVoiceWire, TranslationWire, BookVoiceWire])
 const Kind = z.enum(['chapterVoice', 'bookTranslation', 'bookVoice'])
 type Kind = z.infer<typeof Kind>
-const PATHS: Record<Kind, string> = { chapterVoice: '/speech/tasks', bookTranslation: '/translations/tasks', bookVoice: '/voices/tasks' }
+const PATHS: Record<Kind, string> = {
+  chapterVoice: '/speech/tasks',
+  bookTranslation: '/translations/tasks',
+  bookVoice: '/voices/tasks',
+}
 
 const book = (bookId: string) => `/books/${encodeURIComponent(bookId)}`
 
@@ -61,7 +80,9 @@ const listTasks = createServerFn()
   .middleware([authMiddleware])
   .handler(async ({ context }) => {
     const lists = await Promise.all(
-      Object.values(PATHS).map((path) => context.backend.json({ path, schema: z.object({ tasks: z.array(TaskWire) }) })),
+      Object.values(PATHS).map((path) =>
+        context.backend.json({ path, schema: z.object({ tasks: z.array(TaskWire) }) }),
+      ),
     )
     // Oldest first, as the app shows them.
     return lists.flatMap(({ tasks }) => tasks).toSorted((a, b) => a.createdAt.localeCompare(b.createdAt))
@@ -75,7 +96,9 @@ const getTranslation = createServerFn()
   .handler(({ context, data }) =>
     context.backend.json({
       path: `${book(data.bookId)}/translation`,
-      schema: z.object({ translated: z.array(z.string()), task: TranslationWire.nullable() }).transform((standing): BookTranslation => standing),
+      schema: z
+        .object({ translated: z.array(z.string()), task: TranslationWire.nullable() })
+        .transform((standing): BookTranslation => standing),
     }),
   )
 
@@ -85,7 +108,9 @@ const getVoice = createServerFn()
   .handler(({ context, data }) =>
     context.backend.json({
       path: `${book(data.bookId)}/voice`,
-      schema: z.object({ chapters: z.int(), skipped: z.int(), minutes: z.int(), task: BookVoiceWire.nullable() }).transform((standing): BookVoice => standing),
+      schema: z
+        .object({ chapters: z.int(), skipped: z.int(), minutes: z.int(), task: BookVoiceWire.nullable() })
+        .transform((standing): BookVoice => standing),
     }),
   )
 
@@ -93,14 +118,24 @@ export const translateBook = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator(BookInput.extend({ startChapterId: z.string().nullable() }))
   .handler(({ context, data: { bookId, startChapterId } }) =>
-    context.backend.json({ path: `${book(bookId)}/translation`, method: 'POST', body: startChapterId ? { startChapterId } : {}, schema: TranslationWire }),
+    context.backend.json({
+      path: `${book(bookId)}/translation`,
+      method: 'POST',
+      body: startChapterId ? { startChapterId } : {},
+      schema: TranslationWire,
+    }),
   )
 
 export const voiceBook = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator(BookInput.extend({ voiceCode: z.string().min(1), startChapterId: z.string().nullable() }))
   .handler(({ context, data: { bookId, voiceCode, startChapterId } }) =>
-    context.backend.json({ path: `${book(bookId)}/voice`, method: 'POST', body: { voiceCode, ...(startChapterId ? { startChapterId } : {}) }, schema: BookVoiceWire }),
+    context.backend.json({
+      path: `${book(bookId)}/voice`,
+      method: 'POST',
+      body: { voiceCode, ...(startChapterId ? { startChapterId } : {}) },
+      schema: BookVoiceWire,
+    }),
   )
 
 export const voiceChapter = createServerFn({ method: 'POST' })
@@ -116,7 +151,9 @@ export const voiceChapter = createServerFn({ method: 'POST' })
       sentences: z.array(z.string()).min(1),
     }),
   )
-  .handler(({ context, data }) => context.backend.json({ path: '/speech/tasks', method: 'POST', body: data, schema: ChapterVoiceWire }))
+  .handler(({ context, data }) =>
+    context.backend.json({ path: '/speech/tasks', method: 'POST', body: data, schema: ChapterVoiceWire }),
+  )
 
 const TaskInput = z.object({ kind: Kind, id: z.string().min(1) })
 const taskPath = ({ kind, id }: z.infer<typeof TaskInput>) => `${PATHS[kind]}/${encodeURIComponent(id)}`
@@ -136,7 +173,11 @@ export const translateFirst = createServerFn({ method: 'POST' })
   .middleware([authMiddleware])
   .validator(z.object({ id: z.string().min(1), chapterId: z.string().min(1) }))
   .handler(({ context, data: { id, chapterId } }) =>
-    context.backend.empty({ path: `${taskPath({ kind: 'bookTranslation', id })}/first`, method: 'POST', body: { chapterId } }),
+    context.backend.empty({
+      path: `${taskPath({ kind: 'bookTranslation', id })}/first`,
+      method: 'POST',
+      body: { chapterId },
+    }),
   )
 
 const pollWhile = (active: boolean) => (active ? POLL_MS : false)

@@ -8,7 +8,11 @@ import { PageFailed, PageMissing } from './-page-states'
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
-    meta: [{ charSet: 'utf-8' }, { name: 'viewport', content: 'width=device-width, initial-scale=1' }, { title: 'Sổ đọc' }],
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { title: 'Sổ đọc' },
+    ],
     links: [{ rel: 'stylesheet', href: themeCss }],
   }),
   errorComponent: PageFailed,

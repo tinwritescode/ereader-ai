@@ -27,7 +27,13 @@ export function sameOption(a: LengthOption, b: LengthOption): boolean {
 }
 
 /** Lengths scale with the chapter, so a short chapter is never offered a longer version. */
-export function lengthOptionsFor({ chapterMinutes, vietnamese }: { chapterMinutes: number; vietnamese: boolean }): LengthOption[] {
+export function lengthOptionsFor({
+  chapterMinutes,
+  vietnamese,
+}: {
+  chapterMinutes: number
+  vietnamese: boolean
+}): LengthOption[] {
   const whole: LengthOption[] = [
     { length: 'original', minutes: chapterMinutes },
     ...(vietnamese ? [{ length: 'vietnamese' as const, minutes: chapterMinutes }] : []),
@@ -36,7 +42,10 @@ export function lengthOptionsFor({ chapterMinutes, vietnamese }: { chapterMinute
   return [
     ...whole,
     { length: 'shortened', minutes: Math.round(chapterMinutes * 0.5) },
-    { length: 'keyPoints', minutes: Math.min(Math.max(Math.round(chapterMinutes * 0.25), MINIMUM_OPTION_MINUTES), chapterMinutes) },
+    {
+      length: 'keyPoints',
+      minutes: Math.min(Math.max(Math.round(chapterMinutes * 0.25), MINIMUM_OPTION_MINUTES), chapterMinutes),
+    },
   ]
 }
 

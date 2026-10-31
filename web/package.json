@@ -2,9 +2,6 @@
   "name": "ereader-web",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
@@ -48,5 +45,8 @@
     "tsrs": "^0.20.1-ts7.1.0-beta",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

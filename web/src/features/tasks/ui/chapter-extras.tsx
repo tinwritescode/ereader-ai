@@ -13,7 +13,15 @@ import { isActive, percentOf, turnOf } from '../domain/task'
 import { tasksQuery, translateFirst, translationQuery, voiceChapter } from '../data/tasks'
 
 /** Shown in place of a translation that is not made yet. */
-export function TranslationNotice({ bookId, chapterId, onOriginal }: { bookId: string; chapterId: string; onOriginal: () => void }) {
+export function TranslationNotice({
+  bookId,
+  chapterId,
+  onOriginal,
+}: {
+  bookId: string
+  chapterId: string
+  onOriginal: () => void
+}) {
   const { data } = useQuery(translationQuery(bookId))
   const queryClient = useQueryClient()
   const first = useMutation({
@@ -22,7 +30,11 @@ export function TranslationNotice({ bookId, chapterId, onOriginal }: { bookId: s
   })
   const task = data?.task ?? null
   const turn = task ? turnOf(task, chapterId) : 'none'
-  const title = { now: 'Chương này đang được dịch', later: 'Chương này đang chờ dịch', none: 'Chương này chưa được dịch' }[turn]
+  const title = {
+    now: 'Chương này đang được dịch',
+    later: 'Chương này đang chờ dịch',
+    none: 'Chương này chưa được dịch',
+  }[turn]
   const text = {
     now: `Xong ${task?.current?.percent ?? 0}%. Bản dịch sẽ tự hiện.`,
     later: 'Bạn có thể đọc bản gốc trong lúc chờ, hoặc cho chương này dịch trước.',
@@ -47,7 +59,17 @@ export function TranslationNotice({ bookId, chapterId, onOriginal }: { bookId: s
 }
 
 /** Lets a Max reader have the server read the whole chapter ahead. */
-export function PrepareChapter({ account, source, voiceCode, sentences }: { account: Account; source: ListenSource; voiceCode: string; sentences: string[] }) {
+export function PrepareChapter({
+  account,
+  source,
+  voiceCode,
+  sentences,
+}: {
+  account: Account
+  source: ListenSource
+  voiceCode: string
+  sentences: string[]
+}) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
   const notice = useNotice()
@@ -70,11 +92,16 @@ export function PrepareChapter({ account, source, voiceCode, sentences }: { acco
     onSuccess: () => {
       setOpen(false)
       void queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      notice({ text: `Đang tạo giọng đọc ${source.chapterLabel}. Xong sẽ báo.`, action: { label: 'Xem tác vụ', run: () => void navigate({ to: '/tasks' }) } })
+      notice({
+        text: `Đang tạo giọng đọc ${source.chapterLabel}. Xong sẽ báo.`,
+        action: { label: 'Xem tác vụ', run: () => void navigate({ to: '/tasks' }) },
+      })
     },
     onError: (error) => notice({ text: `Chưa tạo được, kiểm tra mạng rồi thử lại. ${errorMessage(codeOf(error))}` }),
   })
-  const under = tasks.some((task) => task.kind === 'chapterVoice' && task.chapterId === source.chapterId && isActive(task))
+  const under = tasks.some(
+    (task) => task.kind === 'chapterVoice' && task.chapterId === source.chapterId && isActive(task),
+  )
   if (!limitsOf(account).chapterVoice || under || sentences.length === 0) return null
   const left = Math.max(0, limitsOf(account).monthlyVoiceMinutes - account.voiceMinutesUsed)
   return (
@@ -105,5 +132,9 @@ export function TaskCaption({ bookId, fallback }: { bookId: string; fallback: Re
   const working = tasks.findLast((task) => task.bookId === bookId && isActive(task))
   if (!working) return fallback
   const percent = percentOf(working)
-  return <span className="hand">{working.kind === 'bookTranslation' ? `đang dịch ${percent}%` : `tạo giọng đọc ${percent}%`}</span>
+  return (
+    <span className="hand">
+      {working.kind === 'bookTranslation' ? `đang dịch ${percent}%` : `tạo giọng đọc ${percent}%`}
+    </span>
+  )
 }

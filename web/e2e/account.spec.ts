@@ -11,7 +11,9 @@ test.describe('account', () => {
   test('shows use against the plan without provider names', async ({ page }) => {
     await signIn(page)
     await page.getByRole('link', { name: 'Tài khoản' }).click()
-    await expect(page.getByText('12 trên 1.500 phút', { exact: false }).or(page.getByText('12 trên 1500 phút', { exact: false }))).toBeVisible()
+    await expect(
+      page.getByText('12 trên 1.500 phút', { exact: false }).or(page.getByText('12 trên 1500 phút', { exact: false })),
+    ).toBeVisible()
     await expect(page.locator('body')).not.toContainText(/vbee/i)
   })
 
@@ -20,7 +22,9 @@ test.describe('account', () => {
     await stub.set({ plan: 'free', planRequestDelay: 1500 })
     await open(page, '/plans')
     await page.getByRole('region', { name: 'Gói Plus' }).getByRole('button', { name: 'Yêu cầu nâng gói' }).click()
-    await expect(page.getByRole('region', { name: 'Gói Plus' }).getByText('đã gửi yêu cầu')).toBeVisible({ timeout: 700 })
+    await expect(page.getByRole('region', { name: 'Gói Plus' }).getByText('đã gửi yêu cầu')).toBeVisible({
+      timeout: 700,
+    })
     await expect.poll(async () => (await stub.state()).requestedPlan).toBe('plus')
     await page.reload()
     await expect(page.getByRole('region', { name: 'Gói Plus' }).getByText('đã gửi yêu cầu')).toBeVisible()

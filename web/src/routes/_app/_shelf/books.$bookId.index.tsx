@@ -9,18 +9,27 @@ import { ChapterMark, WholeBookRows } from '~/features/tasks/ui/whole-book'
 
 export const Route = createFileRoute('/_app/_shelf/books/$bookId/')({
   loader: ({ context, params }) =>
-    Promise.all([context.queryClient.ensureQueryData(booksQuery()), context.queryClient.ensureQueryData(chaptersQuery(params.bookId))]),
+    Promise.all([
+      context.queryClient.ensureQueryData(booksQuery()),
+      context.queryClient.ensureQueryData(chaptersQuery(params.bookId)),
+    ]),
   component: () => (
     <BookPage
       bookId={Route.useParams().bookId}
       chooseLength={(choice) => <ChooseLength {...choice} />}
       resume={(book, chapters) => <ResumeLine book={book} chapters={chapters} />}
-      markOf={(book, chapter, fallback) => <ChapterMark bookId={book.bookId} chapterId={chapter.chapterId} fallback={fallback} />}
+      markOf={(book, chapter, fallback) => (
+        <ChapterMark bookId={book.bookId} chapterId={chapter.chapterId} fallback={fallback} />
+      )}
       aside={(book) => (
         <WithAccount>
           {(account) => (
             <WithStartChapter bookId={book.bookId}>
-              {(start) => <WithVoices>{(voices) => <WholeBookRows book={book} account={account} start={start} voices={voices} />}</WithVoices>}
+              {(start) => (
+                <WithVoices>
+                  {(voices) => <WholeBookRows book={book} account={account} start={start} voices={voices} />}
+                </WithVoices>
+              )}
             </WithStartChapter>
           )}
         </WithAccount>

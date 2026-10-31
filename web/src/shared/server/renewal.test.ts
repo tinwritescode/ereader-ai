@@ -35,7 +35,10 @@ describe('createRenewal', () => {
   })
 
   it('lets a failed exchange be tried again: a tunnel is not a lost session', async () => {
-    const exchange = vi.fn<() => Promise<{ kind: 'lost' }>>().mockRejectedValueOnce(new Error('down')).mockResolvedValue({ kind: 'lost' })
+    const exchange = vi
+      .fn<() => Promise<{ kind: 'lost' }>>()
+      .mockRejectedValueOnce(new Error('down'))
+      .mockResolvedValue({ kind: 'lost' })
     const renew = createRenewal({ exchange, keepMs: 1000, now: () => 0 })
     await expect(renew('r1')).rejects.toThrow('down')
     expect(await renew('r1')).toEqual({ kind: 'lost' })

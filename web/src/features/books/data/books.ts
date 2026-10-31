@@ -37,4 +37,7 @@ const listChapters = createServerFn()
 export const booksQuery = () => queryOptions({ queryKey: ['books'], queryFn: () => listBooks() })
 
 export const chaptersQuery = (bookId: string) =>
-  queryOptions({ queryKey: ['books', bookId, 'chapters'], queryFn: async () => (await listChapters({ data: { bookId } })).chapters })
+  queryOptions({
+    queryKey: ['books', bookId, 'chapters'],
+    queryFn: async () => (await listChapters({ data: { bookId } })).chapters,
+  })

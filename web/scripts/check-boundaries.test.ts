@@ -20,7 +20,9 @@ describe('import direction', () => {
 
   it('lets features meet only through domain', () => {
     expect(check('src/features/books/ui/x.tsx', `import x from '~/features/tasks/domain/task'`)).toEqual([])
-    expect(check('src/features/books/ui/x.tsx', `import x from '~/features/tasks/data/tasks'`)).toEqual(['feature-border'])
+    expect(check('src/features/books/ui/x.tsx', `import x from '~/features/tasks/data/tasks'`)).toEqual([
+      'feature-border',
+    ])
     expect(check('src/features/books/data/x.ts', `import x from '../../tasks/ui/page'`)).toEqual(['feature-border'])
   })
 
@@ -61,5 +63,7 @@ describe('type discipline', () => {
 it('lets a domain test use its runner, and no one else', () => {
   const code = "import { it } from 'vitest'\n"
   expect(violationsIn({ path: 'src/features/books/domain/book.test.ts', code })).toEqual([])
-  expect(violationsIn({ path: 'src/features/books/domain/book.ts', code }).map(({ rule }) => rule)).toEqual(['domain-purity'])
+  expect(violationsIn({ path: 'src/features/books/domain/book.ts', code }).map(({ rule }) => rule)).toEqual([
+    'domain-purity',
+  ])
 })
