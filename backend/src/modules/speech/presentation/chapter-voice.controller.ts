@@ -19,8 +19,7 @@ export class ChapterVoiceController {
   @Get()
   async list(@CurrentAccount() account: Account) {
     const tasks = await this.chapterVoices.list(account);
-    const queued = tasks.filter(({ state }) => state.kind === 'queued');
-    return { tasks: tasks.map((task) => toResponse(task, queued.includes(task) ? queued.indexOf(task) + 1 : null)) };
+    return { tasks: tasks.map((task) => toResponse(task, this.chapterVoices.position(task))) };
   }
 
   @Delete(':id')
@@ -36,9 +35,10 @@ export class ChapterVoiceController {
 }
 
 function toResponse(task: ChapterVoiceTask, position: number | null) {
-  const { id, bookId, chapterId, bookTitle, chapterLabel, minutes, voiceCode, voiceName, state, done, finishedAt } = task;
+  const { id, bookId, chapterId, bookTitle, chapterLabel, minutes, voiceCode, voiceName, state, done, createdAt, finishedAt } = task;
   return {
     id,
+    kind: 'chapterVoice',
     bookId,
     chapterId,
     bookTitle,
@@ -51,6 +51,7 @@ function toResponse(task: ChapterVoiceTask, position: number | null) {
     done,
     total: task.sentences.length,
     position,
+    createdAt,
     finishedAt,
   };
 }

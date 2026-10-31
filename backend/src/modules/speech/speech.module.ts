@@ -1,4 +1,5 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { AccountSlots } from '../../shared/tasks/account-slots';
 import { STORAGE_GATEWAY, StorageGateway } from '../../shared/storage/storage-gateway';
 import { CHAPTER_VOICE_STORE, ChapterVoiceStore, InMemoryChapterVoiceStore } from './application/chapter-voice-store';
 import { ChapterVoiceService } from './application/chapter-voice.service';
@@ -14,11 +15,13 @@ export type SpeechModuleOptions = {
   storage: StorageGateway;
   index: SpeechClipIndex;
   chapterVoices?: ChapterVoiceStore;
+  /** Shared with every other kind of long task, so the per-account limit counts them all. */
+  slots?: AccountSlots;
 };
 
 @Module({})
 export class SpeechModule {
-  static register({ tts, storage, index, chapterVoices = new InMemoryChapterVoiceStore() }: SpeechModuleOptions): DynamicModule {
+  static register({ tts, storage, index, chapterVoices = new InMemoryChapterVoiceStore(), slots = new AccountSlots() }: SpeechModuleOptions): DynamicModule {
     return {
       module: SpeechModule,
       controllers: [SpeechController, ChapterVoiceController],
@@ -26,6 +29,7 @@ export class SpeechModule {
         SpeechService,
         ChapterVoiceService,
         { provide: CHAPTER_VOICE_STORE, useValue: chapterVoices },
+        { provide: AccountSlots, useValue: slots },
         { provide: STORAGE_GATEWAY, useValue: storage },
         { provide: SPEECH_CLIP_INDEX, useValue: index },
         ...(tts ? [{ provide: TTS_GATEWAY, useValue: tts }] : []),
