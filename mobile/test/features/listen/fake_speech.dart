@@ -10,12 +10,16 @@ class FakeSpeech implements Speech {
     this.downloadError,
     this.synthesisError,
     this.cloud = const [],
+    this.slowText = const {},
   });
 
   bool ready;
   final SpeechException? downloadError;
   final SpeechException? synthesisError;
   final List<CloudVoice> cloud;
+
+  /// Texts whose synthesis waits for their completer.
+  final Map<String, Completer<void>> slowText;
   final synthesized = <(String, Voice)>[];
   final played = <int>[];
   final rates = <double>[];
@@ -60,6 +64,7 @@ class FakeSpeech implements Speech {
     running++;
     if (running > mostAtOnce) mostAtOnce = running;
     await synthesisGate?.future;
+    await slowText[text]?.future;
     running--;
     if (failOnce.remove(text)) {
       throw const SpeechException('CLOUD_VOICE_FAILED');

@@ -24,6 +24,11 @@ String _voiceLine(Voice voice) => switch (voice) {
   CloudVoice(:final label) => 'Giọng $label, cần mạng',
 };
 
+/// Shared with the mini player: the two say the same thing during the wait.
+String preparingLine(int ready, int needed) => needed == 0
+    ? 'Đang chuẩn bị giọng đọc'
+    : 'Đang chuẩn bị $ready trên $needed câu';
+
 String _rateLabel(double rate) =>
     rate == rate.roundToDouble() ? rate.toStringAsFixed(1) : rate.toString();
 
@@ -70,8 +75,9 @@ class ListenPanel extends StatelessWidget {
             dismiss: 'Huỷ',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
-          ListenPreparing() => _Progress(
-            text: 'Đang chuẩn bị giọng đọc',
+          ListenPreparing(:final ready, :final needed) => _Progress(
+            text: preparingLine(ready, needed),
+            value: needed == 0 ? null : ready / needed,
             dismiss: 'Tắt',
             onDismiss: () => bloc.add(const ListenStopped()),
           ),
@@ -311,14 +317,14 @@ class _Player extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const _VoiceHeading('Trên máy'),
-                  for (final voice in DeviceVoice.values)
-                    _VoiceTile(voice: voice, chosen: bloc.state.voice),
                   if (cloudVoices.isNotEmpty) ...[
                     const _VoiceHeading('Giọng qua mạng'),
                     for (final voice in cloudVoices)
                       _VoiceTile(voice: voice, chosen: bloc.state.voice),
                   ],
+                  const _VoiceHeading('Trên máy'),
+                  for (final voice in DeviceVoice.values)
+                    _VoiceTile(voice: voice, chosen: bloc.state.voice),
                 ],
               );
             },

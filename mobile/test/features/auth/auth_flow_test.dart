@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../books/fake_books_repository.dart';
 import '../books/fake_reading_look_store.dart';
 import '../books/fake_reading_spot_store.dart';
+import '../listen/fake_listen_choice_store.dart';
 import '../listen/fake_speech.dart';
 import 'fake_auth_repository.dart';
 
@@ -42,6 +43,7 @@ void main() {
         ),
         speech: FakeSpeech(),
         looks: FakeReadingLookStore(),
+        listenChoices: FakeListenChoiceStore(),
         spots: FakeReadingSpotStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/a.epub', fileName: 'a.epub'),

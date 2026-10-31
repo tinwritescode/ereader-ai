@@ -2,12 +2,14 @@ import 'dart:async';
 
 import 'package:ereader_mobile/features/books/domain/entities/chapter.dart';
 import 'package:ereader_mobile/features/books/domain/entities/reading_length.dart';
+import 'package:ereader_mobile/features/listen/domain/listen_choice.dart';
 import 'package:ereader_mobile/features/listen/domain/listen_source.dart';
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
 import 'package:ereader_mobile/features/listen/presentation/listen_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../books/fake_books_repository.dart';
+import 'fake_listen_choice_store.dart';
 import 'fake_speech.dart';
 
 const source = ListenSource(
@@ -23,7 +25,8 @@ void main() {
     TextBlock(TextBlockKind.paragraph, 'Năm.'),
   ];
 
-  Future<void> settle() => Future<void>.delayed(Duration.zero);
+  Future<void> settle() =>
+      Future<void>.delayed(const Duration(milliseconds: 1));
 
   String playingText(ListenBloc bloc) => switch (bloc.state.stage) {
     ListenPlaying(:final sentence) => sentence.text,
@@ -72,8 +75,9 @@ void main() {
       downloadError: const SpeechException('VOICE_DOWNLOAD_FAILED'),
     );
     final bloc = ListenBloc(speech)
-      ..add(const ListenRequested(blocks, source: source))
-      ..add(const ListenDownloadConfirmed());
+      ..add(const ListenRequested(blocks, source: source));
+    await settle();
+    bloc.add(const ListenDownloadConfirmed());
     await settle();
 
     expect(
@@ -242,6 +246,196 @@ void main() {
       await settle();
 
       expect(playingText(bloc), startsWith('Câu 01'));
+      await bloc.close();
+    });
+  });
+
+  group('starting a cloud voice', () {
+    const hatDe = CloudVoice('hat-de', 'Hạt Dẻ');
+    const vieNeu = CloudVoice('vieneu', 'VieNeu');
+    final seven = [
+      for (final word in ['Một', 'Hai', 'Ba', 'Bốn', 'Năm', 'Sáu', 'Bảy'])
+        TextBlock(TextBlockKind.paragraph, '$word.'),
+    ];
+
+    Future<ListenBloc> listen(
+      FakeSpeech speech,
+      List<TextBlock> chapter,
+    ) async {
+      final bloc = ListenBloc(speech)
+        ..add(const ListenVoiceChosen(vieNeu))
+        ..add(ListenRequested(chapter, source: source));
+      await settle();
+      return bloc;
+    }
+
+    test('waits for five sentences, then plays the first', () async {
+      final slow = Completer<void>();
+      final speech = FakeSpeech(ready: false, slowText: {'Năm.': slow});
+      final bloc = await listen(speech, seven);
+      await settle();
+
+      expect(speech.played, isEmpty);
+      final stage = bloc.state.stage;
+      expect(stage, isA<ListenPreparing>());
+      expect((stage as ListenPreparing).ready, 4);
+      expect(stage.needed, 5);
+
+      slow.complete();
+      await settle();
+      await settle();
+
+      expect(playingText(bloc), 'Một.');
+      await bloc.close();
+    });
+
+    test('a short chapter waits only for what it has', () async {
+      final bloc = await listen(FakeSpeech(ready: false), blocks.sublist(1));
+      await settle();
+      expect(playingText(bloc), 'Năm.');
+      await bloc.close();
+    });
+
+    test('running dry waits for five again, not one', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech, seven);
+      await settle();
+      await settle();
+      expect(playingText(bloc), 'Một.');
+
+      bloc.add(const ListenVoiceChosen(hatDe));
+      await settle();
+      await settle();
+      await settle();
+      expect(playingText(bloc), 'Một.');
+      await bloc.close();
+    });
+
+    test('plays what is ready when a later sentence fails', () async {
+      final speech = FakeSpeech(ready: false)..failOnce.add('Ba.');
+      final bloc = await listen(speech, seven);
+      await settle();
+      await settle();
+
+      expect(playingText(bloc), 'Một.');
+      await bloc.close();
+    });
+
+    test('reports at once when the first sentence fails', () async {
+      final speech = FakeSpeech(
+        ready: false,
+        synthesisError: const SpeechException('VBEE_LIMIT'),
+      );
+      final bloc = await listen(speech, seven);
+      await settle();
+
+      expect(bloc.state.stage, isA<ListenFailed>());
+      await bloc.close();
+    });
+
+    test('a device voice needing its download asks first', () async {
+      final speech = FakeSpeech(ready: false);
+      final bloc = await listen(speech, seven);
+      await settle();
+      await settle();
+
+      bloc.add(const ListenVoiceChosen(DeviceVoice.maiLinh));
+      await settle();
+      await settle();
+
+      expect(bloc.state.stage, isA<ListenNeedsVoice>());
+      await bloc.close();
+    });
+
+    test('a voice can be changed during the wait', () async {
+      final gate = Completer<void>();
+      final speech = FakeSpeech(ready: false)..synthesisGate = gate;
+      final bloc = await listen(speech, seven);
+      await settle();
+
+      bloc.add(const ListenVoiceChosen(hatDe));
+      await settle();
+      gate.complete();
+      await settle();
+      await settle();
+      await settle();
+
+      expect(speech.synthesized.last.$2, hatDe);
+      expect(playingText(bloc), 'Một.');
+      await bloc.close();
+    });
+  });
+
+  group('remembering the voice', () {
+    const hatDe = CloudVoice('hat-de', 'Hạt Dẻ');
+    const vieNeu = CloudVoice('vieneu', 'VieNeu');
+
+    Future<ListenBloc> listen(
+      FakeSpeech speech,
+      FakeListenChoiceStore store,
+    ) async {
+      final bloc = ListenBloc(speech, choices: store)
+        ..add(const ListenRequested(blocks, source: source));
+      await settle();
+      await settle();
+      await settle();
+      return bloc;
+    }
+
+    test('starts on the first voice offered when nothing was chosen', () async {
+      final bloc = await listen(
+        FakeSpeech(ready: false, cloud: const [vieNeu, hatDe]),
+        FakeListenChoiceStore(),
+      );
+      expect(bloc.state.voice, vieNeu);
+      await bloc.close();
+    });
+
+    test('goes back to the last voice and rate', () async {
+      final speech = FakeSpeech(cloud: const [vieNeu, hatDe]);
+      final store = FakeListenChoiceStore(
+        const ListenChoice(voice: DeviceVoice.maiLinh, rate: 1.5),
+      );
+      final bloc = await listen(speech, store);
+      expect(bloc.state.voice, DeviceVoice.maiLinh);
+      expect(bloc.state.rate, 1.5);
+      expect(speech.rates.last, 1.5);
+      await bloc.close();
+    });
+
+    test('a saved voice no longer offered gives way to the first', () async {
+      final bloc = await listen(
+        FakeSpeech(cloud: const [vieNeu]),
+        FakeListenChoiceStore(const ListenChoice(voice: hatDe, rate: 1)),
+      );
+      expect(bloc.state.voice, vieNeu);
+      await bloc.close();
+    });
+
+    test('a saved cloud voice stays when the list cannot be reached', () async {
+      final bloc = await listen(
+        FakeSpeech(),
+        FakeListenChoiceStore(const ListenChoice(voice: hatDe, rate: 1)),
+      );
+      expect(bloc.state.voice, hatDe);
+      await bloc.close();
+    });
+
+    test('without any cloud voice, the device voice reads', () async {
+      final bloc = await listen(FakeSpeech(), FakeListenChoiceStore());
+      expect(bloc.state.voice, DeviceVoice.diemTrinh);
+      await bloc.close();
+    });
+
+    test('saves the voice and the rate when they change', () async {
+      final store = FakeListenChoiceStore();
+      final bloc = ListenBloc(FakeSpeech(), choices: store)
+        ..add(const ListenVoiceChosen(hatDe))
+        ..add(const ListenRateCycled());
+      await settle();
+      await settle();
+      expect(store.saved?.voice, hatDe);
+      expect(store.saved?.rate, 1.25);
       await bloc.close();
     });
   });

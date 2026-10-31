@@ -31,8 +31,8 @@ const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env
 const omnivoice = omnivoiceOptionsFromEnv(process.env);
 const vieneu = vieneuOptionsFromEnv(process.env);
 const ttsProviders: TtsGateway[] = [
-  ...(omnivoice ? [new OmnivoiceTtsGateway(omnivoice)] : []),
   ...(vieneu ? [new VieneuTtsGateway(vieneu)] : []),
+  ...(omnivoice ? [new OmnivoiceTtsGateway(omnivoice)] : []),
   ...(vbee ? [new VbeeTtsGateway(vbee)] : []),
 ];
 

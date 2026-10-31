@@ -19,6 +19,7 @@ import 'features/auth/fake_auth_repository.dart';
 import 'features/books/fake_books_repository.dart';
 import 'features/books/fake_reading_look_store.dart';
 import 'features/books/fake_reading_spot_store.dart';
+import 'features/listen/fake_listen_choice_store.dart';
 import 'features/listen/fake_speech.dart';
 
 void main() {
@@ -44,6 +45,7 @@ void main() {
         repository: repository,
         speech: speech ?? FakeSpeech(),
         looks: looks ?? FakeReadingLookStore(),
+        listenChoices: FakeListenChoiceStore(),
         spots: spots ?? FakeReadingSpotStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/loeb.epub', fileName: 'loeb.epub'),
@@ -256,28 +258,28 @@ void main() {
       'hn_female_ngochuyen_full_48k-fhg',
       'HN - Ngọc Huyền',
     );
-    final speech = FakeSpeech(cloud: [vbee]);
+    const vieNeu = CloudVoice('vieneu-clone', 'VieNeu');
+    final speech = FakeSpeech(cloud: [vieNeu, vbee]);
     await pumpApp(tester, shelf: [loeb], speech: speech);
     await openOriginalChapter(tester);
     await showTools(tester);
     await tester.tap(find.text('Nghe'));
     await tester.pumpAndSettle();
 
-    await tester.tap(
-      find.text('Giọng Diễm Trinh, chạy trên máy, không cần mạng'),
-    );
+    await tester.tap(find.text('Giọng VieNeu, cần mạng'));
     await tester.pumpAndSettle();
     expect(find.text('Trên máy'), findsOneWidget);
     expect(find.text('Giọng qua mạng'), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('Giọng qua mạng')).dy,
+      lessThan(tester.getTopLeft(find.text('Trên máy')).dy),
+    );
     await tester.ensureVisible(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('HN - Ngọc Huyền'));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text('Giọng HN - Ngọc Huyền, cần mạng'),
-      findsOneWidget,
-    );
+    expect(find.text('Giọng HN - Ngọc Huyền, cần mạng'), findsOneWidget);
     expect(speech.synthesized.last.$2, vbee);
   });
 

@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../books/domain/entities/chapter.dart';
+import '../domain/listen_choice.dart';
 import '../domain/listen_source.dart';
 import '../domain/speech.dart';
 import '../domain/speech_plan.dart';
@@ -15,6 +17,8 @@ const _deviceReadAhead = 2;
 const _cloudReadAheadSeconds = 60.0;
 // Enough to outrun playback; the rest wait for a free slot.
 const _cloudRequests = 4;
+// Sentences a cloud voice has ready before it speaks, at the start and whenever it runs dry.
+const _cloudStartSentences = 5;
 
 sealed class ListenStage {
   const ListenStage();
@@ -35,7 +39,11 @@ final class ListenDownloading extends ListenStage {
 }
 
 final class ListenPreparing extends ListenStage {
-  const ListenPreparing();
+  const ListenPreparing({this.ready = 0, this.needed = 0});
+
+  /// Sentences ready of those wanted before speaking; [needed] is 0 when nothing is counted.
+  final int ready;
+  final int needed;
 }
 
 final class ListenPlaying extends ListenStage {
@@ -149,6 +157,20 @@ final class _SentenceReached extends ListenEvent {
   final int index;
 }
 
+final class _Buffering extends ListenEvent {
+  const _Buffering({
+    required this.generation,
+    required this.index,
+    required this.ready,
+    required this.needed,
+  });
+
+  final int generation;
+  final int index;
+  final int ready;
+  final int needed;
+}
+
 final class _RunFailed extends ListenEvent {
   const _RunFailed(this.code);
 
@@ -160,7 +182,9 @@ final class _RunEnded extends ListenEvent {
 }
 
 class ListenBloc extends Bloc<ListenEvent, ListenState> {
-  ListenBloc(this._speech) : super(const ListenState()) {
+  ListenBloc(this._speech, {ListenChoiceStore? choices})
+    : _choices = choices,
+      super(const ListenState()) {
     on<ListenRequested>(_onRequested);
     on<ListenDownloadConfirmed>(_onDownloadConfirmed);
     on<ListenPauseToggled>(_onPauseToggled);
@@ -169,6 +193,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     on<ListenVoiceChosen>(_onVoiceChosen);
     on<ListenStopped>(_onStopped);
     on<_SentenceReached>(_onSentenceReached);
+    on<_Buffering>(_onBuffering);
     on<_RunFailed>(_onRunFailed);
     on<_RunEnded>(
       (_, emit) => emit(state.copyWith(stage: const ListenOff(), done: 1)),
@@ -176,9 +201,14 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   }
 
   final Speech _speech;
+  final ListenChoiceStore? _choices;
+  // Set once the opening voice is decided, or the listener has picked one.
+  var _voiceSettled = false;
   List<TextBlock> _blocks = const [];
   List<SpokenSentence> _plan = const [];
   var _audio = <int, Future<Float32List>>{};
+  // Sentences in [_audio] whose audio has arrived.
+  var _ready = <int>{};
   Future<void> _modelQueue = Future.value();
   // The sentence the voice is on while Vbee has more to fetch.
   int? _playhead;
@@ -197,13 +227,17 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     if (!identical(event.blocks, _blocks)) {
       _blocks = event.blocks;
       _plan = planSpeech(_blocks);
-      _audio = {};
+      _forgetAudio();
       _playhead = null;
     }
     if (_plan.isEmpty) return;
     _from = sentenceAt(_plan, event.block, event.offset);
     emit(state.copyWith(source: event.source));
     if (state.stage is ListenDownloading) return;
+    if (!_voiceSettled) {
+      emit(state.copyWith(stage: const ListenPreparing()));
+      await _settleVoice(emit);
+    }
     if (state.voice is CloudVoice || await _speech.modelReady()) {
       _generation++;
       await _speech.stop();
@@ -233,8 +267,21 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     if (await _speech.modelReady()) _start(_from, emit);
   }
 
+  Future<void> _settleVoice(Emitter<ListenState> emit) async {
+    _voiceSettled = true;
+    final saved = await _choices?.load();
+    final offered = await _speech.cloudVoices();
+    emit(
+      state.copyWith(
+        voice: openingVoice(saved?.voice, offered),
+        rate: saved?.rate,
+      ),
+    );
+  }
+
   void _start(int index, Emitter<ListenState> emit) {
     _generation++;
+    _current = index;
     _paused = false;
     _release();
     emit(state.copyWith(stage: const ListenPreparing()));
@@ -248,6 +295,10 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       for (var index = from; index < _plan.length; index++) {
         final samples = _synthesized(index);
         _readAhead(index);
+        if (state.voice is CloudVoice &&
+            (index == from || !_ready.contains(index))) {
+          await _buffer(generation, index);
+        }
         final audio = await samples;
         if (_paused) await (_unpaused ??= Completer<void>()).future;
         if (generation != _generation) return;
@@ -255,6 +306,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
         await _speech.play(audio);
         if (generation != _generation) return;
         _audio.remove(index);
+        _ready.remove(index);
       }
       await _speech.stop();
       add(const _RunEnded());
@@ -262,6 +314,34 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
       if (generation != _generation) return;
       await _speech.stop();
       add(_RunFailed(error.code));
+    }
+  }
+
+  /// Waits until the sentences from [index] are ready in a row. One failing
+  /// past the first ends the wait: what came before it can still be heard.
+  Future<void> _buffer(int generation, int index) async {
+    final end = min(index + _cloudStartSentences, _plan.length);
+    final needed = end - index;
+    final wanted = [for (var i = index; i < end; i++) i];
+    if (_ready.containsAll(wanted)) return;
+    void report(int ready) => add(
+      _Buffering(
+        generation: generation,
+        index: index,
+        ready: ready,
+        needed: needed,
+      ),
+    );
+    report(0);
+    for (final sentence in wanted) {
+      try {
+        await _synthesized(sentence);
+      } on SpeechException {
+        if (sentence == index) rethrow;
+        return;
+      }
+      if (generation != _generation) return;
+      report(sentence - index + 1);
     }
   }
 
@@ -296,11 +376,13 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
 
   Future<Float32List> _fetch(int index, CloudVoice voice) {
     final audio = _audio;
+    final ready = _ready;
     _cloudRunning++;
     final job = _speech.synthesize(_plan[index].text, voice);
     job.then<void>(
       (_) {
         _cloudRunning--;
+        ready.add(index);
         _fetchAhead();
       },
       onError: (Object _) {
@@ -333,6 +415,25 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     final unpaused = _unpaused;
     _unpaused = null;
     if (unpaused != null && !unpaused.isCompleted) unpaused.complete();
+  }
+
+  void _forgetAudio() {
+    _audio = {};
+    _ready = {};
+  }
+
+  void _remember() => unawaited(
+    _choices?.save(ListenChoice(voice: state.voice, rate: state.rate)),
+  );
+
+  void _onBuffering(_Buffering event, Emitter<ListenState> emit) {
+    if (event.generation != _generation) return;
+    _current = event.index;
+    emit(
+      state.copyWith(
+        stage: ListenPreparing(ready: event.ready, needed: event.needed),
+      ),
+    );
   }
 
   void _onSentenceReached(_SentenceReached event, Emitter<ListenState> emit) {
@@ -392,6 +493,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   ) async {
     final rate = _rates[(_rates.indexOf(state.rate) + 1) % _rates.length];
     emit(state.copyWith(rate: rate));
+    _remember();
     await _speech.setRate(rate);
   }
 
@@ -399,11 +501,23 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     ListenVoiceChosen event,
     Emitter<ListenState> emit,
   ) async {
+    _voiceSettled = true;
     emit(state.copyWith(voice: event.voice));
-    _audio = {};
-    if (state.stage is! ListenPlaying) return;
+    _forgetAudio();
+    _remember();
+    final stage = state.stage;
+    if (stage is! ListenPlaying &&
+        stage is! ListenPreparing &&
+        stage is! ListenFailed) {
+      return;
+    }
     _generation++;
     await _speech.stop();
+    if (event.voice is DeviceVoice && !await _speech.modelReady()) {
+      _from = _current;
+      emit(state.copyWith(stage: const ListenNeedsVoice()));
+      return;
+    }
     _start(_current, emit);
   }
 
@@ -412,7 +526,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
     Emitter<ListenState> emit,
   ) async {
     await _halt();
-    _audio = {};
+    _forgetAudio();
     emit(state.copyWith(stage: const ListenOff(), done: 0));
   }
 

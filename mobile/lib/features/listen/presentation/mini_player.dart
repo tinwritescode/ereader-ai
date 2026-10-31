@@ -6,6 +6,7 @@ import '../../books/presentation/formatting.dart';
 import '../../books/presentation/widgets.dart';
 import '../domain/listen_source.dart';
 import 'listen_bloc.dart';
+import 'listen_panel.dart';
 
 String _line(ListenStage stage) => switch (stage) {
   ListenPlaying(:final sentence) => sentence.text,
@@ -13,7 +14,8 @@ String _line(ListenStage stage) => switch (stage) {
   ListenNeedsVoice() => 'Cần tải giọng đọc',
   ListenDownloading(:final progress) =>
     'Đang tải giọng đọc, ${(progress * 100).floor()}%',
-  ListenPreparing() || ListenOff() => 'Đang chuẩn bị giọng đọc',
+  ListenPreparing(:final ready, :final needed) => preparingLine(ready, needed),
+  ListenOff() => preparingLine(0, 0),
 };
 
 /// The voice's bar on every page outside its own chapter. Takes no room while

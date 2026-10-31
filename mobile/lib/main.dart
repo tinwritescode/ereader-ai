@@ -20,6 +20,8 @@ import 'features/books/presentation/length_memory.dart';
 import 'features/books/presentation/listen_spots.dart';
 import 'features/books/presentation/reading_look_cubit.dart';
 import 'features/books/presentation/reading_spots_cubit.dart';
+import 'features/listen/data/prefs_listen_choice_store.dart';
+import 'features/listen/domain/listen_choice.dart';
 import 'features/listen/data/kokoro_speech.dart';
 import 'features/listen/data/vbee_voices.dart';
 import 'features/listen/domain/speech.dart';
@@ -52,6 +54,7 @@ void main() {
       repository: BooksRepositoryImpl(api),
       speech: KokoroSpeech(vbee: VbeeVoices(api)),
       looks: PrefsReadingLookStore(),
+      listenChoices: PrefsListenChoiceStore(),
       spots: PrefsReadingSpotStore(),
       pickEpub: pickEpubFromDevice,
     ),
@@ -65,6 +68,7 @@ class EReaderApp extends StatelessWidget {
     required this.repository,
     required this.speech,
     required this.looks,
+    required this.listenChoices,
     required this.spots,
     required this.pickEpub,
   });
@@ -73,6 +77,7 @@ class EReaderApp extends StatelessWidget {
   final BooksRepository repository;
   final Speech speech;
   final ReadingLookStore looks;
+  final ListenChoiceStore listenChoices;
   final ReadingSpotStore spots;
   final PickEpub pickEpub;
 
@@ -95,7 +100,9 @@ class EReaderApp extends StatelessWidget {
           BlocProvider(create: (_) => ReadingLookCubit(looks)..load()),
           BlocProvider(create: (_) => ReadingSpotsCubit(spots)..load()),
           // Lives above the pages: the voice goes on when a book is closed.
-          BlocProvider(create: (_) => ListenBloc(speech)),
+          BlocProvider(
+            create: (_) => ListenBloc(speech, choices: listenChoices),
+          ),
         ],
         child: ListenSpots(
           child: MaterialApp(

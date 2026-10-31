@@ -9,6 +9,7 @@ import '../test/features/auth/fake_auth_repository.dart';
 import '../test/features/books/fake_books_repository.dart';
 import '../test/features/books/fake_reading_look_store.dart';
 import '../test/features/books/fake_reading_spot_store.dart';
+import '../test/features/listen/fake_listen_choice_store.dart';
 import '../test/features/listen/fake_speech.dart';
 
 /// Walks the app on sample data for `tool/capture_screenshots.sh`, which saves
@@ -30,6 +31,7 @@ void main() {
         repository: FakeBooksRepository(shelf: [loeb]),
         speech: FakeSpeech(),
         looks: FakeReadingLookStore(),
+        listenChoices: FakeListenChoiceStore(),
         spots: FakeReadingSpotStore({
           'book-1': ReadingSpot(
             chapterId: chapterOne.chapterId,
