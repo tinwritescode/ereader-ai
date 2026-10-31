@@ -3,6 +3,7 @@ import 'package:ereader_mobile/features/books/data/repositories/books_repository
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_look_store.dart';
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_spot_store.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
+import 'package:ereader_mobile/features/listen/data/prefs_listen_choice_store.dart';
 import 'package:ereader_mobile/features/listen/data/vbee_voices.dart';
 import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
@@ -45,7 +46,7 @@ void main() {
           repository: BooksRepositoryImpl(api),
           speech: KokoroSpeech(vbee: VbeeVoices(api)),
           looks: PrefsReadingLookStore(),
-          listenChoices: FakeListenChoiceStore(),
+          listenChoices: PrefsListenChoiceStore(),
           spots: PrefsReadingSpotStore(),
           pickEpub: () async => null,
         ),
