@@ -74,7 +74,7 @@ describe('speech', () => {
       .expect(401);
   });
 
-  it('stops at the Vbee minutes of the plan, and counts neither failures nor kept sentences', async () => {
+  it('stops at the cloud voice minutes of the plan, and counts neither failures nor kept sentences', async () => {
     const say = (text: string) =>
       request(app.getHttpServer())
         .post('/speech')
@@ -134,7 +134,7 @@ describe('speech', () => {
         res.on('end', () => done(null, Buffer.concat(chunks)));
       });
 
-  it('keeps each sentence it reads, and reads it again from storage without asking Vbee', async () => {
+  it('keeps each sentence it reads, and reads it again from storage without asking the voice service', async () => {
     await speak('Xin chào bạn.').expect(200);
     expect(storage.objects.size).toBe(1);
 
@@ -184,7 +184,7 @@ describe('speech', () => {
       .expect(({ body }) => expect(body.code).toBe('SPEECH_FAILED'));
   });
 
-  it('offers no voices and refuses to speak when Vbee is not configured', async () => {
+  it('offers no voices and refuses to speak when the voice service is not configured', async () => {
     await app.close();
     await start(null);
     await request(app.getHttpServer())

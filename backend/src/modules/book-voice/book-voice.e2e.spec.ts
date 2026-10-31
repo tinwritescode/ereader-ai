@@ -32,9 +32,9 @@ class FakeTts implements TtsGateway {
     return [hatDe];
   }
 
-  async speak(text: string) {
+  async speak(text: string, voiceCode: string) {
     await this.gate;
-    if (this.failing) throw new TtsError('UPSTREAM_ERROR');
+    if (this.failing || voiceCode !== hatDe.code) throw new TtsError('UPSTREAM_ERROR');
     this.spoken.push(text);
     return Buffer.from('RIFF');
   }
@@ -210,6 +210,26 @@ describe('voicing a whole book', () => {
     await settled();
     expect(await seconds()).toBe(spent);
     expect(tts.spoken.length).toBe(read);
+  });
+
+  it('stops cleanly, charging nothing, on resuming a task whose voice is no longer offered', async () => {
+    const { bookId } = await importBook();
+    await voice(bookId).expect(201);
+    const [{ id }] = await settled();
+    const [saved] = await store.ofAccount('max-1');
+    await store.save({
+      ...saved,
+      voiceCode: 'hn_female_ngochuyen_full_48k-fhg',
+      remaining: saved.voiced,
+      voiced: [],
+      state: { kind: 'stopped', code: 'SPEECH_FAILED' },
+    });
+    const before = await seconds();
+
+    await http().post(`/voices/tasks/${id}/resume`).set(as('max-1')).expect(201);
+
+    expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'SPEECH_FAILED' });
+    expect(await seconds()).toBe(before);
   });
 
   it('stops on a voice failure, keeping what is done', async () => {

@@ -97,6 +97,12 @@ describe('VieneuTtsGateway', () => {
     await expect(gatewayAnswering().gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow('UPSTREAM_ERROR');
   });
 
+  it('refuses a voice code it does not enroll, such as one saved from a former provider, without calling the service', async () => {
+    const { calls, gateway } = gatewayAnswering();
+    await expect(gateway.speak('Xin chào.', 'hn_female_ngochuyen_full_48k-fhg')).rejects.toThrow(new TtsError('UPSTREAM_ERROR'));
+    expect(calls).toEqual([]);
+  });
+
   it('stays off unless both the address and the key are set', () => {
     expect(vieneuOptionsFromEnv({})).toBeNull();
     expect(vieneuOptionsFromEnv({ VIENEU_URL: 'http://voice.test' })).toBeNull();

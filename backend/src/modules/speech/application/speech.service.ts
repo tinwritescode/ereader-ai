@@ -61,7 +61,7 @@ export class SpeechService {
     for (const result of results) if (result.status === 'rejected') throw result.reason;
   }
 
-  // Storage only saves credits: when it fails, reading goes on through Vbee.
+  // Storage only saves credits: when it fails, reading goes on through the voice service.
   private async kept(key: string): Promise<Buffer | null> {
     try {
       const objectKey = await this.index.find(key);

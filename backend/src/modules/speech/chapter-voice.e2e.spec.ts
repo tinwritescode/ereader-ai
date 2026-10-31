@@ -23,9 +23,9 @@ class FakeTts implements TtsGateway {
     return [hatDe];
   }
 
-  async speak(text: string) {
+  async speak(text: string, voiceCode: string) {
     await this.gate;
-    if (text === this.failOn) throw new TtsError('UPSTREAM_ERROR');
+    if (text === this.failOn || voiceCode !== hatDe.code) throw new TtsError('UPSTREAM_ERROR');
     this.spoken.push(text);
     return Buffer.from('RIFF');
   }
@@ -175,6 +175,20 @@ describe('chapter voice tasks', () => {
     await request(server()).post(`/speech/tasks/${body.id}/resume`).set('Authorization', 'Bearer max-1').expect(201);
     expect((await settled())[0]).toMatchObject({ state: 'done', done: 2, code: null });
     expect(tts.spoken.filter((text) => text === 'Câu một.')).toHaveLength(1);
+  });
+
+  it('stops cleanly, charging nothing, on resuming a task whose voice is no longer offered', async () => {
+    await post(job('c1')).expect(201);
+    await settled();
+    const [saved] = await store.ofAccount('max-1');
+    const stopped = { kind: 'stopped', code: 'SPEECH_FAILED' } as const;
+    await store.save({ ...saved, voiceCode: 'hn_female_ngochuyen_full_48k-fhg', state: stopped });
+    const { vbeeSeconds: before } = await accounts.usage('max-1', usageMonth(new Date()));
+
+    await request(server()).post(`/speech/tasks/${saved.id}/resume`).set('Authorization', 'Bearer max-1').expect(201);
+
+    expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'SPEECH_FAILED' });
+    expect((await accounts.usage('max-1', usageMonth(new Date()))).vbeeSeconds).toBe(before);
   });
 
   it('stops when the minutes of the plan run out', async () => {

@@ -14,10 +14,8 @@ import { DigestController } from './modules/ai-reading/presentation/digest.contr
 import { InMemorySpeechClipIndex } from './modules/speech/application/speech-clip-index';
 import { PostgresChapterVoiceStore } from './modules/speech/infrastructure/postgres.chapter-voice-store';
 import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgres.speech-clip-index';
-import { RoutedTtsGateway } from './modules/speech/application/routed-tts-gateway';
-import { TTS_GATEWAY, TtsGateway } from './modules/speech/application/tts-gateway';
+import { TTS_GATEWAY } from './modules/speech/application/tts-gateway';
 import { VieneuTtsGateway, vieneuOptionsFromEnv } from './modules/speech/infrastructure/vieneu.tts-gateway';
-import { VbeeTtsGateway, vbeeOptionsFromEnv } from './modules/speech/infrastructure/vbee.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
 import { LLM_GATEWAY } from './shared/llm/llm-gateway';
@@ -42,18 +40,13 @@ import {
 import { BookTranslationController } from './modules/translation/presentation/book-translation.controller';
 
 const storage = storageFromEnv(process.env);
-const vbee = vbeeOptionsFromEnv(process.env);
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
 
 // Voice and translation tasks share one per-account limit.
 const slots = new AccountSlots();
 
 const vieneu = vieneuOptionsFromEnv(process.env);
-const ttsProviders: TtsGateway[] = [
-  ...(vieneu ? [new VieneuTtsGateway(vieneu)] : []),
-  ...(vbee ? [new VbeeTtsGateway(vbee)] : []),
-];
-const tts = ttsProviders.length > 0 ? new RoutedTtsGateway(ttsProviders) : null;
+const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
 
 @Module({
   imports: [
