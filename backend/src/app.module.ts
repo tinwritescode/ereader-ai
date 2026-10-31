@@ -16,6 +16,7 @@ import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgre
 import { RoutedTtsGateway } from './modules/speech/application/routed-tts-gateway';
 import { TtsGateway } from './modules/speech/application/tts-gateway';
 import { OmnivoiceTtsGateway, omnivoiceOptionsFromEnv } from './modules/speech/infrastructure/omnivoice.tts-gateway';
+import { VieneuTtsGateway, vieneuOptionsFromEnv } from './modules/speech/infrastructure/vieneu.tts-gateway';
 import { VbeeTtsGateway, vbeeOptionsFromEnv } from './modules/speech/infrastructure/vbee.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
@@ -28,8 +29,10 @@ const vbee = vbeeOptionsFromEnv(process.env);
 const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env.DATABASE_URL }) : null;
 
 const omnivoice = omnivoiceOptionsFromEnv(process.env);
+const vieneu = vieneuOptionsFromEnv(process.env);
 const ttsProviders: TtsGateway[] = [
   ...(omnivoice ? [new OmnivoiceTtsGateway(omnivoice)] : []),
+  ...(vieneu ? [new VieneuTtsGateway(vieneu)] : []),
   ...(vbee ? [new VbeeTtsGateway(vbee)] : []),
 ];
 
