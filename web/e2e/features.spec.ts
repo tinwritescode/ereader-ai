@@ -11,8 +11,9 @@ const CHAPTER = '/books/deep/chapters/deep-1?length=original&minutes=12'
 const noAudioClock = (browserName: string) => browserName === 'webkit' && process.platform === 'linux'
 
 test.describe('listening', () => {
-  test('audio plays and the mark moves on, sentence by sentence', async ({ page, browserName }) => {
-    test.skip(noAudioClock(browserName), 'needs real playback time')
+  test.skip(({ browserName }) => noAudioClock(browserName), 'needs real playback time')
+
+  test('audio plays and the mark moves on, sentence by sentence', async ({ page }) => {
     await signIn(page)
     await open(page, CHAPTER)
     await page.getByRole('button', { name: 'Nghe', exact: true }).click()
@@ -23,8 +24,7 @@ test.describe('listening', () => {
     expect((await stub.state()).speechCalls).toContain('Câu thứ hai rất ngắn.')
   })
 
-  test('the keyboard pauses and moves between sentences', async ({ page, browserName }) => {
-    test.skip(noAudioClock(browserName), 'needs real playback time')
+  test('the keyboard pauses and moves between sentences', async ({ page }) => {
     await signIn(page)
     await stub.set({ speechDelay: 0 })
     await open(page, CHAPTER)
@@ -50,8 +50,7 @@ test.describe('listening', () => {
     await expect(page.getByRole('button', { name: 'Tốc độ 1,25x' })).toBeVisible()
   })
 
-  test('choosing to listen from the length sheet starts reading on arrival', async ({ page, browserName }) => {
-    test.skip(noAudioClock(browserName), 'needs real playback time')
+  test('choosing to listen from the length sheet starts reading on arrival', async ({ page }) => {
     await signIn(page)
     await page.getByRole('link', { name: 'Deep Work' }).click()
     await page.getByRole('button', { name: /Chương Một/ }).click()
