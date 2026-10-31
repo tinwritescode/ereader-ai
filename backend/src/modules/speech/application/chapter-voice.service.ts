@@ -54,8 +54,12 @@ export class ChapterVoiceService implements OnApplicationBootstrap {
     const voice = (await this.tts.voices()).find(({ code }) => code === request.voiceCode);
     if (!voice) throw new BadRequestException({ code: 'VOICE_UNKNOWN' });
 
+    // The same chapter in other words, a shorter version or a translation, is other work.
     const sameJob = (task: ChapterVoiceTask) =>
-      task.chapterId === request.chapterId && task.voiceCode === request.voiceCode && task.minutes === request.minutes;
+      task.chapterId === request.chapterId &&
+      task.voiceCode === request.voiceCode &&
+      task.sentences.length === request.sentences.length &&
+      task.sentences.every((sentence, index) => sentence === request.sentences[index]);
     const underWay = (await this.store.ofAccount(account.id)).find((task) => sameJob(task) && !isFinished(task));
     if (underWay) return underWay;
 

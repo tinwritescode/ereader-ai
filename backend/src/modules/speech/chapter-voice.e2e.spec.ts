@@ -145,6 +145,9 @@ describe('chapter voice tasks', () => {
     const second = await post(job('c1')).expect(201);
     expect(second.body.id).toBe(first.body.id);
     expect(await tasks()).toHaveLength(1);
+    // The same chapter in other words, its translation, is other work.
+    const translated = await post(job('c1', ['Sentence one.'])).expect(201);
+    expect(translated.body.id).not.toBe(first.body.id);
     open();
     await settled();
   });
