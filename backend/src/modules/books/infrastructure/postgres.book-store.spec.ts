@@ -11,6 +11,7 @@ const book = (id: string, userId = 'user-1'): BookRecord => ({
   title: 'Sách',
   author: null,
   language: 'vi',
+  shapeVersion: 1,
   status: 'READY',
   sourceChecksum: 'same-file',
   sourceKey: 'sources/same-file.epub',
@@ -21,6 +22,7 @@ const chapter = (bookId: string, index: number): ChapterRecord => ({
   id: `${bookId}-${index}`,
   bookId,
   index,
+  kind: 'main',
   label: `Chương ${index}`,
   subtitle: null,
   wordCount: 100,
@@ -53,6 +55,30 @@ const chapter = (bookId: string, index: number): ChapterRecord => ({
     expect(await store.chapter('b1-1')).toEqual(chapter('b1', 1));
     expect(await store.list('user-1')).toEqual([{ ...book('b1'), chapterCount: 2, minutes: 4 }]);
     expect(await store.count('user-1')).toBe(1);
+  });
+
+  it('reshapes a stale book, leaving front matter out of its chapter count', async () => {
+    await store.add({ ...book('b1'), shapeVersion: 0 }, [chapter('b1', 0), chapter('b1', 1)]);
+    expect((await store.staleBefore(1)).map(({ id }) => id)).toEqual(['b1']);
+    await store.reshape({
+      bookId: 'b1',
+      language: 'en',
+      shapeVersion: 1,
+      chapters: [{ id: 'b1-0', label: 'Giới thiệu', subtitle: null, kind: 'front' }],
+    });
+    expect(await store.staleBefore(1)).toEqual([]);
+    expect(await store.find('b1')).toMatchObject({ language: 'en', shapeVersion: 1 });
+    expect(await store.chapter('b1-0')).toMatchObject({ label: 'Giới thiệu', kind: 'front' });
+    expect(await store.chapter('b1-1')).toMatchObject({ label: 'Chương 1', kind: 'main' });
+    expect((await store.summary('b1'))?.chapterCount).toBe(1);
+  });
+
+  it('adds the new columns to tables made before them, with books due a reshape', async () => {
+    await store.add(book('b1'), [chapter('b1', 0)]);
+    await pool.query('ALTER TABLE books DROP COLUMN shape_version; ALTER TABLE chapters DROP COLUMN kind');
+    const reopened = new PostgresBookStore(pool);
+    expect((await reopened.staleBefore(1)).map(({ id }) => id)).toEqual(['b1']);
+    expect(await reopened.chapter('b1-0')).toMatchObject({ kind: 'main' });
   });
 
   it('answers with the kept book when the same file arrives twice at once', async () => {

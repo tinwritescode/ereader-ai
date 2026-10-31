@@ -1,11 +1,13 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { countWords, readingMinutes } from '../../../shared/reading-time';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
-import { BookCover, BookImportResult, BookRecord, ChapterRecord } from '../domain/book';
+import { BookCover, BookImportResult, BookRecord, ChapterRecord, SHAPE_VERSION } from '../domain/book';
+import { bookLanguage } from '../domain/book-language';
+import { reshapedChapters } from '../domain/book-reshape';
 import { BOOK_STORE, BookStore, BookSummary } from './book-store';
-import { EpubChapter, EpubCover, readEpub } from './epub-reader';
+import { EpubBook, EpubChapter, EpubCover, readEpub } from './epub-reader';
 
 export type ImportBookCommand = {
   userId: string;
@@ -16,6 +18,8 @@ export type ImportBookCommand = {
 
 @Injectable()
 export class BookService {
+  private readonly logger = new Logger(BookService.name);
+
   constructor(
     @Inject(STORAGE_GATEWAY) private readonly storage: StorageGateway,
     @Inject(BOOK_STORE) private readonly store: BookStore,
@@ -46,13 +50,13 @@ export class BookService {
       userId,
       title: metadata.title ?? fileName.slice(0, -'.epub'.length),
       author: metadata.author,
-      language: metadata.language,
+      language: languageOf(epub.book),
       status: 'READY',
       sourceChecksum,
       sourceKey,
       cover: await this.storeCover(sourceChecksum, cover),
+      shapeVersion: SHAPE_VERSION,
     };
-    // Chapters are split during import for now; the BullMQ normalize job replaces this step later.
     const stored = await this.store.add(book, chapters.map((chapter, index) => toChapterRecord(book.id, index, chapter)));
     return { kind: stored.created ? 'created' : 'existing', book: stored.book };
   }
@@ -89,6 +93,25 @@ export class BookService {
     return this.store.chapters((await this.status(userId, bookId)).id);
   }
 
+  /** The book proper: what whole-book tasks work through. */
+  async mainChapters(userId: string, bookId: string): Promise<ChapterRecord[]> {
+    return (await this.chapters(userId, bookId)).filter(({ kind }) => kind === 'main');
+  }
+
+  /**
+   * Reads books kept by an older reader again. [onVietnamese] runs first for a book found to be Vietnamese
+   * after all, and a failure leaves that book stale, so a crash anywhere just repeats the pass.
+   */
+  async reshapeStale(onVietnamese: (book: BookRecord) => Promise<void>): Promise<void> {
+    for (const book of await this.store.staleBefore(SHAPE_VERSION)) {
+      try {
+        await this.reshape(book, onVietnamese);
+      } catch (error) {
+        this.logger.warn(`Book ${book.id} could not be read again: ${String(error)}`);
+      }
+    }
+  }
+
   async chapter(userId: string, chapterId: string): Promise<ChapterRecord> {
     const chapter = await this.store.chapter(chapterId);
     const book = chapter && (await this.store.find(chapter.bookId));
@@ -96,6 +119,20 @@ export class BookService {
       throw new NotFoundException('CHAPTER_NOT_FOUND');
     }
     return chapter;
+  }
+
+  private async reshape(book: BookRecord, onVietnamese: (book: BookRecord) => Promise<void>): Promise<void> {
+    const bytes = await this.storage.get(book.sourceKey);
+    const epub = bytes && (await readEpub(bytes));
+    if (epub?.kind !== 'ok') throw new Error('SOURCE_UNREADABLE');
+    const language = languageOf(epub.book);
+    if (language === 'vi' && !book.language?.toLowerCase().startsWith('vi')) await onVietnamese(book);
+    await this.store.reshape({
+      bookId: book.id,
+      language,
+      chapters: reshapedChapters(await this.store.chapters(book.id), epub.book.chapters),
+      shapeVersion: SHAPE_VERSION,
+    });
   }
 
   private async storeCover(sourceChecksum: string, cover: EpubCover | null): Promise<BookCover | null> {
@@ -106,7 +143,13 @@ export class BookService {
   }
 }
 
-function toChapterRecord(bookId: string, index: number, { label, subtitle, blocks }: EpubChapter): ChapterRecord {
+function languageOf({ metadata, chapters }: EpubBook): string {
+  const main = chapters.filter(({ kind }) => kind === 'main');
+  const text = main.flatMap(({ blocks }) => blocks.map((block) => block.text)).join(' ');
+  return bookLanguage({ declared: metadata.language, text });
+}
+
+function toChapterRecord(bookId: string, index: number, { label, subtitle, kind, blocks }: EpubChapter): ChapterRecord {
   const id = `${bookId}-c${index}`;
   const wordCount = blocks.reduce((total, block) => total + countWords(block.text), 0);
   return {
@@ -115,6 +158,7 @@ function toChapterRecord(bookId: string, index: number, { label, subtitle, block
     index,
     label,
     subtitle,
+    kind,
     wordCount,
     minutes: readingMinutes(wordCount),
     blocks: blocks.map((block, blockIndex) => ({ blockId: `${id}-b${blockIndex}`, ...block })),

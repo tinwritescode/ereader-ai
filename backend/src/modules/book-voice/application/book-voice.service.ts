@@ -153,7 +153,7 @@ export class BookVoiceService implements OnApplicationBootstrap {
 
   /** The chapters a Vietnamese voice can read, with their text, and how many it cannot yet. */
   private async readable(account: Account, book: BookRecord) {
-    const chapters = await this.books.chapters(account.id, book.id);
+    const chapters = await this.books.mainChapters(account.id, book.id);
     const texts = await Promise.all(
       chapters.map(async ({ id, label, wordCount, blocks }) => ({
         chapter: { chapterId: id, label, words: wordCount } satisfies ChapterInLine,

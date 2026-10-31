@@ -93,7 +93,7 @@ describe('Reading an imported book', () => {
   it('falls back to one chapter per spine file when the EPUB has no navigation document', async () => {
     const chapters = await chaptersOf(await importBook(await buildEpub({ withNav: false })));
 
-    expect(chapters.map((chapter: { label: string }) => chapter.label)).toEqual(['Phần 1', 'Chương Một', 'Chương Ba']);
+    expect(chapters.map((chapter: { label: string }) => chapter.label)).toEqual(['Giới thiệu', 'Chương Một', 'Chương Ba']);
   });
 
   const digest = (chapterId: string) =>

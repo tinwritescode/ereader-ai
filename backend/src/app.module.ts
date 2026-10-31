@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { Pool } from 'pg';
 import { z } from 'zod';
-import { FormatAgentService } from './modules/processing/application/format-agent.service';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { InMemoryAccountStore } from './modules/accounts/application/account-store';
 import { PostgresAccountStore } from './modules/accounts/infrastructure/postgres.account-store';
@@ -70,7 +69,6 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
   controllers: [DigestController, BookTranslationController, BookVoiceController],
   providers: [
     DigestService,
-    FormatAgentService,
     BookTranslationService,
     BookVoiceService,
     { provide: TTS_GATEWAY, useValue: tts },
@@ -80,6 +78,5 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
     { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },
     { provide: LLM_GATEWAY, useFactory: () => new OpenAiCompatibleLlmGateway(llmOptionsFromEnv(process.env)) },
   ],
-  exports: [FormatAgentService],
 })
 export class AppModule {}

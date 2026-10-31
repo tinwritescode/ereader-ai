@@ -61,6 +61,21 @@ export class BookTranslationService implements OnApplicationBootstrap {
       await this.store.save({ ...task, state: { kind: 'queued' }, current: null });
       this.enqueue(task, task.createdAt);
     }
+    // In the background: a large shelf must not hold up the server starting.
+    void this.books
+      .reshapeStale(({ id, userId }) => this.forgetBook(userId, id))
+      .catch((error: unknown) => this.logger.warn(`Books could not be read again: ${String(error)}`));
+  }
+
+  /** The book turned out to need no translating: nothing was delivered, so a held charge goes back. */
+  async forgetBook(accountId: string, bookId: string): Promise<void> {
+    const account = await this.accounts.byId(accountId);
+    if (!account) return;
+    for (const task of await this.store.ofAccount(accountId)) {
+      if (task.bookId !== bookId || task.state.kind === 'done') continue;
+      await this.cancel(account, task.id);
+      if (task.charged) await this.accounts.charge(account, 'bookTranslations', 1).giveBack();
+    }
   }
 
   async create(account: Account, bookId: string, startAt: string | null): Promise<BookTranslationTask> {
@@ -73,7 +88,7 @@ export class BookTranslationService implements OnApplicationBootstrap {
     );
     if (earlier) return earlier.state.kind === 'stopped' ? this.resume(account, earlier.id) : earlier;
 
-    const chapters: ChapterInLine[] = (await this.books.chapters(account.id, bookId)).map(({ id, label, wordCount }) => ({
+    const chapters: ChapterInLine[] = (await this.books.mainChapters(account.id, bookId)).map(({ id, label, wordCount }) => ({
       chapterId: id,
       label,
       words: wordCount,

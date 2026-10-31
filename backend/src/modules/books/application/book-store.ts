@@ -1,6 +1,14 @@
 import { BookRecord, ChapterRecord } from '../domain/book';
+import { ChapterShape } from '../domain/book-reshape';
 
 export const BOOK_STORE = Symbol('BOOK_STORE');
+
+export type BookShape = {
+  bookId: string;
+  language: string;
+  chapters: ChapterShape[];
+  shapeVersion: number;
+};
 
 export type BookSummary = BookRecord & {
   chapterCount: number;
@@ -17,6 +25,9 @@ export interface BookStore {
   count(userId: string): Promise<number>;
   chapters(bookId: string): Promise<ChapterRecord[]>;
   chapter(id: string): Promise<ChapterRecord | null>;
+  /** Books read by an older version of the reader. */
+  staleBefore(shapeVersion: number): Promise<BookRecord[]>;
+  reshape(shape: BookShape): Promise<void>;
 }
 
 export class InMemoryBookStore implements BookStore {
@@ -60,6 +71,22 @@ export class InMemoryBookStore implements BookStore {
     return [...this.chaptersByBook.values()].flat().find((chapter) => chapter.id === id) ?? null;
   }
 
+  async staleBefore(shapeVersion: number) {
+    return [...this.books.values()].filter((book) => book.shapeVersion < shapeVersion);
+  }
+
+  async reshape({ bookId, language, chapters, shapeVersion }: BookShape) {
+    const book = this.books.get(bookId);
+    if (book) this.books.set(bookId, { ...book, language, shapeVersion });
+    this.chaptersByBook.set(
+      bookId,
+      (this.chaptersByBook.get(bookId) ?? []).map((chapter) => ({
+        ...chapter,
+        ...chapters.find(({ id }) => id === chapter.id),
+      })),
+    );
+  }
+
   private ofUser(userId: string) {
     return [...this.books.values()].filter((book) => book.userId === userId);
   }
@@ -68,7 +95,7 @@ export class InMemoryBookStore implements BookStore {
     const chapters = this.chaptersByBook.get(book.id) ?? [];
     return {
       ...book,
-      chapterCount: chapters.length,
+      chapterCount: chapters.filter(({ kind }) => kind === 'main').length,
       minutes: chapters.reduce((total, chapter) => total + chapter.minutes, 0),
     };
   }

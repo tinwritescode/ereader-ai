@@ -1,5 +1,8 @@
 export type BookStatus = 'PROCESSING' | 'READY' | 'FAILED';
 
+/** Bump when books need reading again from their files. */
+export const SHAPE_VERSION = 1;
+
 export type BookCover = {
   key: string;
   mediaType: string;
@@ -15,6 +18,7 @@ export type BookRecord = {
   sourceChecksum: string;
   sourceKey: string;
   cover: BookCover | null;
+  shapeVersion: number;
 };
 
 export type Block = {
@@ -23,12 +27,16 @@ export type Block = {
   text: string;
 };
 
+/** Front matter is what stands before the table of contents begins. */
+export type ChapterKind = 'main' | 'front';
+
 export type ChapterRecord = {
   id: string;
   bookId: string;
   index: number;
   label: string;
   subtitle: string | null;
+  kind: ChapterKind;
   wordCount: number;
   minutes: number;
   blocks: Block[];

@@ -94,8 +94,8 @@ describe('translating a whole book', () => {
   const http = () => request(app.getHttpServer());
   const as = (id: string) => ({ Authorization: `Bearer ${id}` });
 
-  const importBook = async (userId = 'max-1', language = 'en') => {
-    const { body } = await http().post('/books').set(as(userId)).attach('file', await buildEpub({ language }), 'book.epub').expect(202);
+  const importBook = async (userId = 'max-1', language = 'en', frontMatter = false) => {
+    const { body } = await http().post('/books').set(as(userId)).attach('file', await buildEpub({ language, frontMatter }), 'book.epub').expect(202);
     const { body: list } = await http().get(`/books/${body.bookId}/chapters`).set(as(userId)).expect(200);
     return { bookId: String(body.bookId), chapters: list.chapters.map(({ chapterId }: { chapterId: string }) => chapterId) };
   };
@@ -194,7 +194,7 @@ describe('translating a whole book', () => {
   it('stops when the model keeps failing, hands the month back, and goes on for free', async () => {
     const { bookId, chapters } = await importBook();
     llm.answer = (request) => {
-      if (hasBlocks(request.input) && request.input.blocks.some(({ text }) => text.startsWith('hai'))) {
+      if (hasBlocks(request.input) && request.input.blocks.some(({ text }) => text.startsWith('two'))) {
         throw new LlmError('UPSTREAM_ERROR');
       }
       return translate(request);
@@ -212,10 +212,29 @@ describe('translating a whole book', () => {
     expect(await used()).toBe(0);
   });
 
+  it('leaves front matter out of a whole-book translation', async () => {
+    const { bookId, chapters } = await importBook('max-1', 'en', true);
+    llm.answer = async (request) => translate(request);
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+    expect(await translations.find(chapters[0])).toBeNull();
+    expect(await translations.find(chapters[1])).not.toBeNull();
+  });
+
+  it('forgets a task, and hands the month back, when its book proves to be Vietnamese', async () => {
+    const { bookId } = await importBook();
+    gate = new Promise(() => undefined);
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    expect(await used()).toBe(1);
+    await app.get(BookTranslationService).forgetBook('max-1', bookId);
+    expect(await tasks()).toEqual([]);
+    expect(await used()).toBe(0);
+  });
+
   it('cancelling keeps what is translated and the month stays used', async () => {
     const { bookId, chapters } = await importBook();
     llm.answer = async (request) => {
-      if (hasBlocks(request.input) && request.input.blocks.some(({ text }) => text.startsWith('hai'))) {
+      if (hasBlocks(request.input) && request.input.blocks.some(({ text }) => text.startsWith('two'))) {
         await new Promise(() => undefined);
       }
       return translate(request);

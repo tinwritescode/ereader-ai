@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import { BookStore, BookSummary } from '../application/book-store';
-import { Block, BookCover, BookRecord, BookStatus, ChapterRecord } from '../domain/book';
+import { BookShape, BookStore, BookSummary } from '../application/book-store';
+import { Block, BookCover, BookRecord, BookStatus, ChapterKind, ChapterRecord } from '../domain/book';
 
 const CREATE_TABLES = `
   CREATE TABLE IF NOT EXISTS books (
@@ -26,7 +26,9 @@ const CREATE_TABLES = `
     minutes integer NOT NULL,
     blocks jsonb NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS chapters_of_book ON chapters (book_id, index)`;
+  CREATE INDEX IF NOT EXISTS chapters_of_book ON chapters (book_id, index);
+  ALTER TABLE books ADD COLUMN IF NOT EXISTS shape_version integer NOT NULL DEFAULT 0;
+  ALTER TABLE chapters ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'main'`;
 
 type BookRow = {
   id: string;
@@ -38,6 +40,7 @@ type BookRow = {
   source_checksum: string;
   source_key: string;
   cover: BookCover | null;
+  shape_version: number;
 };
 
 type ChapterRow = {
@@ -46,13 +49,14 @@ type ChapterRow = {
   index: number;
   label: string;
   subtitle: string | null;
+  kind: ChapterKind;
   word_count: number;
   minutes: number;
   blocks: Block[];
 };
 
 const SUMMARY = `
-  SELECT books.*, count(chapters.id)::int AS chapter_count, coalesce(sum(chapters.minutes), 0)::int AS total_minutes
+  SELECT books.*, (count(chapters.id) FILTER (WHERE chapters.kind = 'main'))::int AS chapter_count, coalesce(sum(chapters.minutes), 0)::int AS total_minutes
   FROM books LEFT JOIN chapters ON chapters.book_id = books.id`;
 
 function toBook(row: BookRow): BookRecord {
@@ -66,6 +70,7 @@ function toBook(row: BookRow): BookRecord {
     sourceChecksum: row.source_checksum,
     sourceKey: row.source_key,
     cover: row.cover,
+    shapeVersion: row.shape_version,
   };
 }
 
@@ -88,16 +93,16 @@ export class PostgresBookStore implements BookStore {
     try {
       await client.query('BEGIN');
       const { rowCount } = await client.query(
-        `INSERT INTO books (id, user_id, title, author, language, status, source_checksum, source_key, cover)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO books (id, user_id, title, author, language, status, source_checksum, source_key, cover, shape_version)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (user_id, source_checksum) DO NOTHING`,
-        [book.id, book.userId, book.title, book.author, book.language, book.status, book.sourceChecksum, book.sourceKey, book.cover],
+        [book.id, book.userId, book.title, book.author, book.language, book.status, book.sourceChecksum, book.sourceKey, book.cover, book.shapeVersion],
       );
       for (const chapter of rowCount === 1 ? chapters : []) {
         await client.query(
-          `INSERT INTO chapters (id, book_id, index, label, subtitle, word_count, minutes, blocks)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [chapter.id, chapter.bookId, chapter.index, chapter.label, chapter.subtitle, chapter.wordCount, chapter.minutes, JSON.stringify(chapter.blocks)],
+          `INSERT INTO chapters (id, book_id, index, label, subtitle, kind, word_count, minutes, blocks)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [chapter.id, chapter.bookId, chapter.index, chapter.label, chapter.subtitle, chapter.kind, chapter.wordCount, chapter.minutes, JSON.stringify(chapter.blocks)],
         );
       }
       await client.query('COMMIT');
@@ -165,6 +170,30 @@ export class PostgresBookStore implements BookStore {
     await this.tables();
     const { rows } = await this.pool.query<ChapterRow>('SELECT * FROM chapters WHERE id = $1', [id]);
     return rows[0] ? toChapter(rows[0]) : null;
+  }
+
+  async staleBefore(shapeVersion: number) {
+    await this.tables();
+    const { rows } = await this.pool.query<BookRow>('SELECT * FROM books WHERE shape_version < $1', [shapeVersion]);
+    return rows.map(toBook);
+  }
+
+  async reshape({ bookId, language, chapters, shapeVersion }: BookShape) {
+    await this.tables();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const { id, label, subtitle, kind } of chapters) {
+        await client.query('UPDATE chapters SET label = $2, subtitle = $3, kind = $4 WHERE id = $1', [id, label, subtitle, kind]);
+      }
+      await client.query('UPDATE books SET language = $2, shape_version = $3 WHERE id = $1', [bookId, language, shapeVersion]);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private tables(): Promise<unknown> {

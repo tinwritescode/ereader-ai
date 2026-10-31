@@ -2,6 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import JSZip from 'jszip';
 import { HTMLElement, Node, NodeType, parse as parseHtml } from 'node-html-parser';
 import { posix } from 'node:path';
+import { ChapterKind } from '../domain/book';
 
 export type EpubMetadata = {
   title: string | null;
@@ -17,6 +18,7 @@ export type EpubBlock = {
 export type EpubChapter = {
   label: string;
   subtitle: string | null;
+  kind: ChapterKind;
   blocks: EpubBlock[];
 };
 
@@ -36,6 +38,8 @@ export type EpubReadResult =
   | { kind: 'invalid'; reason: string };
 
 const EPUB_MIMETYPE = 'application/epub+zip';
+const NCX_MEDIA_TYPE = 'application/x-dtbncx+xml';
+const SHORT_LINE = 60;
 const ZIP_LOCAL_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const FIRST_ENTRY_NAME_OFFSET = 30;
 const FIRST_ENTRY_NAME_LENGTH_OFFSET = 26;
@@ -52,7 +56,8 @@ type TocEntry = { label: string; path: string; fragment: string | null };
 
 /**
  * Validates the EPUB container (OCF), reads Dublin Core metadata, and splits the spine text into chapters
- * using the top level of the table of contents. Without one, each spine document becomes a chapter.
+ * using the top level of the table of contents. Text before its first entry is kept as front matter.
+ * Without one, each spine document becomes a chapter.
  */
 export async function readEpub(bytes: Buffer): Promise<EpubReadResult> {
   if (!startsWithMimetypeEntry(bytes)) {
@@ -199,6 +204,28 @@ function hasBlockDescendant(element: HTMLElement): boolean {
 }
 
 async function readToc(zip: JSZip, manifest: ManifestItem[]): Promise<TocEntry[]> {
+  const entries = await readNav(zip, manifest);
+  return entries.length > 0 ? entries : readNcx(zip, manifest);
+}
+
+function tocEntry(label: string, baseDir: string, href: string): TocEntry {
+  const [file, fragment] = href.split('#');
+  return { label, path: resolvePath(baseDir, file), fragment: fragment ?? null };
+}
+
+/** EPUB 2 keeps the table of contents in an NCX file. */
+async function readNcx(zip: JSZip, manifest: ManifestItem[]): Promise<TocEntry[]> {
+  const ncx = manifest.find((item) => item.mediaType === NCX_MEDIA_TYPE);
+  const source = ncx === undefined ? undefined : await zip.file(ncx.path)?.async('string');
+  if (ncx === undefined || source === undefined) return [];
+  return list(child(child(child(parseXml(source), 'ncx'), 'navMap'), 'navPoint')).flatMap((point) => {
+    const label = text(child(child(point, 'navLabel'), 'text'));
+    const href = child(child(point, 'content'), '@_src');
+    return label === null || typeof href !== 'string' ? [] : [tocEntry(label, posix.dirname(ncx.path), href)];
+  });
+}
+
+async function readNav(zip: JSZip, manifest: ManifestItem[]): Promise<TocEntry[]> {
   const nav = manifest.find((item) => item.properties.includes('nav'));
   const source = nav === undefined ? undefined : await zip.file(nav.path)?.async('string');
   if (nav === undefined || source === undefined) return [];
@@ -214,12 +241,7 @@ async function readToc(zip: JSZip, manifest: ManifestItem[]): Promise<TocEntry[]
     );
     const href = link?.getAttribute('href');
     if (!link || !href) return [];
-    const [file, fragment] = href.split('#');
-    return [{
-      label: link.text.replace(/\s+/g, ' ').trim(),
-      path: resolvePath(posix.dirname(nav.path), file),
-      fragment: fragment ?? null,
-    }];
+    return [tocEntry(link.text.replace(/\s+/g, ' ').trim(), posix.dirname(nav.path), href)];
   });
 }
 
@@ -229,18 +251,25 @@ function splitChapters(blocks: PlacedBlock[], spine: SpineDocument[], toc: TocEn
     .filter((located): located is { entry: TocEntry; start: number } => located.start !== null)
     .sort((a, b) => a.start - b.start)
     .filter((located, index, all) => index === 0 || located.start !== all[index - 1].start);
-  if (starts.length === 0) {
-    return spine
-      .map((document) => blocks.filter((block) => block.path === document.path))
-      .filter((chapterBlocks) => chapterBlocks.length > 0)
-      .map((chapterBlocks, index) => {
-        const label = chapterBlocks[0].kind === 'heading' ? chapterBlocks[0].text : `Phần ${index + 1}`;
-        return toChapter(label, chapterBlocks);
-      });
-  }
-  return starts.map(({ entry, start }, index) =>
-    toChapter(entry.label, blocks.slice(start, starts[index + 1]?.start ?? blocks.length)),
-  );
+  if (starts.length === 0) return byDocument(blocks, spine, 'main');
+  return [
+    ...byDocument(blocks.slice(0, starts[0].start), spine, 'front'),
+    ...starts.map(({ entry, start }, index) =>
+      toChapter(entry.label, 'main', blocks.slice(start, starts[index + 1]?.start ?? blocks.length)),
+    ),
+  ];
+}
+
+function byDocument(blocks: PlacedBlock[], spine: SpineDocument[], kind: ChapterKind): EpubChapter[] {
+  return spine
+    .map((document) => blocks.filter((block) => block.path === document.path))
+    .filter((chapterBlocks) => chapterBlocks.length > 0)
+    .map((chapterBlocks, index) => toChapter(openingLine(chapterBlocks[0]) ?? `Phần ${index + 1}`, kind, chapterBlocks));
+}
+
+/** A heading, or a short line that does not read as a sentence: what a title page or a "Giới thiệu" opens with. */
+function openingLine({ kind, text: line }: EpubBlock): string | null {
+  return kind === 'heading' || (line.length <= SHORT_LINE && !/[.,:;!?…]$/.test(line)) ? line : null;
 }
 
 function tocEntryStart(blocks: PlacedBlock[], { path, fragment }: TocEntry): number | null {
@@ -254,12 +283,12 @@ function tocEntryStart(blocks: PlacedBlock[], { path, fragment }: TocEntry): num
  * The run of headings that opens the chapter becomes its subtitle (minus the one repeating the label)
  * and is left out of the body, so readers and digests start at the prose.
  */
-function toChapter(label: string, placed: PlacedBlock[]): EpubChapter {
+function toChapter(label: string, kind: ChapterKind, placed: PlacedBlock[]): EpubChapter {
   const blocks = placed.map(({ kind, text: content }) => ({ kind, text: content }));
   const firstBody = blocks.findIndex((block) => block.kind !== 'heading');
   const bodyStart = firstBody === -1 ? blocks.length : firstBody;
   const subtitle = blocks.slice(0, bodyStart).map((block) => block.text).filter((heading) => heading !== label).join(' ');
-  return { label, subtitle: subtitle.length > 0 ? subtitle : null, blocks: blocks.slice(bodyStart) };
+  return { label, subtitle: subtitle.length > 0 ? subtitle : null, kind, blocks: blocks.slice(bodyStart) };
 }
 
 function resolvePath(baseDir: string, href: string): string {
