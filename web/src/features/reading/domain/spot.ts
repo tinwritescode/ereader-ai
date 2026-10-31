@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { LengthOption } from './length'
+import type { ReaderSearch } from './length'
 
 /** Where reading stopped in one book. */
 export const ReadingSpot = z.object({
@@ -36,4 +37,23 @@ export function nextChapterSpot({ chapterId, chapterLabel, minutes, listened }: 
 
 export function minutesLeft({ minutes, read }: { minutes: number; read: number }): number {
   return Math.ceil(minutes * (1 - read))
+}
+
+/** Spots are kept oldest first, so the last one of a book still on the shelf was read last. */
+export function latestSpot({ spots, bookIds }: { spots: ReadingSpots; bookIds: readonly string[] }): { bookId: string; spot: ReadingSpot } | null {
+  const shelf = new Set(bookIds)
+  const entry = Object.entries(spots).findLast(([bookId]) => shelf.has(bookId))
+  return entry ? { bookId: entry[0], spot: entry[1] } : null
+}
+
+/** Puts a book's spot last, as the one read most recently. */
+export function withSpot({ spots, bookId, spot }: { spots: ReadingSpots; bookId: string; spot: ReadingSpot }): ReadingSpots {
+  const { [bookId]: _old, ...others } = spots
+  return { ...others, [bookId]: spot }
+}
+
+/** A whole version's length is the chapter's, whatever a link said. */
+export function wholeLength({ search, chapterMinutes }: { search: ReaderSearch; chapterMinutes: number }): ReaderSearch | null {
+  const whole = search.length === 'original' || search.length === 'vietnamese'
+  return whole && search.minutes !== chapterMinutes ? { ...search, minutes: chapterMinutes } : null
 }

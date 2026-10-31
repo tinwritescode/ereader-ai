@@ -47,6 +47,8 @@ function fresh() {
     role: 'super_admin',
     requestedPlan: null as string | null,
     planRequestDelay: 0,
+    cancelDelay: 0,
+    cancelFails: false,
     planRequestFails: false,
     digestsUsed: 3,
     digestFails: null as string | null,
@@ -205,8 +207,8 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return send(response, 200, { refreshCalls: state.refreshCalls, speechCalls: state.speechCalls, uploads: state.uploads, requestedPlan: state.requestedPlan, accounts: state.accounts })
   }
   if (path === '/__stub/task') {
-    const { kind, ...task } = await json<{ kind: 'voice' | 'translation' | 'book' } & Task>()
-    state.tasks[kind].push(task)
+    const task = await json<Task>()
+    state.tasks[task['kind'] === 'chapterVoice' ? 'voice' : task['kind'] === 'bookVoice' ? 'book' : 'translation'].push(task)
     return send(response, 204)
   }
   if (path === '/user_management/authorize') {
@@ -354,6 +356,8 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     const list = task[1] === 'speech/tasks' ? 'voice' : task[1] === 'translations/tasks' ? 'translation' : 'book'
     const found = state.tasks[list].find((entry) => entry.id === task[2])
     if (method === 'DELETE') {
+      await sleep(state.cancelDelay)
+      if (state.cancelFails) return send(response, 500, { code: 'CANCEL_FAILED' })
       state.tasks[list] = state.tasks[list].filter((entry) => entry.id !== task[2])
       return send(response, 204)
     }

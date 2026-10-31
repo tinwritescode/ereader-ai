@@ -11,7 +11,7 @@ const ROW_HEIGHT = 46
 
 export type LengthChoice = { book: Book; chapters: ChapterSummary[]; chapter: ChapterSummary; top: number; onClose: () => void }
 
-function ChapterList({ chapters, onChoose, markOf }: { chapters: ChapterSummary[]; onChoose: (chapter: ChapterSummary, top: number) => void; markOf: (chapter: ChapterSummary) => ReactNode }) {
+function ChapterList({ chapters, onChoose, markOf }: { chapters: ChapterSummary[]; onChoose: (chapter: ChapterSummary, top: number) => void; markOf: (chapter: ChapterSummary, fallback: ReactNode) => ReactNode }) {
   const list = useRef<HTMLDivElement>(null)
   const virtual = useWindowVirtualizer({
     count: chapters.length,
@@ -35,7 +35,7 @@ function ChapterList({ chapters, onChoose, markOf }: { chapters: ChapterSummary[
             onClick={(event) => onChoose(chapter, event.currentTarget.getBoundingClientRect().top)}
           >
             <span>{number ? `${number}. ${title}` : title}</span>
-            {markOf(chapter) ?? <em className="s">{durationLabel(chapter.minutes)}</em>}
+            {markOf(chapter, <em className="s">{durationLabel(chapter.minutes)}</em>)}
           </button>
         )
       })}
@@ -47,7 +47,7 @@ type Slots = {
   chooseLength: (choice: LengthChoice) => ReactNode
   aside?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   resume?: (book: Book, chapters: ChapterSummary[]) => ReactNode
-  markOf?: (book: Book, chapter: ChapterSummary) => ReactNode
+  markOf?: (book: Book, chapter: ChapterSummary, fallback: ReactNode) => ReactNode
 }
 
 export function BookPage({ bookId, chooseLength, aside, resume, markOf }: { bookId: string } & Slots) {
@@ -63,7 +63,7 @@ export function BookPage({ bookId, chooseLength, aside, resume, markOf }: { book
         <h1>{book.title}</h1>
         <p className="soft">{[book.author, `${book.chapterCount} chương`].filter(Boolean).join(', ')}</p>
         {resume?.(book, chapters)}
-        <ChapterList chapters={chapters} onChoose={(chapter, top) => setChosen({ chapter, top })} markOf={(chapter) => markOf?.(book, chapter)} />
+        <ChapterList chapters={chapters} onChoose={(chapter, top) => setChosen({ chapter, top })} markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)} />
       </div>
       {chosen && chooseLength({ book, chapters, chapter: chosen.chapter, top: chosen.top, onClose: () => setChosen(null) })}
     </div>

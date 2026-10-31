@@ -43,9 +43,15 @@ function savedSpotFor({ spot, chapterId, option, blocks }: { spot: ReadingSpot |
   return (spot.block > 0 || spot.offset > 0) && spot.block < blocks.length ? spot : null
 }
 
-function Block({ block, index, marked }: { block: TextBlock; index: number; marked: ReaderVoice['marked'] }) {
+function Block({ block, index, marked, onPick }: { block: TextBlock; index: number; marked: ReaderVoice['marked']; onPick?: (block: number) => void }) {
   const Tag = block.kind === 'heading' ? 'h2' : 'p'
-  if (marked?.block !== index) return <Tag data-block={index}>{block.text}</Tag>
+  if (marked?.block !== index) {
+    return (
+      <Tag data-block={index} onClick={onPick && (() => onPick(index))}>
+        {block.text}
+      </Tag>
+    )
+  }
   return (
     <Tag data-block={index}>
       {block.text.slice(0, marked.start)}
@@ -98,12 +104,13 @@ export function ReaderPage({
   chapterId: string
   search: ReaderSearch
   voice?: ReaderVoice
-  bar?: (blocks: TextBlock[] | null, option: LengthOption) => ReactNode
+  bar?: (blocks: TextBlock[] | null, option: LengthOption, topBlock: () => number) => ReactNode
   translationNotice?: (args: { chapterId: string; onOriginal: () => void }) => ReactNode
 }) {
   const navigate = useNavigate()
   const look = readingLook.useValue()
   const [showLook, setShowLook] = useState(false)
+  const [picked, setPicked] = useState<number | null>(null)
   const option: LengthOption = { length: search.length, minutes: search.minutes }
   const index = chapters.findIndex((chapter) => chapter.chapterId === chapterId)
   const chapter = chapters[index]
@@ -237,6 +244,7 @@ export function ReaderPage({
             text={text}
             voice={voice}
             onOriginal={original ? () => choose(original) : undefined}
+            onPick={bar && !voice.heardHere(option) ? setPicked : undefined}
             translationNotice={translationNotice?.({ chapterId, onOriginal: () => (original ? choose(original) : undefined) })}
           />
           {blocks && (
@@ -260,8 +268,24 @@ export function ReaderPage({
           )}
         </div>
       </div>
+      {picked !== null && blocks && (
+        <div className="offer" style={{ position: 'fixed', top: 'auto', bottom: 76, left: '50%', transform: 'translateX(-50%)' }}>
+          <Button
+            quiet
+            onClick={() => {
+              voice.start({ blocks, option, block: picked, offset: 0 })
+              setPicked(null)
+            }}
+          >
+            Nghe từ câu này
+          </Button>
+          <Button quiet onClick={() => setPicked(null)}>
+            Đóng
+          </Button>
+        </div>
+      )}
       {showLook && <LookSheet onClose={() => setShowLook(false)} />}
-      {bar?.(blocks, option)}
+      {bar?.(blocks, option, topBlock)}
     </div>
   )
 }
@@ -283,11 +307,13 @@ function ReaderBody({
   text,
   voice,
   onOriginal,
+  onPick,
   translationNotice,
 }: {
   text: ReturnType<typeof useChapterText>
   voice: ReaderVoice
   onOriginal: (() => void) | undefined
+  onPick: ((block: number) => void) | undefined
   translationNotice: ReactNode
 }) {
   const [limitClosed, setLimitClosed] = useState(false)
@@ -321,7 +347,7 @@ function ReaderBody({
       return (
         <div className="text">
           {text.blocks.map((block, index) => (
-            <Block key={index} block={block} index={index} marked={voice.marked} />
+            <Block key={index} block={block} index={index} marked={voice.marked} onPick={onPick} />
           ))}
         </div>
       )

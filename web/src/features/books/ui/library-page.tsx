@@ -64,7 +64,10 @@ export function LibraryPage({ continueReading, captionOf }: { continueReading: R
           <Link key={book.bookId} className="book-tile" to="/books/$bookId" params={{ bookId: book.bookId }}>
             <BookCover book={book} />
             <span className="sr-only">{book.title}</span>
-            <div className="cap">{captionOf(book) ?? book.author}</div>
+            <div className="cap">
+              {book.author}
+              <div>{captionOf(book)}</div>
+            </div>
           </Link>
         ))}
         <div>
