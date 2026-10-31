@@ -1,8 +1,27 @@
 import type { Speaker } from '../domain/controller'
 import { fetchClip } from '../data/speech'
 
-// Half a second of silence: playing it inside a tap lets later clips play without one (Safari).
-const SILENCE = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='
+const RATE = 8000
+const SILENT_SAMPLES = RATE / 10
+
+/** A tenth of a second of silence: playing it inside a tap lets later clips play without one (Safari). */
+function silence(): string {
+  const wav = new DataView(new ArrayBuffer(44 + SILENT_SAMPLES * 2))
+  const text = (at: number, value: string) => [...value].forEach((letter, index) => wav.setUint8(at + index, letter.charCodeAt(0)))
+  text(0, 'RIFF')
+  wav.setUint32(4, 36 + SILENT_SAMPLES * 2, true)
+  text(8, 'WAVEfmt ')
+  wav.setUint32(16, 16, true)
+  wav.setUint16(20, 1, true)
+  wav.setUint16(22, 1, true)
+  wav.setUint32(24, RATE, true)
+  wav.setUint32(28, RATE * 2, true)
+  wav.setUint16(32, 2, true)
+  wav.setUint16(34, 16, true)
+  text(36, 'data')
+  wav.setUint32(40, SILENT_SAMPLES * 2, true)
+  return URL.createObjectURL(new Blob([wav.buffer], { type: 'audio/wav' }))
+}
 
 /** Plays clips through one reused audio element, so a browser that wants a tap first gets it once. */
 export function createAudioSpeaker(): Speaker<string> & { unlock: () => void } {
@@ -20,7 +39,7 @@ export function createAudioSpeaker(): Speaker<string> & { unlock: () => void } {
       if (unlocked) return
       unlocked = true
       const player = audio()
-      player.src = SILENCE
+      player.src = silence()
       void player.play().catch(() => {})
     },
     synthesize: async (sentence) => URL.createObjectURL(await fetchClip(sentence)),
