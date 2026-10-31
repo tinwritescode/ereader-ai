@@ -2,9 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:ereader_mobile/features/books/data/repositories/books_repository_impl.dart';
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_look_store.dart';
 import 'package:ereader_mobile/features/books/data/repositories/prefs_reading_spot_store.dart';
+import 'package:ereader_mobile/features/listen/data/cloud_voices.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
 import 'package:ereader_mobile/features/listen/data/prefs_listen_choice_store.dart';
-import 'package:ereader_mobile/features/listen/data/vbee_voices.dart';
 import 'package:ereader_mobile/main.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,7 +45,7 @@ void main() {
         EReaderApp(
           auth: FakeAuthRepository(),
           repository: BooksRepositoryImpl(api),
-          speech: KokoroSpeech(vbee: VbeeVoices(api)),
+          speech: KokoroSpeech(cloud: CloudVoices(api)),
           looks: PrefsReadingLookStore(),
           listenChoices: PrefsListenChoiceStore(),
           spots: PrefsReadingSpotStore(),

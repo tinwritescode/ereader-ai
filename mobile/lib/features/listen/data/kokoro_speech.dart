@@ -16,7 +16,7 @@ import '../domain/phonemizer.dart';
 import '../domain/speech.dart';
 import '../domain/spoken_numbers.dart';
 import '../domain/wav.dart';
-import 'vbee_voices.dart';
+import 'cloud_voices.dart';
 
 const _modelUrl =
     'https://huggingface.co/contextboxai/Kokoro-Vietnamese/resolve/main/kokoro_vi.onnx';
@@ -26,14 +26,14 @@ const _modelSha256 =
 const _speedNormal = 1.0;
 const _heldSilenceSeconds = 5;
 
-/// Kokoro Vietnamese through ONNX Runtime, plus Vbee voices from [_vbee].
+/// Kokoro Vietnamese through ONNX Runtime, plus cloud voices from [_cloud].
 /// Device voices use the network only in [downloadModel].
 class KokoroSpeech implements Speech {
-  KokoroSpeech({required VbeeVoices vbee, Dio? dio})
-    : _vbee = vbee,
+  KokoroSpeech({required CloudVoices cloud, Dio? dio})
+    : _cloud = cloud,
       _dio = dio ?? Dio();
 
-  final VbeeVoices _vbee;
+  final CloudVoices _cloud;
   final Dio _dio;
   final _player = AudioPlayer();
   // iOS suspends a backgrounded app the moment its audio stops, which would
@@ -152,12 +152,12 @@ class KokoroSpeech implements Speech {
   }
 
   @override
-  Future<List<CloudVoice>> cloudVoices() => _vbee.list();
+  Future<List<CloudVoice>> cloudVoices() => _cloud.list();
 
   @override
   Future<Float32List> synthesize(String text, Voice voice) => switch (voice) {
     DeviceVoice() => _synthesizeOnDevice(text, voice),
-    CloudVoice() => _vbee.speak(text, voice),
+    CloudVoice() => _cloud.speak(text, voice),
   };
 
   Future<Float32List> _synthesizeOnDevice(

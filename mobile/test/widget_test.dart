@@ -246,13 +246,10 @@ void main() {
     expect(find.text('Đức An'), findsOneWidget);
   });
 
-  testWidgets('a Vbee voice can be chosen from the player', (tester) async {
-    const vbee = CloudVoice(
-      'hn_female_ngochuyen_full_48k-fhg',
-      'HN - Ngọc Huyền',
-    );
+  testWidgets('a cloud voice can be chosen from the player', (tester) async {
+    const trungTin = CloudVoice('vieneu-trung-tin', 'Trung Tín');
     const vieNeu = CloudVoice('vieneu-clone', 'VieNeu');
-    final speech = FakeSpeech(cloud: [vieNeu, vbee]);
+    final speech = FakeSpeech(cloud: [vieNeu, trungTin]);
     await pumpApp(tester, shelf: [loeb], speech: speech);
     await openOriginalChapter(tester);
     await showTools(tester);
@@ -269,13 +266,13 @@ void main() {
         tester.getTopLeft(find.text('Trên máy, nghe không cần mạng')).dy,
       ),
     );
-    await tester.ensureVisible(find.text('HN - Ngọc Huyền'));
+    await tester.ensureVisible(find.text('Trung Tín'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('HN - Ngọc Huyền'));
+    await tester.tap(find.text('Trung Tín'));
     await tester.pumpAndSettle();
 
-    expect(find.text('HN - Ngọc Huyền'), findsOneWidget);
-    expect(speech.synthesized.last.$2, vbee);
+    expect(find.text('Trung Tín'), findsOneWidget);
+    expect(speech.synthesized.last.$2, trungTin);
   });
 
   testWidgets('a cloud voice counts its sentences before it speaks', (

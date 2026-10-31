@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:ereader_mobile/features/listen/data/cloud_voices.dart';
 import 'package:ereader_mobile/features/listen/data/kokoro_speech.dart';
-import 'package:ereader_mobile/features/listen/data/vbee_voices.dart';
 import 'package:ereader_mobile/features/listen/domain/speech.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -13,7 +13,7 @@ void main() {
     tester,
   ) async {
     // Device voices only: no backend is needed.
-    final speech = KokoroSpeech(vbee: VbeeVoices(Dio()));
+    final speech = KokoroSpeech(cloud: CloudVoices(Dio()));
     if (!await speech.modelReady()) {
       var last = 0.0;
       await speech.downloadModel(onProgress: (progress) => last = progress);

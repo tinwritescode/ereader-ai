@@ -13,7 +13,7 @@ import '../domain/speech_plan.dart';
 const _rates = [1.0, 1.25, 1.5, 0.8];
 // Sentences made ready ahead of the one playing, so playback does not wait for the model.
 const _deviceReadAhead = 2;
-// Vbee takes seconds per sentence, so a thin buffer runs dry: keep a minute of speech ready.
+// A cloud voice takes seconds per sentence, so a thin buffer runs dry: keep a minute of speech ready.
 const _cloudReadAheadSeconds = 60.0;
 // Enough to outrun playback; the rest wait for a free slot.
 const _cloudRequests = 4;
@@ -222,7 +222,7 @@ class ListenBloc extends Bloc<ListenEvent, ListenState> {
   // Sentences in [_audio] whose audio has arrived.
   var _ready = <int>{};
   Future<void> _modelQueue = Future.value();
-  // The sentence the voice is on while Vbee has more to fetch.
+  // The sentence the voice is on while the cloud voice has more to fetch.
   int? _playhead;
   int _cloudRunning = 0;
   // Each run owns one generation; a newer one makes an older run stop by itself.

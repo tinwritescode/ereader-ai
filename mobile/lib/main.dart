@@ -22,8 +22,8 @@ import 'features/books/presentation/reading_look_cubit.dart';
 import 'features/books/presentation/reading_spots_cubit.dart';
 import 'features/listen/data/prefs_listen_choice_store.dart';
 import 'features/listen/domain/listen_choice.dart';
+import 'features/listen/data/cloud_voices.dart';
 import 'features/listen/data/kokoro_speech.dart';
-import 'features/listen/data/vbee_voices.dart';
 import 'features/listen/domain/speech.dart';
 import 'features/listen/presentation/listen_bloc.dart';
 import 'features/tasks/data/prefs_task_notice_store.dart';
@@ -57,7 +57,7 @@ void main() {
         clientId: _workosClientId,
       ),
       repository: BooksRepositoryImpl(api),
-      speech: KokoroSpeech(vbee: VbeeVoices(api)),
+      speech: KokoroSpeech(cloud: CloudVoices(api)),
       looks: PrefsReadingLookStore(),
       listenChoices: PrefsListenChoiceStore(),
       spots: PrefsReadingSpotStore(),

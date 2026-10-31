@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-/// A voice to read with: one on the device, or one from Vbee over the network.
+/// A voice to read with: one on the device, or one from our voice service over the network.
 sealed class Voice {
   String get label;
 }
@@ -29,7 +29,7 @@ enum DeviceVoice implements Voice {
   final String label;
 }
 
-/// A Vbee voice, rendered on Vbee's servers through the backend.
+/// A cloud voice, rendered by our voice service through the backend.
 final class CloudVoice implements Voice {
   const CloudVoice(this.code, this.label);
 
@@ -65,7 +65,7 @@ abstract interface class Speech {
 
   void cancelDownload();
 
-  /// The Vbee voices on offer; empty when the backend has none or is unreachable.
+  /// The cloud voices on offer; empty when the backend has none or is unreachable.
   Future<List<CloudVoice>> cloudVoices();
 
   Future<Float32List> synthesize(String text, Voice voice);

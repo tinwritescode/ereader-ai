@@ -141,24 +141,21 @@ void main() {
     await bloc.close();
   });
 
-  test('a Vbee voice reads without the device model', () async {
-    const vbee = CloudVoice(
-      'hn_female_ngochuyen_full_48k-fhg',
-      'HN - Ngọc Huyền',
-    );
+  test('a cloud voice reads without the device model', () async {
+    const cloud = CloudVoice('vieneu-clone', 'Hạt Dẻ');
     final speech = FakeSpeech(ready: false);
     final bloc = ListenBloc(speech)
-      ..add(const ListenVoiceChosen(vbee))
+      ..add(const ListenVoiceChosen(cloud))
       ..add(const ListenRequested(blocks, source: source));
     await settle();
 
     expect(playingText(bloc), 'Một.');
-    expect(speech.synthesized.first, ('Một.', vbee));
+    expect(speech.synthesized.first, ('Một.', cloud));
     await bloc.close();
   });
 
-  group('a Vbee voice', () {
-    const vbee = CloudVoice('code', 'Vbee');
+  group('a cloud voice', () {
+    const cloud = CloudVoice('code', 'Giọng');
     // 150 characters read for about 10 seconds.
     final long = List.filled(30, ' ').indexed.map((e) {
       return 'Câu ${e.$1.toString().padLeft(2, '0')} ${'chữ ' * 36}'
@@ -171,7 +168,7 @@ void main() {
 
     Future<ListenBloc> listen(FakeSpeech speech) async {
       final bloc = ListenBloc(speech)
-        ..add(const ListenVoiceChosen(vbee))
+        ..add(const ListenVoiceChosen(cloud))
         ..add(ListenRequested(chapter, source: source));
       await settle();
       return bloc;
@@ -443,6 +440,23 @@ void main() {
       final bloc = await listen(
         FakeSpeech(cloud: const [vieNeu]),
         FakeListenChoiceStore(const ListenChoice(voice: hatDe, rate: 1)),
+      );
+      expect(bloc.state.voice, vieNeu);
+      await bloc.close();
+    });
+
+    test('a saved Vbee voice gives way to the first voice offered', () async {
+      final bloc = await listen(
+        FakeSpeech(cloud: const [vieNeu]),
+        FakeListenChoiceStore(
+          const ListenChoice(
+            voice: CloudVoice(
+              'hn_female_ngochuyen_full_48k-fhg',
+              'HN - Ngọc Huyền',
+            ),
+            rate: 1,
+          ),
+        ),
       );
       expect(bloc.state.voice, vieNeu);
       await bloc.close();

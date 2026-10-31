@@ -17,7 +17,7 @@ flowchart LR
     reader(["Người đọc"])
     llm(["Dịch vụ LLM"])
     hf(["Hugging Face"])
-    vbee(["Vbee"])
+    gcloud(["Google Cloud Run"])
     workos(["WorkOS"])
     admin(["Super admin"])
 
@@ -34,7 +34,7 @@ flowchart LR
         resume(["Đọc tiếp chỗ lần trước"])
         download(["Tải giọng đọc lần đầu"])
         tune(["Đổi giọng và tốc độ"])
-        cloud(["Nghe bằng giọng Vbee"])
+        cloud(["Nghe bằng giọng VieNeu qua mạng"])
         signin(["Đăng nhập"])
         usage(["Xem gói và mức đã dùng"])
         upgrade(["Yêu cầu nâng gói"])
@@ -63,7 +63,7 @@ flowchart LR
     listen -. "gồm, lần đầu" .-> download
     shorten --> llm
     download --> hf
-    cloud --> vbee
+    cloud --> gcloud
 ```
 
 ## Dữ liệu chạy ở đâu
@@ -79,7 +79,7 @@ flowchart LR
     subgraph server["Backend NestJS trên Railway"]
         api["API sách và chương"]
         digest["Rút gọn và cache"]
-        speech["Proxy giọng Vbee"]
+        speech["Proxy giọng qua mạng"]
         accounts["Tài khoản, gói, mức dùng"]
         memory[("Cache trong bộ nhớ")]
         db[("Postgres: tài khoản, mức dùng, sách, chương")]
@@ -95,7 +95,7 @@ flowchart LR
 
     llm["Dịch vụ LLM"]
     hf["Hugging Face"]
-    vbee["Vbee batch TTS"]
+    gcloud["VieNeu trên Cloud Run"]
     workos["WorkOS AuthKit"]
 
     ui -- "trang đăng nhập, PKCE" --> workos
@@ -106,10 +106,10 @@ flowchart LR
     digest --> llm
     hf -- "model 326 MB, tải một lần" --> tts
     ui -- "từng câu một" --> speech
-    speech -- "token chỉ nằm trên server" --> vbee
+    speech -- "khoá chỉ nằm trên server" --> gcloud
 ```
 
-Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chương vẫn lấy từ server, nên không có mạng thì không mở được chương.
+Chỉ giọng trên máy là offline; giọng qua mạng cần mạng. Nội dung chương vẫn lấy từ server, nên không có mạng thì không mở được chương.
 
 ## Hiện có và dự kiến
 
@@ -117,12 +117,11 @@ Chỉ giọng trên máy là offline; giọng Vbee cần mạng. Nội dung chư
 |---|---|---|
 | Lưu sách | Sách và chương trong PostgreSQL; file EPUB và ảnh bìa trong Railway bucket. Chương rút gọn được cache trong bộ nhớ, nên sau khi restart sẽ rút gọn (và tính lượt) lại | Chương rút gọn trong PostgreSQL |
 | Xử lý EPUB | Trong tiến trình backend | Hàng đợi Redis và BullMQ |
-| Tài khoản | Đăng nhập qua WorkOS. Gói Free, Plus, Max: 3, 30, 200 cuốn; 10, 100, 500 chương rút gọn mỗi tháng; 30, 300, 1.500 phút Vbee mỗi tháng; file EPUB tối đa 20, 100, 100 MB. Giọng trên máy và bản gốc không giới hạn. Tài khoản đầu tiên đăng nhập bằng `SUPER_ADMIN_EMAIL` đã xác minh thành super admin và duyệt gói | Thanh toán, xoá tài khoản trong app |
+| Tài khoản | Đăng nhập qua WorkOS. Gói Free, Plus, Max: 3, 30, 200 cuốn; 10, 100, 500 chương rút gọn mỗi tháng; 30, 300, 1.500 phút giọng qua mạng mỗi tháng; file EPUB tối đa 20, 100, 100 MB. Giọng trên máy và bản gốc không giới hạn. Tài khoản đầu tiên đăng nhập bằng `SUPER_ADMIN_EMAIL` đã xác minh thành super admin và duyệt gói | Thanh toán, xoá tài khoản trong app |
 | Tiến độ đọc | Lưu trên máy: chương, bản đọc và đoạn | Đồng bộ giữa các máy |
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
-| Giọng Vbee | Batch API, 2 đến 10 giây mỗi câu. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi Vbee | Realtime API (khoảng 0,5 giây) sau khi nâng gói, 5 giọng |
-| Giọng VieNeu | VieNeu-TTS trên Cloud Run GPU của Google (`voice/`), có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn trong `voice/clips`. Service tự tắt khi rảnh, nên câu đầu sau khi nghỉ chờ khoảng một phút. Tính chung vào số phút hằng tháng với Vbee | |
+| Giọng qua mạng | VieNeu-TTS trên Cloud Run GPU của Google (`voice/`), có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn trong `voice/clips`. Service tự tắt khi rảnh, nên câu đầu sau khi nghỉ chờ khoảng một phút. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi service. Tính vào số phút giọng qua mạng hằng tháng | |
 | Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
@@ -140,7 +139,7 @@ Cần Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # điền WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN và VBEE_APP_ID không bắt buộc
+cp .env.example .env   # điền WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VIENEU_URL và VIENEU_API_KEY không bắt buộc
 npm ci
 npm run start:dev
 ```
@@ -188,7 +187,7 @@ Integration test ghi đè app đã cài trên simulator, nên phải build lại
 
 ## Deploy
 
-Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng Vbee thì `VBEE_TOKEN`, `VBEE_APP_ID`, `VIENEU_URL`, `VIENEU_API_KEY`, trong biến môi trường của Railway, không đưa vào repo.
+Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng giọng qua mạng thì `VIENEU_URL`, `VIENEU_API_KEY`, trong biến môi trường của Railway, không đưa vào repo.
 
 Bản iPhone trỏ vào backend đã deploy:
 

@@ -5,9 +5,9 @@ import 'package:dio/dio.dart';
 import '../domain/speech.dart';
 import '../domain/wav.dart';
 
-/// Vbee voices through the backend, which holds the Vbee token.
-class VbeeVoices {
-  VbeeVoices(this._dio);
+/// Cloud voices through the backend, which holds the voice service's key.
+class CloudVoices {
+  CloudVoices(this._dio);
 
   final Dio _dio;
 

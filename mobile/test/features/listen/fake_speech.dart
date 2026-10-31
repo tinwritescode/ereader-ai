@@ -30,7 +30,7 @@ class FakeSpeech implements Speech {
   /// Texts that fail once, like a brief network drop.
   final failOnce = <String>{};
 
-  /// When set, each synthesis waits for it, like a slow Vbee call.
+  /// When set, each synthesis waits for it, like a slow cloud voice.
   Completer<void>? synthesisGate;
   var running = 0;
   var mostAtOnce = 0;

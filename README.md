@@ -17,7 +17,7 @@ flowchart LR
     reader(["Reader"])
     llm(["LLM service"])
     hf(["Hugging Face"])
-    vbee(["Vbee"])
+    gcloud(["Google Cloud Run"])
     workos(["WorkOS"])
     admin(["Super admin"])
 
@@ -34,7 +34,7 @@ flowchart LR
         resume(["Continue where reading stopped"])
         download(["Download the voice once"])
         tune(["Change voice and speed"])
-        cloud(["Listen with a Vbee voice"])
+        cloud(["Listen with a VieNeu cloud voice"])
         signin(["Sign in"])
         usage(["See plan and usage"])
         upgrade(["Ask for a higher plan"])
@@ -63,7 +63,7 @@ flowchart LR
     listen -. "includes, first time" .-> download
     shorten --> llm
     download --> hf
-    cloud --> vbee
+    cloud --> gcloud
 ```
 
 ## Where things run
@@ -79,7 +79,7 @@ flowchart LR
     subgraph server["NestJS backend on Railway"]
         api["Books and chapters API"]
         digest["Shortening and cache"]
-        speech["Vbee speech proxy"]
+        speech["Cloud voice proxy"]
         accounts["Accounts, plans, usage"]
         memory[("In-memory cache")]
         db[("Postgres: accounts, usage, books, chapters")]
@@ -95,7 +95,7 @@ flowchart LR
 
     llm["LLM service"]
     hf["Hugging Face"]
-    vbee["Vbee batch TTS"]
+    gcloud["VieNeu on Cloud Run"]
     workos["WorkOS AuthKit"]
 
     ui -- "sign-in page, PKCE" --> workos
@@ -106,10 +106,10 @@ flowchart LR
     digest --> llm
     hf -- "326 MB model, downloaded once" --> tts
     ui -- "one sentence at a time" --> speech
-    speech -- "token stays on the server" --> vbee
+    speech -- "key stays on the server" --> gcloud
 ```
 
-Only the device voices are offline; Vbee voices need a connection. Chapter text still comes from the server, so a chapter can't be opened without a connection.
+Only the device voices are offline; cloud voices need a connection. Chapter text still comes from the server, so a chapter can't be opened without a connection.
 
 ## Today and planned
 
@@ -117,12 +117,11 @@ Only the device voices are offline; Vbee voices need a connection. Chapter text 
 |---|---|---|
 | Book storage | Books and chapters in PostgreSQL; EPUB files and covers in a Railway bucket. Shortened chapters are cached in memory, so a restart shortens (and charges) them again | Shortened chapters in PostgreSQL |
 | EPUB processing | Inside the backend process | Redis and BullMQ queue |
-| Accounts | WorkOS sign-in. Plans Free, Plus, Max: 3, 30, 200 books; 10, 100, 500 shortened chapters a month; 30, 300, 1,500 Vbee minutes a month; EPUB up to 20, 100, 100 MB. Device voices and original text have no limit. The first account to sign in with the verified `SUPER_ADMIN_EMAIL` becomes super admin and grants plans | Payment, account deletion in the app |
+| Accounts | WorkOS sign-in. Plans Free, Plus, Max: 3, 30, 200 books; 10, 100, 500 shortened chapters a month; 30, 300, 1,500 cloud voice minutes a month; EPUB up to 20, 100, 100 MB. Device voices and original text have no limit. The first account to sign in with the verified `SUPER_ADMIN_EMAIL` becomes super admin and grants plans | Payment, account deletion in the app |
 | Reading progress | Saved on the device: chapter, version, and paragraph | Sync across devices |
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
-| Vbee voices | Batch API, 2 to 10 seconds per sentence. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling Vbee | Realtime API (about 0.5 s) after a package upgrade, 5 voices |
-| VieNeu voices | VieNeu-TTS on Google Cloud Run GPU (`voice/`), in the Hạt Dẻ and Trung Tín voices, cloned from short clips in `voice/clips`. The service scales to zero, so the first sentence after a pause waits about a minute. Counts against the same monthly minutes as Vbee | |
+| Cloud voices | VieNeu-TTS on Google Cloud Run GPU (`voice/`), in the Hạt Dẻ and Trung Tín voices, cloned from short clips in `voice/clips`. The service scales to zero, so the first sentence after a pause waits about a minute. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling the service. Counts against the monthly cloud voice minutes | |
 | Platforms | iOS 16 and later | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.
@@ -140,7 +139,7 @@ Requires Node 24.
 
 ```bash
 cd backend
-cp .env.example .env   # fill in WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VBEE_TOKEN and VBEE_APP_ID are optional
+cp .env.example .env   # fill in WORKOS_CLIENT_ID, WORKOS_API_KEY, SUPER_ADMIN_EMAIL, LLM_BASE_URL, LLM_API_KEY, LLM_MODEL; VIENEU_URL and VIENEU_API_KEY are optional
 npm ci
 npm run start:dev
 ```
@@ -188,7 +187,7 @@ Integration tests replace the app installed on the simulator, so rebuild the rea
 
 ## Deploy
 
-The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VBEE_TOKEN`, `VBEE_APP_ID`, `VIENEU_URL`, `VIENEU_API_KEY` in Railway's environment variables, never in the repo.
+The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VIENEU_URL`, `VIENEU_API_KEY` in Railway's environment variables, never in the repo.
 
 To build for an iPhone against the deployed backend:
 
