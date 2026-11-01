@@ -27,11 +27,13 @@ export class PostgresSpeechClipIndex implements SpeechClipIndex {
 
   async count(keys: readonly string[]): Promise<number> {
     await this.table();
-    const { rows } = await this.pool.query<{ stored: number }>(
+    const {
+      rows: [{ stored }],
+    } = await this.pool.query<{ stored: number }>(
       'SELECT count(*)::int AS stored FROM speech_clips WHERE key = ANY($1)',
       [keys],
     );
-    return rows[0]?.stored ?? 0;
+    return stored;
   }
 
   async add(clip: SpeechClip): Promise<void> {

@@ -14,6 +14,21 @@ describe('planSpeech', () => {
   it('cuts text exactly as the app does, so stored clips match what it asks for', () => {
     expect(planSpeech(golden.blocks.map((text) => ({ text })))).toEqual(golden.sentences.map(({ text }) => text));
   });
+
+  it('keeps a sentence of exactly 300 characters whole', () => {
+    expect(planSpeech([{ text: 'a'.repeat(300) }])).toEqual(['a'.repeat(300)]);
+  });
+
+  it('never makes a piece longer than 300 characters, even when a comma falls right after the limit', () => {
+    expect(planSpeech([{ text: `${'b'.repeat(300)}, tail` }])).toEqual(['b'.repeat(300), ', tail']);
+  });
+
+  it('cuts after a comma only when it lies past the middle of the piece', () => {
+    const atMiddle = `${'c'.repeat(150)},${'d'.repeat(200)}`;
+    expect(planSpeech([{ text: atMiddle }])).toEqual([atMiddle.slice(0, 300), atMiddle.slice(300)]);
+    const pastMiddle = `${'c'.repeat(151)},${'d'.repeat(200)}`;
+    expect(planSpeech([{ text: pastMiddle }])).toEqual([pastMiddle.slice(0, 152), pastMiddle.slice(152)]);
+  });
 });
 
 describe('spokenMinutes', () => {

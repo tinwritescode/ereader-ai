@@ -27,8 +27,7 @@ function withinLimit(text: string, from: number, to: number): string[] {
     while (start < to && SPACE.test(text[start])) start += 1;
     if (start === to) break;
     const end = to - start <= MAX_SENTENCE_CHARACTERS ? to : cutBefore(text, start, start + MAX_SENTENCE_CHARACTERS);
-    const piece = text.slice(start, end).replace(TRAILING_SPACE, '');
-    if (piece.length > 0) pieces.push(piece);
+    pieces.push(text.slice(start, end).replace(TRAILING_SPACE, ''));
     start = end;
   }
   return pieces;
