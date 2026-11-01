@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { TtsError, TtsGateway } from '../application/tts-gateway';
 import { CloudVoice } from '../domain/cloud-voice';
-import { SAYABLE, SILENCE, samplesOf, wavOf } from './wav';
+import { SAMPLE_RATE, SAYABLE, SILENCE, samplesOf, wavOf } from './wav';
 
 // Waits behind the other sentences in the queue, and a cold start.
 const TIMEOUT_MS = 120_000;
-const CODE_PREFIX = 'zero-';
+// Bumped when the audio changes, so clips kept under the old code are not served.
+const CODE_PREFIX = 'zero2-';
+// The service trims each clip tight, so sentences played in a row would run together.
+const BREATH_AFTER_SENTENCE = Buffer.alloc(Math.round(SAMPLE_RATE * 0.4) * 2);
 
 const voice = (id: string, name: string, gender: CloudVoice['gender']): CloudVoice => ({
   code: `${CODE_PREFIX}${id}`,
@@ -67,7 +70,8 @@ export class ZeroTtsGateway implements TtsGateway {
     })
       .then(async (response) => (response.ok ? Buffer.from(await response.arrayBuffer()) : null))
       .catch(() => null);
-    if (!wav || !samplesOf(wav)) throw new TtsError('UPSTREAM_ERROR');
-    return wav;
+    const samples = wav && samplesOf(wav);
+    if (!samples) throw new TtsError('UPSTREAM_ERROR');
+    return wavOf(Buffer.concat([samples, BREATH_AFTER_SENTENCE]));
   }
 }

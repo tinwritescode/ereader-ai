@@ -1,8 +1,8 @@
 import { TtsError } from '../application/tts-gateway';
 import { ZERO_VOICES, ZeroTtsGateway, zeroOptionsFromEnv } from './zero.tts-gateway';
-import { wavOf } from './wav';
+import { SAMPLE_RATE, wavOf } from './wav';
 
-const MAI_CHI = 'zero-maichi';
+const MAI_CHI = 'zero2-maichi';
 
 function gateway(answer: () => Response) {
   const calls: { url: string; key: string | null; body: unknown }[] = [];
@@ -33,6 +33,13 @@ describe('ZeroTtsGateway', () => {
       { url: 'https://zero.test/tts', key: 'secret', body: { text: 'Có 3 con mèo.', voice: 'maichi' } },
     ]);
     expect(audio.subarray(0, 4).toString('latin1')).toBe('RIFF');
+  });
+
+  it('leaves a breath of silence after the sentence, since the service trims its audio tight', async () => {
+    const audio = await gateway(speech).zero.speak('Câu một.', MAI_CHI);
+    const breath = (SAMPLE_RATE * 2 * 4) / 10;
+    expect(audio.readUInt32LE(40)).toBe(100 + breath);
+    expect(audio.subarray(44 + 100).every((byte) => byte === 0)).toBe(true);
   });
 
   it('stays silent on text with nothing to say, without calling the service', async () => {
