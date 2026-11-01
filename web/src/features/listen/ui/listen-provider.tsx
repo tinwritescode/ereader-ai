@@ -1,11 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query'
+import type { UseQueryOptions } from '@tanstack/react-query'
 import { createContext, use, useEffect, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { z } from 'zod'
 import { createStored } from '~/shared/ui/stored'
 import { ListenController } from '../domain/controller'
-import type { Heard, ListenState } from '../domain/controller'
-import { voicesQuery } from '../data/speech'
+import type { Heard, ListenState, Voice } from '../domain/controller'
+import { fetchClip, voicesQuery } from '../data/speech'
 import { createAudioSpeaker } from './audio-speaker'
 
 const choice = createStored({
@@ -14,7 +15,21 @@ const choice = createStored({
   fallback: null,
 })
 
-type Listening = { controller: ListenController<string>; unlock: () => void }
+/** Where the voices and their audio come from. */
+export type VoiceSource = {
+  voices: UseQueryOptions<Voice[], Error, Voice[], string[]>
+  clip: (sentence: { text: string; voiceCode: string }) => Promise<Blob>
+  /** Whether listening takes from the listener's own plan. */
+  spendsMinutes: boolean
+}
+
+const ACCOUNT_VOICES: VoiceSource = {
+  voices: voicesQuery(),
+  clip: (sentence) => fetchClip(sentence),
+  spendsMinutes: true,
+}
+
+type Listening = { controller: ListenController<string>; unlock: () => void; source: VoiceSource }
 const ListenContext = createContext<Listening | null>(null)
 
 export function useListening(): Listening {
@@ -29,17 +44,25 @@ export function useListenState(): ListenState {
 }
 
 /** One voice for the whole app, so it keeps reading while the reader moves between pages. */
-export function ListenProvider({ onHeard, children }: { onHeard: (heard: Heard) => void; children: ReactNode }) {
+export function ListenProvider({
+  onHeard,
+  source = ACCOUNT_VOICES,
+  children,
+}: {
+  onHeard: (heard: Heard) => void
+  source?: VoiceSource
+  children: ReactNode
+}) {
   const queryClient = useQueryClient()
   const [listening] = useState((): Listening => {
-    const speaker = createAudioSpeaker()
+    const speaker = createAudioSpeaker(source.clip)
     const controller = new ListenController({
       speaker,
-      voices: () => queryClient.ensureQueryData(voicesQuery()),
+      voices: () => queryClient.ensureQueryData(source.voices),
       choice: { load: choice.read, save: choice.write },
       onHeard: (heard) => onHeard(heard),
     })
-    return { controller, unlock: speaker.unlock }
+    return { controller, unlock: speaker.unlock, source }
   })
   // Any first tap or key lets audio play later without one.
   useEffect(() => {

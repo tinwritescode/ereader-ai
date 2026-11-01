@@ -1,5 +1,4 @@
 import type { Speaker } from '../domain/controller'
-import { fetchClip } from '../data/speech'
 
 const RATE = 8000
 const SILENT_SAMPLES = RATE / 10
@@ -25,7 +24,9 @@ function silence(): string {
 }
 
 /** Plays clips through one reused audio element, so a browser that wants a tap first gets it once. */
-export function createAudioSpeaker(): Speaker<string> & { unlock: () => void } {
+export function createAudioSpeaker(
+  clip: (sentence: { text: string; voiceCode: string }) => Promise<Blob>,
+): Speaker<string> & { unlock: () => void } {
   let element: HTMLAudioElement | null = null
   let rate = 1
   let finish: (() => void) | null = null
@@ -43,7 +44,7 @@ export function createAudioSpeaker(): Speaker<string> & { unlock: () => void } {
       player.src = silence()
       void player.play().catch(() => {})
     },
-    synthesize: async (sentence) => URL.createObjectURL(await fetchClip(sentence)),
+    synthesize: async (sentence) => URL.createObjectURL(await clip(sentence)),
     play: (url) =>
       new Promise((resolve, reject) => {
         const player = audio()

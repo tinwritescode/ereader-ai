@@ -12,6 +12,7 @@ export const stub = {
   state: async (): Promise<{
     refreshCalls: number
     speechCalls: string[]
+    sharedSpeech: string[]
     uploads: string[]
     requestedPlan: string | null
     accounts: { id: string; plan: string }[]

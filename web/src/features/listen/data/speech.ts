@@ -2,13 +2,9 @@ import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '~/shared/server/auth.middleware'
-import type { Voice } from '../domain/controller'
+import { VoiceWire } from '../domain/wire'
 
-const Voices = z.object({
-  voices: z.array(
-    z.object({ code: z.string(), name: z.string(), gender: z.string() }).transform((voice): Voice => voice),
-  ),
-})
+const Voices = z.object({ voices: z.array(VoiceWire) })
 const Failure = z.object({ code: z.string() })
 
 const listVoices = createServerFn()
@@ -27,10 +23,13 @@ export function speechCode({ status, body }: { status: number; body: unknown }):
 }
 
 /** One sentence as audio. */
-export async function fetchClip({ text, voiceCode }: { text: string; voiceCode: string }): Promise<Blob> {
+export async function fetchClip(
+  { text, voiceCode }: { text: string; voiceCode: string },
+  path = '/api/speech',
+): Promise<Blob> {
   let response: Response
   try {
-    response = await fetch('/api/speech', {
+    response = await fetch(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, voiceCode }),

@@ -130,6 +130,52 @@ test('a chapter reads in the same reader, without what costs the owner', async (
   await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
 })
 
+test('a viewer hears a chapter already voiced, in the voices it has, and starts nothing new', async ({
+  page,
+  browser,
+  baseURL,
+}) => {
+  await makeLink(page)
+  await stub.set({ sharedVoices: ['nam-an'] })
+  const viewer = await machine(browser, baseURL)
+  await enter(viewer)
+  await viewer.getByRole('button', { name: /Chương Hai/ }).click()
+
+  const play = viewer.getByRole('button', { name: 'Nghe', exact: true })
+  const note = await viewer.getByText('chỉ đọc').boundingBox()
+  const button = await play.boundingBox()
+  if (!note || !button) throw new Error('margin not laid out')
+  expect(button.y).toBeGreaterThanOrEqual(note.y + note.height)
+
+  await play.click()
+
+  await expect(viewer.getByText(/^Câu \d+ trên \d+$/)).toBeVisible()
+  const { sharedSpeech, speechCalls } = await stub.state()
+  expect(sharedSpeech.length).toBeGreaterThan(0)
+  expect(speechCalls).toEqual([])
+  await expect(viewer.getByRole('button', { name: 'Nghe bản này' })).toHaveCount(0)
+
+  await viewer.getByRole('button', { name: 'Đổi giọng' }).click()
+  await expect(viewer.getByRole('radio')).toHaveCount(1)
+  await expect(viewer.getByRole('radio')).toContainText('Nam An')
+  await expect(viewer.getByText('tính vào phút của gói')).toHaveCount(0)
+})
+
+test('a chapter with no stored voice has no way to listen', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  await stub.set({ sharedVoices: ['nam-an'], sharedVoicesChapter: 'deep-3' })
+  const viewer = await machine(browser, baseURL)
+  await enter(viewer)
+
+  await viewer.getByRole('button', { name: /Chương Hai/ }).click()
+  await expect(viewer.locator('[data-block="0"]')).toBeVisible()
+  await expect(viewer.getByRole('button', { name: 'Nghe', exact: true })).toHaveCount(0)
+
+  await viewer.getByText('Xong Chương Hai').scrollIntoViewIfNeeded()
+  await viewer.getByRole('link', { name: 'Đọc Chương Ba' }).click()
+  await expect(viewer.getByRole('button', { name: 'Nghe', exact: true })).toBeVisible()
+})
+
 test('a second machine is turned away and asked for nothing', async ({ page, browser, baseURL }) => {
   await makeLink(page)
   const first = await machine(browser, baseURL)

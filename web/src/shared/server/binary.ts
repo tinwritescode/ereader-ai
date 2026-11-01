@@ -1,5 +1,5 @@
 import '@tanstack/react-start/server-only'
-import { BackendFailure, authedOnce, authedResponse, publicResponse } from './backend'
+import { BackendFailure, authedOnce, authedResponse, publicResponse, viewerResponse } from './backend'
 
 const COVER_CACHE = 'public, max-age=86400'
 
@@ -28,12 +28,32 @@ export async function coverResponse(id: string): Promise<Response> {
   }
 }
 
+const speechInit = (body: string): RequestInit => ({
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body,
+})
+
 export async function speechResponse(request: Request): Promise<Response> {
   try {
-    const body = await request.text()
-    return streamed(
-      await authedResponse('/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body }),
-    )
+    return streamed(await authedResponse('/speech', speechInit(await request.text())))
+  } catch (error) {
+    return failed(error)
+  }
+}
+
+export async function sharedSpeechResponse({
+  request,
+  token,
+  chapterId,
+}: {
+  request: Request
+  token: string
+  chapterId: string
+}): Promise<Response> {
+  const path = `/shared/${encodeURIComponent(token)}/chapters/${encodeURIComponent(chapterId)}/speech`
+  try {
+    return streamed(await viewerResponse(path, speechInit(await request.text())))
   } catch (error) {
     return failed(error)
   }

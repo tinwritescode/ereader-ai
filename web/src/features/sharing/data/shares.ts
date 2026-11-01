@@ -2,12 +2,17 @@ import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { BookWire, ChapterWire, TextBlockWire } from '~/features/books/domain/wire'
+import { VoiceWire } from '~/features/listen/domain/wire'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 import { viewerMiddleware } from '~/shared/server/viewer.middleware'
 
 const ShareWire = z.object({ shareId: z.string(), createdAt: z.string(), opened: z.boolean() })
 
 const Blocks = z.array(TextBlockWire)
+const Voices = z.array(VoiceWire)
+
+/** The versions of a chapter a viewer is offered. */
+export type SharedVersion = 'original' | 'vietnamese'
 
 const shares = (bookId: string) => `/books/${encodeURIComponent(bookId)}/shares`
 const shared = (token: string) => `/shared/${encodeURIComponent(token)}`
@@ -65,6 +70,16 @@ const readChapter = createServerFn()
     }),
   )
 
+const readVoices = createServerFn()
+  .middleware([viewerMiddleware])
+  .validator(z.object({ token: z.string().min(1), chapterId: z.string().min(1) }))
+  .handler(({ context, data: { token, chapterId } }) =>
+    context.viewerBackend.json({
+      path: `${shared(token)}/chapters/${encodeURIComponent(chapterId)}/voices`,
+      schema: z.object({ original: Voices, vietnamese: Voices }),
+    }),
+  )
+
 export const sharesQuery = (bookId: string) =>
   queryOptions({
     queryKey: ['books', bookId, 'shares'],
@@ -80,3 +95,21 @@ export const sharedChapterQuery = ({ token, chapterId }: { token: string; chapte
     queryFn: () => readChapter({ data: { token, chapterId } }),
     retry: false,
   })
+
+export const sharedVoicesQuery = ({
+  token,
+  chapterId,
+  version,
+}: {
+  token: string
+  chapterId: string
+  version: SharedVersion
+}) =>
+  queryOptions({
+    queryKey: ['shared', token, chapterId, 'voices', version],
+    queryFn: async () => (await readVoices({ data: { token, chapterId } }))[version],
+    retry: false,
+  })
+
+export const sharedClipPath = ({ token, chapterId }: { token: string; chapterId: string }) =>
+  `/api${shared(token)}/chapters/${encodeURIComponent(chapterId)}/speech`

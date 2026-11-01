@@ -237,10 +237,11 @@ export function Reader({
 
   const original = options.find(({ length }) => length === 'original')
   const heading = chapterHeading(chapter)
-  const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions', string> = {
+  const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions' | '--note', string> = {
     '--text-size': `${TEXT_SIZES[look.size]}px`,
     '--line-height': `${LINE_SPACINGS[look.spacing]}`,
     '--versions': `${options.length}`,
+    '--note': note ? '48px' : '0px',
   }
 
   return (

@@ -130,11 +130,18 @@ export const backend = {
 
 export type Backend = typeof backend
 
+/** Sends as this machine, for what comes back as it is. */
+export function viewerResponse(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  const device = readDevice()
+  if (device) headers.set('x-share-device', device)
+  return send(path, { ...init, headers })
+}
+
 /** For a shared link: no session, only the key that stands for this machine. */
 export const viewerBackend = {
   async json<Schema extends z.ZodType>({ path, schema }: { path: string; schema: Schema }): Promise<z.output<Schema>> {
-    const device = readDevice()
-    return checked(await send(path, device ? { headers: { 'x-share-device': device } } : {}), schema)
+    return checked(await viewerResponse(path), schema)
   },
   async open({ path, password }: { path: string; password: string }): Promise<void> {
     const response = await send(path, jsonInit({ password, device: keepDevice() }))

@@ -6,7 +6,8 @@ import { codeOf, errorMessage } from '~/features/books/domain/words'
 import type { ChapterText } from '~/features/reading/domain/chapter-text'
 import type { LengthOption } from '~/features/reading/domain/length'
 import { Paper } from '~/shared/ui/shell'
-import { openShare, sharedBookQuery, sharedChapterQuery } from '../data/shares'
+import { openShare, sharedBookQuery, sharedChapterQuery, sharedVoicesQuery } from '../data/shares'
+import type { SharedVersion } from '../data/shares'
 
 /** Written in the margin in red pen. Nothing on these pages writes, and the backend gives a link no way to. */
 export function ReadOnlyNote() {
@@ -72,7 +73,7 @@ export function WithSharedBook({
   )
 }
 
-/** A chapter's words, in Vietnamese where there is a translation unless the viewer chose the original. */
+/** A chapter's words, in Vietnamese where there is a translation unless the viewer chose the original, and whether they can be heard. */
 export function WithSharedText({
   token,
   chapterId,
@@ -84,7 +85,13 @@ export function WithSharedText({
   chapterId: string
   minutes: number
   wanted: LengthOption['length'] | undefined
-  children: (read: { text: ChapterText; option: LengthOption; options: LengthOption[] }) => ReactNode
+  children: (read: {
+    text: ChapterText
+    option: LengthOption
+    options: LengthOption[]
+    version: SharedVersion
+    voiced: boolean
+  }) => ReactNode
 }) {
   const chapter = useQuery(sharedChapterQuery({ token, chapterId }))
   const vietnamese = chapter.data?.vietnamese ?? null
@@ -92,6 +99,8 @@ export function WithSharedText({
   const translated: LengthOption = { length: 'vietnamese', minutes }
   const options = vietnamese ? [original, translated] : [original]
   const inVietnamese = vietnamese && wanted !== 'original'
+  const version = inVietnamese ? 'vietnamese' : 'original'
+  const voices = useQuery({ ...sharedVoicesQuery({ token, chapterId, version }), enabled: chapter.isSuccess })
   const text = (): ChapterText => {
     if (chapter.data) return { kind: 'loaded', blocks: inVietnamese ? vietnamese : chapter.data.original }
     if (chapter.error) {
@@ -99,5 +108,11 @@ export function WithSharedText({
     }
     return { kind: 'loading', shortening: false }
   }
-  return children({ text: text(), option: inVietnamese ? translated : original, options })
+  return children({
+    text: text(),
+    option: inVietnamese ? translated : original,
+    options,
+    version,
+    voiced: Boolean(voices.data?.length),
+  })
 }

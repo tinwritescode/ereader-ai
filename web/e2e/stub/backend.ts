@@ -85,6 +85,9 @@ function fresh() {
     speechLimit: false,
     speechDelay: 0,
     speechCalls: [] as string[],
+    sharedSpeech: [] as string[],
+    sharedVoices: [] as string[],
+    sharedVoicesChapter: null as string | null,
     uploads: [] as string[],
     uploadFails: null as string | null,
     uploadExpireOnce: false,
@@ -272,6 +275,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return send(response, 200, {
       refreshCalls: state.refreshCalls,
       speechCalls: state.speechCalls,
+      sharedSpeech: state.sharedSpeech,
       uploads: state.uploads,
       requestedPlan: state.requestedPlan,
       accounts: state.accounts,
@@ -309,7 +313,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     response.writeHead(200, { 'content-type': 'image/png' })
     return void response.end(PNG)
   }
-  const shared = /^\/shared\/([^/]+)(?:\/(open)|\/chapters\/([^/]+))?$/.exec(path)
+  const shared = /^\/shared\/([^/]+)(?:\/(open)|\/chapters\/([^/]+)(?:\/(voices|speech))?)?$/.exec(path)
   if (shared?.[1]) {
     const share = state.shares.find(({ token }) => token === shared[1])
     if (!share) return send(response, 404, { code: 'SHARE_GONE' })
@@ -323,6 +327,17 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     const device = request.headers['x-share-device']
     if (!share.device) return send(response, 401, { code: 'SHARE_LOCKED' })
     if (share.device !== device) return send(response, 403, { code: 'SHARE_TAKEN' })
+    const voiced = shared[3] && (state.sharedVoicesChapter ?? shared[3]) === shared[3] ? state.sharedVoices : []
+    if (shared[4] === 'voices') {
+      return send(response, 200, { original: VOICES.filter(({ code }) => voiced.includes(code)), vietnamese: [] })
+    }
+    if (shared[4] === 'speech') {
+      const { text, voiceCode } = await json<{ text: string; voiceCode: string }>()
+      if (!voiced.includes(voiceCode)) return send(response, 404, { code: 'SPEECH_NOT_READY' })
+      state.sharedSpeech.push(text)
+      response.writeHead(200, { 'content-type': 'audio/wav' })
+      return void response.end(wav())
+    }
     if (shared[3]) {
       const original = blocks(shared[3])
       return send(response, 200, {

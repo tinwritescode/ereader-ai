@@ -1,7 +1,12 @@
 import { createFileRoute, linkOptions } from '@tanstack/react-router'
 import { z } from 'zod'
 import { BookView } from '~/features/books/ui/book-page'
+import { fetchClip } from '~/features/listen/data/speech'
+import { ListenPort } from '~/features/listen/ui/listen-port'
+import { ListenProvider } from '~/features/listen/ui/listen-provider'
+import { recordHeard } from '~/features/reading/ui/heard'
 import { Reader } from '~/features/reading/ui/reader-page'
+import { sharedClipPath, sharedVoicesQuery } from '~/features/sharing/data/shares'
 import { ReadOnlyNote, WithSharedBook, WithSharedText } from '~/features/sharing/ui/shared-page'
 import { pageTitle } from '~/shared/ui/page-title'
 import { Paper } from '~/shared/ui/shell'
@@ -43,31 +48,50 @@ export const Route = createFileRoute('/s/$token')({
               minutes={chapters.find((chapter) => chapter.chapterId === chapterId)?.minutes ?? 0}
               wanted={length}
             >
-              {({ text, option, options }) => (
-                <Reader
-                  book={book}
-                  chapters={chapters}
-                  chapterId={chapterId}
-                  search={option}
-                  text={text}
-                  options={options}
-                  onChoose={(chosen) =>
-                    void navigate({
-                      search: { chapter: chapterId, length: chosen.length === 'original' ? 'original' : 'vietnamese' },
-                      replace: true,
-                    })
-                  }
-                  contents={linkOptions({ to: '/s/$token', params: { token } })}
-                  chapterLink={(next) =>
-                    linkOptions({
-                      to: '/s/$token',
-                      params: { token },
-                      search: { chapter: next.chapterId },
-                      viewTransition: PAGE_TURN,
-                    })
-                  }
-                  note={<ReadOnlyNote />}
-                />
+              {({ text, option, options, version, voiced }) => (
+                // A voice is for one version of one chapter here, and ends with the page.
+                <ListenProvider
+                  key={`${chapterId}:${version}`}
+                  onHeard={recordHeard}
+                  source={{
+                    voices: sharedVoicesQuery({ token, chapterId, version }),
+                    clip: (sentence) => fetchClip(sentence, sharedClipPath({ token, chapterId })),
+                    spendsMinutes: false,
+                  }}
+                >
+                  <ListenPort book={book} chapters={chapters} chapterId={chapterId} option={option}>
+                    {(port) => (
+                      <Reader
+                        book={book}
+                        chapters={chapters}
+                        chapterId={chapterId}
+                        search={option}
+                        text={text}
+                        options={options}
+                        onChoose={(chosen) =>
+                          void navigate({
+                            search: {
+                              chapter: chapterId,
+                              length: chosen.length === 'original' ? 'original' : 'vietnamese',
+                            },
+                            replace: true,
+                          })
+                        }
+                        contents={linkOptions({ to: '/s/$token', params: { token } })}
+                        chapterLink={(next) =>
+                          linkOptions({
+                            to: '/s/$token',
+                            params: { token },
+                            search: { chapter: next.chapterId },
+                            viewTransition: PAGE_TURN,
+                          })
+                        }
+                        note={<ReadOnlyNote />}
+                        {...(voiced ? port : {})}
+                      />
+                    )}
+                  </ListenPort>
+                </ListenProvider>
               )}
             </WithSharedText>
           )
