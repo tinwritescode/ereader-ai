@@ -5,6 +5,7 @@ import { BookPage } from '~/features/books/ui/book-page'
 import { WithVoices } from '~/features/listen/ui/with-voices'
 import { ChooseLength } from '~/features/reading/ui/choose-length'
 import { ResumeLine, WithStartChapter } from '~/features/reading/ui/spots'
+import { ShareBook } from '~/features/sharing/ui/share-book'
 import { ChapterMark, WholeBookRows } from '~/features/tasks/ui/whole-book'
 import { pageTitle } from '~/shared/ui/page-title'
 
@@ -34,13 +35,16 @@ function BookRoute() {
             <ChapterMark bookId={book.bookId} chapterId={chapter.chapterId} fallback={fallback} />
           )}
           aside={(book) => (
-            <WithAccount>
-              {(account) => (
-                <WithVoices>
-                  {(voices) => <WholeBookRows book={book} account={account} start={current} voices={voices} />}
-                </WithVoices>
-              )}
-            </WithAccount>
+            <>
+              <WithAccount>
+                {(account) => (
+                  <WithVoices>
+                    {(voices) => <WholeBookRows book={book} account={account} start={current} voices={voices} />}
+                  </WithVoices>
+                )}
+              </WithAccount>
+              <ShareBook bookId={book.bookId} />
+            </>
           )}
         />
       )}

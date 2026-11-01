@@ -1,4 +1,5 @@
 import '@tanstack/react-start/server-only'
+import { randomBytes } from 'node:crypto'
 import { deleteCookie, getCookie, setCookie } from '@tanstack/react-start/server'
 import { z } from 'zod'
 import { config } from './config'
@@ -7,7 +8,9 @@ import type { Tokens } from './renewal'
 const ACCESS = 'sd_access'
 const REFRESH = 'sd_refresh'
 const SIGN_IN = 'sd_sign_in'
+const DEVICE = 'sd_device'
 const THIRTY_DAYS = 30 * 24 * 60 * 60
+const ONE_YEAR = 365 * 24 * 60 * 60
 const TEN_MINUTES = 10 * 60
 
 const PendingSignIn = z.object({ verifier: z.string().min(1), state: z.string().min(1) })
@@ -38,6 +41,15 @@ export function writeTokens({ access, refresh }: Tokens): void {
 export function clearTokens(): void {
   deleteCookie(ACCESS, cookieOptions(0))
   deleteCookie(REFRESH, cookieOptions(0))
+}
+
+export const readDevice = (): string | undefined => getCookie(DEVICE)
+
+/** This browser's own key, which stands for the machine when a shared link is taken. */
+export function keepDevice(): string {
+  const device = readDevice() ?? randomBytes(32).toString('base64url')
+  setCookie(DEVICE, device, cookieOptions(ONE_YEAR))
+  return device
 }
 
 export function writePendingSignIn(pending: PendingSignIn): void {

@@ -15,6 +15,10 @@ const ERROR_MESSAGES: Partial<Record<string, string>> = {
   DIGEST_LIMIT: 'Hết lượt rút gọn tháng này.',
   NETWORK_ERROR: 'Không kết nối được máy chủ.',
   DIGEST_FAILED: 'AI chưa rút gọn được chương này.',
+  SHARE_TAKEN: 'Link này đã được mở trên một máy khác.',
+  SHARE_GONE: 'Link này không còn dùng được.',
+  SHARE_PASSWORD_WRONG: 'Sai mật khẩu.',
+  SHARE_PASSWORD_INVALID: 'Mật khẩu cần ít nhất 6 ký tự.',
 }
 
 export function errorMessage(code: string): string {

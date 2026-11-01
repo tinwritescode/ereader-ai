@@ -1,0 +1,117 @@
+import { expect, test } from '@playwright/test'
+import type { Browser, BrowserContext, Page } from '@playwright/test'
+import { hydrated, open, signIn, stub } from './helpers'
+
+const PASSWORD = 'mat-khau-1'
+const LINK = '/s/link-1'
+
+const machines: BrowserContext[] = []
+
+test.beforeEach(async () => {
+  await stub.reset()
+})
+
+// A page left open starves the next test's in WebKit.
+test.afterEach(async () => {
+  await Promise.all(machines.splice(0).map((context) => context.close()))
+})
+
+/** Another machine: nothing of the reader's, and none of its cookies. */
+async function machine(browser: Browser, baseURL: string | undefined): Promise<Page> {
+  const context = await browser.newContext({ baseURL })
+  machines.push(context)
+  return context.newPage()
+}
+
+async function makeLink(page: Page): Promise<void> {
+  await signIn(page)
+  await open(page, '/books/deep')
+  await page.getByRole('button', { name: 'Chia sẻ' }).click()
+  await page.getByLabel('Mật khẩu cho người nhận').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Tạo link' }).click()
+}
+
+async function enter(page: Page, password = PASSWORD): Promise<void> {
+  await open(page, LINK)
+  await page.getByLabel('Mật khẩu').fill(password)
+  await page.getByRole('button', { name: 'Mở sách' }).click()
+}
+
+test('the owner makes a link, sees it once, and takes it back', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  await expect(page.getByLabel('Link chia sẻ')).toHaveValue(new RegExp(`${LINK}$`))
+  await expect(page.getByText('Chưa ai mở')).toBeVisible()
+
+  const viewer = await machine(browser, baseURL)
+  await enter(viewer)
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
+
+  await open(page, '/books/deep')
+  await page.getByRole('button', { name: 'Chia sẻ' }).click()
+  await expect(page.getByLabel('Link chia sẻ')).toHaveCount(0)
+  await expect(page.getByText('Đã khóa vào một máy')).toBeVisible()
+  await page.getByRole('button', { name: 'Thu hồi' }).click()
+  await expect(page.getByText('Đã khóa vào một máy')).toHaveCount(0)
+
+  await viewer.reload()
+  await expect(viewer.getByText('Link này không còn dùng được.')).toBeVisible()
+})
+
+test('a viewer signs in nowhere, reads the book, and has nothing to edit', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  const viewer = await machine(browser, baseURL)
+
+  await enter(viewer, 'sai-mat-khau')
+  await expect(viewer.getByText('Sai mật khẩu.')).toBeVisible()
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toHaveCount(0)
+
+  await viewer.getByLabel('Mật khẩu').fill(PASSWORD)
+  await viewer.getByRole('button', { name: 'Mở sách' }).click()
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
+  await expect(viewer.getByText('Chỉ đọc')).toBeVisible()
+
+  await viewer.getByRole('link', { name: /Chương Hai/ }).click()
+  await expect(viewer.locator('[data-block="0"]')).toBeVisible()
+  await expect(viewer.getByText('Chỉ đọc')).toBeVisible()
+  await expect(viewer.locator('input, textarea, [contenteditable]')).toHaveCount(0)
+
+  await viewer.reload()
+  await hydrated(viewer)
+  await expect(viewer.locator('[data-block="0"]')).toBeVisible()
+})
+
+test('a translated chapter opens in Vietnamese, with the original a press away', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  await stub.set({ translationReady: true })
+  const viewer = await machine(browser, baseURL)
+  await enter(viewer)
+
+  await viewer.getByRole('link', { name: /Chương Hai/ }).click()
+  await expect(viewer.locator('[data-block="0"]')).toContainText('Bản dịch:')
+
+  await viewer.getByRole('button', { name: 'Bản gốc' }).click()
+  await expect(viewer.locator('[data-block="0"]')).not.toContainText('Bản dịch:')
+})
+
+test('a second machine is turned away and asked for nothing', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  const first = await machine(browser, baseURL)
+  await enter(first)
+  await expect(first.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
+
+  const second = await machine(browser, baseURL)
+  await open(second, LINK)
+
+  await expect(second.getByText('Link này đã được mở trên một máy khác.')).toBeVisible()
+  await expect(second.getByLabel('Mật khẩu')).toHaveCount(0)
+  await expect(second.getByRole('heading', { name: 'Deep Work' })).toHaveCount(0)
+})
+
+test('the page asks to stay out of search and out of referrers', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  const viewer = await machine(browser, baseURL)
+  await open(viewer, LINK)
+
+  await expect(viewer.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+  await expect(viewer.locator('meta[name="referrer"]')).toHaveAttribute('content', 'no-referrer')
+})

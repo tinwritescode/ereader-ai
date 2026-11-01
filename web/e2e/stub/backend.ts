@@ -90,6 +90,7 @@ function fresh() {
     uploadExpireOnce: false,
     translated: new Set<string>(),
     translationReady: false,
+    shares: [] as { shareId: string; token: string; password: string; device: string | null }[],
     books: [
       bookOf('deep', 'Deep Work', 'Cal Newport', 'en', 3, true),
       bookOf('viet', 'Cuộc chiến sinh tồn', 'Suzanne Collins', 'vi', 3),
@@ -308,6 +309,33 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     response.writeHead(200, { 'content-type': 'image/png' })
     return void response.end(PNG)
   }
+  const shared = /^\/shared\/([^/]+)(?:\/(open)|\/chapters\/([^/]+))?$/.exec(path)
+  if (shared?.[1]) {
+    const share = state.shares.find(({ token }) => token === shared[1])
+    if (!share) return send(response, 404, { code: 'SHARE_GONE' })
+    if (shared[2] === 'open') {
+      const { password, device } = await json<{ password: string; device: string }>()
+      if (share.device && share.device !== device) return send(response, 403, { code: 'SHARE_TAKEN' })
+      if (password !== share.password) return send(response, 401, { code: 'SHARE_PASSWORD_WRONG' })
+      share.device = device
+      return send(response, 204)
+    }
+    const device = request.headers['x-share-device']
+    if (!share.device) return send(response, 401, { code: 'SHARE_LOCKED' })
+    if (share.device !== device) return send(response, 403, { code: 'SHARE_TAKEN' })
+    if (shared[3]) {
+      const original = blocks(shared[3])
+      return send(response, 200, {
+        chapterId: shared[3],
+        label: 'Chương',
+        original,
+        vietnamese: state.translationReady
+          ? original.map((block) => ({ ...block, text: `Bản dịch: ${block.text}` }))
+          : null,
+      })
+    }
+    return send(response, 200, { title: 'Deep Work', author: 'Cal Newport', chapters: chapters('deep') })
+  }
   if (!authed(request)) return send(response, 401, { code: 'SIGN_IN_REQUIRED' })
 
   if (path === '/me') {
@@ -359,6 +387,32 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       bookId: bookChapters[1],
       chapters: [...(bookChapters[1] === 'deep' ? [FRONT_MATTER] : []), ...chapters(bookChapters[1])],
     })
+  if (/^\/books\/[^/]+\/shares$/.test(path)) {
+    if (method === 'POST') {
+      const { password } = await json<{ password: string }>()
+      if (password.length < 6) return send(response, 400, { code: 'SHARE_PASSWORD_INVALID' })
+      const shareId = `share-${state.shares.length + 1}`
+      state.shares.push({ shareId, token: `link-${state.shares.length + 1}`, password, device: null })
+      return send(response, 201, {
+        shareId,
+        createdAt: '2026-11-01T02:00:00.000Z',
+        opened: false,
+        token: `link-${state.shares.length}`,
+      })
+    }
+    return send(response, 200, {
+      shares: state.shares.map(({ shareId, device }) => ({
+        shareId,
+        createdAt: '2026-11-01T02:00:00.000Z',
+        opened: device !== null,
+      })),
+    })
+  }
+  const revoked = /^\/shares\/([^/]+)$/.exec(path)
+  if (revoked && method === 'DELETE') {
+    state.shares = state.shares.filter(({ shareId }) => shareId !== revoked[1])
+    return send(response, 204)
+  }
   const translationOfBook = /^\/books\/([^/]+)\/translation$/.exec(path)
   if (translationOfBook?.[1] && method === 'GET') {
     const bookId = translationOfBook[1]

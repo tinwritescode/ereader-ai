@@ -3,7 +3,7 @@ import type { z } from 'zod'
 import { config } from './config'
 import { createRenewal } from './renewal'
 import type { Renewed, Tokens } from './renewal'
-import { clearTokens, readTokens, writeTokens } from './session'
+import { clearTokens, keepDevice, readDevice, readTokens, writeTokens } from './session'
 
 const KEEP_RENEWAL_MS = 30_000
 
@@ -110,14 +110,17 @@ function initOf({ method = 'GET', body }: { method?: string; body?: unknown }): 
     : { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }
 }
 
+/** Checks what comes back, the one place outside data enters. */
+async function checked<Schema extends z.ZodType>(response: Response, schema: Schema): Promise<z.output<Schema>> {
+  if (!response.ok) throw await failureOf(response)
+  const parsed = schema.safeParse(await response.json().catch(() => null))
+  if (!parsed.success) throw new BackendFailure('UNEXPECTED_RESPONSE')
+  return parsed.data
+}
+
 export const backend = {
-  /** Calls the backend and checks what comes back, the one place outside data enters. */
   async json<Schema extends z.ZodType>({ schema, ...call }: JsonCall<Schema>): Promise<z.output<Schema>> {
-    const response = await authedResponse(call.path, initOf(call))
-    if (!response.ok) throw await failureOf(response)
-    const parsed = schema.safeParse(await response.json().catch(() => null))
-    if (!parsed.success) throw new BackendFailure('UNEXPECTED_RESPONSE')
-    return parsed.data
+    return checked(await authedResponse(call.path, initOf(call)), schema)
   },
   async empty(call: EmptyCall): Promise<void> {
     const response = await authedResponse(call.path, initOf(call))
@@ -126,6 +129,18 @@ export const backend = {
 }
 
 export type Backend = typeof backend
+
+/** For a shared link: no session, only the key that stands for this machine. */
+export const viewerBackend = {
+  async json<Schema extends z.ZodType>({ path, schema }: { path: string; schema: Schema }): Promise<z.output<Schema>> {
+    const device = readDevice()
+    return checked(await send(path, device ? { headers: { 'x-share-device': device } } : {}), schema)
+  },
+  async open({ path, password }: { path: string; password: string }): Promise<void> {
+    const response = await send(path, jsonInit({ password, device: keepDevice() }))
+    if (!response.ok) throw await failureOf(response)
+  },
+}
 
 /** Without a session, for the one public route: covers. */
 export function publicResponse(path: string): Promise<Response> {
