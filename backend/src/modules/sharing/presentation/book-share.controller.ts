@@ -56,7 +56,7 @@ export class BookShareController {
     @Headers('x-share-device') device: string | undefined,
   ) {
     const { chapter, vietnamese } = await this.shares.chapter(token, device, chapterId);
-    return { chapterId, label: chapter.label, original: chapter.blocks, vietnamese };
+    return { chapterId, label: chapter.label, original: chapter.blocks, figures: chapter.figures, vietnamese };
   }
 
   @Get('shared/:token/chapters/:chapterId/voices')

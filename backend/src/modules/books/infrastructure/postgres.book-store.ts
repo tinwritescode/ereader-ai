@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { BookShape, BookStore, BookSummary } from '../application/book-store';
-import { Block, BookCover, BookRecord, BookStatus, ChapterKind, ChapterRecord } from '../domain/book';
+import { Block, BookCover, BookRecord, BookStatus, ChapterKind, ChapterRecord, Figure } from '../domain/book';
 
 const CREATE_TABLES = `
   CREATE TABLE IF NOT EXISTS books (
@@ -28,7 +28,8 @@ const CREATE_TABLES = `
   );
   CREATE INDEX IF NOT EXISTS chapters_of_book ON chapters (book_id, index);
   ALTER TABLE books ADD COLUMN IF NOT EXISTS shape_version integer NOT NULL DEFAULT 0;
-  ALTER TABLE chapters ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'main'`;
+  ALTER TABLE chapters ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'main';
+  ALTER TABLE chapters ADD COLUMN IF NOT EXISTS figures jsonb NOT NULL DEFAULT '[]'`;
 
 type BookRow = {
   id: string;
@@ -53,6 +54,7 @@ type ChapterRow = {
   word_count: number;
   minutes: number;
   blocks: Block[];
+  figures: Figure[];
 };
 
 const SUMMARY = `
@@ -100,9 +102,9 @@ export class PostgresBookStore implements BookStore {
       );
       for (const chapter of rowCount === 1 ? chapters : []) {
         await client.query(
-          `INSERT INTO chapters (id, book_id, index, label, subtitle, kind, word_count, minutes, blocks)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [chapter.id, chapter.bookId, chapter.index, chapter.label, chapter.subtitle, chapter.kind, chapter.wordCount, chapter.minutes, JSON.stringify(chapter.blocks)],
+          `INSERT INTO chapters (id, book_id, index, label, subtitle, kind, word_count, minutes, blocks, figures)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [chapter.id, chapter.bookId, chapter.index, chapter.label, chapter.subtitle, chapter.kind, chapter.wordCount, chapter.minutes, JSON.stringify(chapter.blocks), JSON.stringify(chapter.figures)],
         );
       }
       await client.query('COMMIT');
@@ -183,8 +185,10 @@ export class PostgresBookStore implements BookStore {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      for (const { id, label, subtitle, kind } of chapters) {
-        await client.query('UPDATE chapters SET label = $2, subtitle = $3, kind = $4 WHERE id = $1', [id, label, subtitle, kind]);
+      for (const { id, label, subtitle, kind, figures } of chapters) {
+        await client.query('UPDATE chapters SET label = $2, subtitle = $3, kind = $4, figures = $5 WHERE id = $1', [
+          id, label, subtitle, kind, JSON.stringify(figures),
+        ]);
       }
       await client.query('UPDATE books SET language = $2, shape_version = $3 WHERE id = $1', [bookId, language, shapeVersion]);
       await client.query('COMMIT');

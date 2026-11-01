@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { countWords, readingMinutes } from '../../../shared/reading-time';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
-import { BookCover, BookImportResult, BookRecord, ChapterRecord, SHAPE_VERSION } from '../domain/book';
+import { BookCover, BookImportResult, BookRecord, ChapterRecord, PICTURE_TYPES, SHAPE_VERSION } from '../domain/book';
 import { bookLanguage } from '../domain/book-language';
 import { reshapedChapters } from '../domain/book-reshape';
 import { BOOK_STORE, BookStore, BookSummary } from './book-store';
@@ -45,6 +45,7 @@ export class BookService {
     // Content-addressed keys: a retried or concurrent upload rewrites the same objects.
     await this.storage.put({ key: sourceKey, bytes });
     const { metadata, chapters, cover } = epub.book;
+    await this.storeImages(chapters);
     const book: BookRecord = {
       id: randomUUID(),
       userId,
@@ -89,6 +90,16 @@ export class BookService {
     return { bytes, mediaType: cover.mediaType };
   }
 
+  /** Open to anyone holding the name, which comes from the picture's bytes and cannot be guessed. */
+  async image(name: string): Promise<EpubCover> {
+    const mediaType = PICTURE_TYPES.get(PICTURE_NAME.exec(name)?.[1] ?? '');
+    const bytes = mediaType && (await this.storage.get(imageKey(name)));
+    if (!mediaType || !bytes) {
+      throw new NotFoundException('IMAGE_NOT_FOUND');
+    }
+    return { bytes, mediaType };
+  }
+
   async chapters(userId: string, bookId: string): Promise<ChapterRecord[]> {
     return this.store.chapters((await this.status(userId, bookId)).id);
   }
@@ -127,12 +138,21 @@ export class BookService {
     if (epub?.kind !== 'ok') throw new Error('SOURCE_UNREADABLE');
     const language = languageOf(epub.book);
     if (language === 'vi' && !book.language?.toLowerCase().startsWith('vi')) await onVietnamese(book);
+    await this.storeImages(epub.book.chapters);
     await this.store.reshape({
       bookId: book.id,
       language,
-      chapters: reshapedChapters(await this.store.chapters(book.id), epub.book.chapters),
+      chapters: reshapedChapters(await this.store.chapters(book.id), epub.book.chapters.map(withStoredFigures)),
       shapeVersion: SHAPE_VERSION,
     });
+  }
+
+  /** Named by their bytes, so a retry or another copy of the book rewrites the same objects. */
+  private async storeImages(chapters: EpubChapter[]): Promise<void> {
+    const images = new Map(chapters.flatMap(({ figures }) => figures.map(({ image }) => [image.name, image.bytes])));
+    for (const [name, bytes] of images) {
+      await this.storage.put({ key: imageKey(name), bytes });
+    }
   }
 
   private async storeCover(sourceChecksum: string, cover: EpubCover | null): Promise<BookCover | null> {
@@ -143,13 +163,24 @@ export class BookService {
   }
 }
 
+const PICTURE_NAME = /^[0-9a-f]{64}\.(\w+)$/;
+const imageKey = (name: string) => `images/${name}`;
+
+function withStoredFigures({ figures, ...chapter }: EpubChapter) {
+  return {
+    ...chapter,
+    figures: figures.map(({ before, alt, image: { name, width, height } }) => ({ before, alt, image: name, width, height })),
+  };
+}
+
 function languageOf({ metadata, chapters }: EpubBook): string {
   const main = chapters.filter(({ kind }) => kind === 'main');
   const text = main.flatMap(({ blocks }) => blocks.map((block) => block.text)).join(' ');
   return bookLanguage({ declared: metadata.language, text });
 }
 
-function toChapterRecord(bookId: string, index: number, { label, subtitle, kind, blocks }: EpubChapter): ChapterRecord {
+function toChapterRecord(bookId: string, index: number, chapter: EpubChapter): ChapterRecord {
+  const { label, subtitle, kind, blocks, figures } = withStoredFigures(chapter);
   const id = `${bookId}-c${index}`;
   const wordCount = blocks.reduce((total, block) => total + countWords(block.text), 0);
   return {
@@ -162,5 +193,6 @@ function toChapterRecord(bookId: string, index: number, { label, subtitle, kind,
     wordCount,
     minutes: readingMinutes(wordCount),
     blocks: blocks.map((block, blockIndex) => ({ blockId: `${id}-b${blockIndex}`, ...block })),
+    figures,
   };
 }

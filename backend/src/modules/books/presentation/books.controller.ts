@@ -108,6 +108,20 @@ export class CoversController {
   }
 }
 
+@Controller('images')
+export class ImagesController {
+  constructor(private readonly books: BookService) {}
+
+  @Get(':name')
+  async image(@Param('name') name: string, @Res() response: Response) {
+    const { bytes, mediaType } = await this.books.image(name);
+    response
+      .type(mediaType)
+      .set({ 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff' })
+      .send(bytes);
+  }
+}
+
 @Controller('chapters')
 @UseGuards(AuthGuard)
 export class ChaptersController {
@@ -115,8 +129,8 @@ export class ChaptersController {
 
   @Get(':id')
   async chapter(@Param('id') id: string, @CurrentAccount() account: Account) {
-    const { blocks, ...chapter } = await this.books.chapter(account.id, id);
-    return { ...toChapterSummary(chapter), bookId: chapter.bookId, blocks };
+    const { blocks, figures, ...chapter } = await this.books.chapter(account.id, id);
+    return { ...toChapterSummary(chapter), bookId: chapter.bookId, blocks, figures };
   }
 }
 
@@ -124,6 +138,6 @@ export function toBookResponse({ id, status, title, author, language, cover, cha
   return { bookId: id, status, title, author, language, hasCover: cover !== null, chapterCount, minutes };
 }
 
-export function toChapterSummary({ id, index, label, subtitle, kind, wordCount, minutes }: Omit<ChapterRecord, 'blocks'>) {
+export function toChapterSummary({ id, index, label, subtitle, kind, wordCount, minutes }: Omit<ChapterRecord, 'blocks' | 'figures'>) {
   return { chapterId: id, index, label, subtitle, kind, wordCount, minutes };
 }

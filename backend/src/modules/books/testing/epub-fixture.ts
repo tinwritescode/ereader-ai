@@ -15,9 +15,18 @@ export type EpubFixtureOptions = {
   toc?: 'nav' | 'ncx';
   /** Length of each of Chương Ba's two paragraphs. */
   lastParagraphWords?: number;
+  /** Pictures through the text: inside a paragraph, between paragraphs, ending a file, and alone in a file. */
+  pictures?: boolean;
+  /** The cover image also stands on the first page, as most books do. */
+  coverPicture?: boolean;
 };
 
 export const COVER_PNG = Buffer.from('fake-png-bytes');
+/** A real picture, 2 wide and 1 high. */
+export const PICTURE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAQAAABeK7cBAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 const words = (count: number, word: string) => Array.from({ length: count }, () => word).join(' ');
 
@@ -35,6 +44,8 @@ export async function buildEpub({
   toc = 'nav',
   writtenIn = language,
   lastParagraphWords = 500,
+  pictures = false,
+  coverPicture = false,
 }: EpubFixtureOptions = {}): Promise<Buffer> {
   const [one, two, three] = writtenIn.startsWith('vi') ? ['một', 'hai', 'ba'] : ['one', 'two', 'three'];
   const zip = new JSZip();
@@ -59,10 +70,11 @@ export async function buildEpub({
     ${cover === undefined ? '' : `<item id="art" href="images/art.png" media-type="image/png"${cover === 'epub3' ? ' properties="cover-image"' : ''}/>`}
     <item id="c1" href="text/c1.xhtml" media-type="application/xhtml+xml"/>
     <item id="c2" href="text/c2.xhtml" media-type="application/xhtml+xml"/>
+    ${pictures ? '<item id="plate" href="text/plate.xhtml" media-type="application/xhtml+xml"/><item id="back" href="text/back.xhtml" media-type="application/xhtml+xml"/>' : ''}
   </manifest>
-  <spine><itemref idref="cover"/><itemref idref="c1"/><itemref idref="c2"/></spine>
+  <spine><itemref idref="cover"/><itemref idref="c1"/>${pictures ? '<itemref idref="plate"/>' : ''}<itemref idref="c2"/>${pictures ? '<itemref idref="back"/>' : ''}</spine>
 </package>`);
-  if (cover !== undefined) zip.file('OEBPS/images/art.png', COVER_PNG);
+  if (cover !== undefined) zip.file('OEBPS/images/art.png', coverPicture ? PICTURE_PNG : COVER_PNG);
   zip.file('OEBPS/nav.xhtml', `<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body>
 <nav epub:type="toc"><ol>
@@ -80,17 +92,30 @@ export async function buildEpub({
   <navPoint id="p2" playOrder="3"><navLabel><text>Chương Hai</text></navLabel><content src="text/c1.xhtml#c2"/></navPoint>
   <navPoint id="p3" playOrder="4"><navLabel><text>Chương Ba</text></navLabel><content src="text/c2.xhtml"/></navPoint>
 </navMap></ncx>`);
-  zip.file('OEBPS/text/cover.xhtml', `<html><body>${frontMatter || !withNav ? '<p>Giới thiệu</p><p>Một cuốn sách viết để thử.</p>' : ''}</body></html>`);
+  zip.file('OEBPS/text/cover.xhtml', `<html><body>${coverPicture ? '<img src="../images/art.png"/>' : ''}${frontMatter || !withNav ? '<p>Giới thiệu</p><p>Một cuốn sách viết để thử.</p>' : ''}</body></html>`);
+  const picture = (name: string, alt = '') => (pictures ? `<img src="../images/${name}" alt="${alt}"/>` : '');
+  if (pictures) {
+    zip.file('OEBPS/images/map.png', PICTURE_PNG);
+    zip.file('OEBPS/images/end.png', PICTURE_PNG);
+    zip.file('OEBPS/images/plate.png', PICTURE_PNG);
+    zip.file('OEBPS/images/broken.png', 'not a picture');
+    zip.file('OEBPS/images/art.svg', '<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>');
+    zip.file('OEBPS/text/back.xhtml', `<html><body><div>${picture('plate.png')}</div></body></html>`);
+    zip.file('OEBPS/text/plate.xhtml', `<html><body><svg><image xlink:href="../images/plate.png"/></svg></body></html>`);
+  }
   zip.file('OEBPS/text/c1.xhtml', `<html xmlns="http://www.w3.org/1999/xhtml"><body>
 <h1>Chương Một</h1>
 <h2 id="t1">TIÊU ĐỀ MỘT</h2>
-<p>${words(300, one)}</p>
+<p>${words(300, one)}${picture('map.png', 'Bản đồ')}</p>
+<div>${picture('art.svg')}${picture('gone.png')}${picture('broken.png')}${pictures ? '<img src=""/><img src="https://example.com/a.png"/><img src="bad%zz.png"/>' : ''}</div>
 <p>${words(300, one)} &amp; hết</p>
 <h1 id="c2">Chương Hai</h1>
 <p>${words(200, two)}</p>
+${picture('end.png')}
 </body></html>`);
   zip.file('OEBPS/text/c2.xhtml', `<html xmlns="http://www.w3.org/1999/xhtml"><body>
 <h1>Chương Ba</h1>
+${pictures ? `<p>${picture('end.png')}</p>` : ''}
 <div><p>${words(lastParagraphWords, three)}</p><p>${words(lastParagraphWords, three)}</p></div>
 </body></html>`);
   return zip.generateAsync({ type: 'nodebuffer' });

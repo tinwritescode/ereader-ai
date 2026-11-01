@@ -18,7 +18,10 @@ const book = (id: string, userId = 'user-1'): BookRecord => ({
   cover: { key: 'covers/same-file', mediaType: 'image/png' },
 });
 
+const FIGURE = { before: 0, image: 'a.png', alt: null, width: 2, height: 1 };
+
 const chapter = (bookId: string, index: number): ChapterRecord => ({
+  figures: [],
   id: `${bookId}-${index}`,
   bookId,
   index,
@@ -64,18 +67,18 @@ const chapter = (bookId: string, index: number): ChapterRecord => ({
       bookId: 'b1',
       language: 'en',
       shapeVersion: 1,
-      chapters: [{ id: 'b1-0', label: 'Giới thiệu', subtitle: null, kind: 'front' }],
+      chapters: [{ id: 'b1-0', label: 'Giới thiệu', subtitle: null, kind: 'front', figures: [FIGURE] }],
     });
     expect(await store.staleBefore(1)).toEqual([]);
     expect(await store.find('b1')).toMatchObject({ language: 'en', shapeVersion: 1 });
-    expect(await store.chapter('b1-0')).toMatchObject({ label: 'Giới thiệu', kind: 'front' });
+    expect(await store.chapter('b1-0')).toMatchObject({ label: 'Giới thiệu', kind: 'front', figures: [FIGURE] });
     expect(await store.chapter('b1-1')).toMatchObject({ label: 'Chương 1', kind: 'main' });
     expect((await store.summary('b1'))?.chapterCount).toBe(1);
   });
 
   it('adds the new columns to tables made before them, with books due a reshape', async () => {
     await store.add(book('b1'), [chapter('b1', 0)]);
-    await pool.query('ALTER TABLE books DROP COLUMN shape_version; ALTER TABLE chapters DROP COLUMN kind');
+    await pool.query('ALTER TABLE books DROP COLUMN shape_version; ALTER TABLE chapters DROP COLUMN kind, DROP COLUMN figures');
     const reopened = new PostgresBookStore(pool);
     expect((await reopened.staleBefore(1)).map(({ id }) => id)).toEqual(['b1']);
     expect(await reopened.chapter('b1-0')).toMatchObject({ kind: 'main' });

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { STORAGE_GATEWAY, StorageGateway } from '../../shared/storage/storage-gateway';
 import { BOOK_STORE, BookStore, InMemoryBookStore } from './application/book-store';
 import { BookService } from './application/book.service';
-import { BooksController, ChaptersController, CoversController } from './presentation/books.controller';
+import { BooksController, ChaptersController, CoversController, ImagesController } from './presentation/books.controller';
 
 export type BooksModuleOptions = {
   maxUploadBytes: number;
@@ -26,7 +26,7 @@ export class BooksModule {
     return {
       module: BooksModule,
       imports: [MulterModule.register({ limits: { fileSize: maxUploadBytes, files: 1 } })],
-      controllers: [BooksController, ChaptersController, CoversController],
+      controllers: [BooksController, ChaptersController, CoversController, ImagesController],
       providers: [
         BookService,
         { provide: STORAGE_GATEWAY, useValue: storage },

@@ -1,12 +1,13 @@
-import { Block, ChapterKind, ChapterRecord } from './book';
+import { Block, ChapterKind, ChapterRecord, Figure } from './book';
 
-export type ChapterShape = Pick<ChapterRecord, 'id' | 'label' | 'subtitle' | 'kind'>;
+export type ChapterShape = Pick<ChapterRecord, 'id' | 'label' | 'subtitle' | 'kind' | 'figures'>;
 
 type ReadChapter = {
   label: string;
   subtitle: string | null;
   kind: ChapterKind;
   blocks: Pick<Block, 'text'>[];
+  figures: Figure[];
 };
 
 const sameText = (one: Pick<Block, 'text'>[], other: Pick<Block, 'text'>[]) =>
@@ -19,6 +20,6 @@ const sameText = (one: Pick<Block, 'text'>[], other: Pick<Block, 'text'>[]) =>
 export function reshapedChapters(stored: ChapterRecord[], fresh: ReadChapter[]): ChapterShape[] {
   return stored.flatMap(({ id, blocks }) => {
     const same = fresh.find((chapter) => sameText(chapter.blocks, blocks));
-    return same ? [{ id, label: same.label, subtitle: same.subtitle, kind: same.kind }] : [];
+    return same ? [{ id, label: same.label, subtitle: same.subtitle, kind: same.kind, figures: same.figures }] : [];
   });
 }

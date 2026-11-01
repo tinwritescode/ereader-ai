@@ -13,7 +13,9 @@
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "compression": "^1.8.2",
     "fast-xml-parser": "^5.11.2",
+    "image-size": "^2.0.4",
     "jose": "^5.10.0",
     "jszip": "^3.10.2",
     "node-html-parser": "^9.0.6",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.2.8",
+    "@types/compression": "^1.8.1",
     "@types/jest": "^29.5.14",
     "@types/multer": "^2.3.0",
     "@types/node": "^22.15.0",

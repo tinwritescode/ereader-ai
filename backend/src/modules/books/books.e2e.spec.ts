@@ -7,7 +7,7 @@ import request from 'supertest';
 import { testAccounts } from '../accounts/testing/fake-identity';
 import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
 import { BooksModule } from './books.module';
-import { buildEpub, COVER_PNG } from './testing/epub-fixture';
+import { buildEpub, COVER_PNG, PICTURE_PNG } from './testing/epub-fixture';
 
 const MAX_UPLOAD_BYTES = 21 * 1024 * 1024;
 
@@ -70,6 +70,35 @@ describe('POST /books (EPUB import)', () => {
     expect(response.headers['content-type']).toContain('image/png');
     expect(response.body).toEqual(COVER_PNG);
   });
+
+  it('tells where the pictures of a chapter stand, and serves them to anyone holding the name', async () => {
+    const { body: book } = await upload(await buildEpub({ pictures: true })).expect(202);
+    const { body: chapters } = await request(app.getHttpServer())
+      .get(`/books/${book.bookId}/chapters`)
+      .set('Authorization', 'Bearer user-1')
+      .expect(200);
+    const { body: chapter } = await request(app.getHttpServer())
+      .get(`/chapters/${chapters.chapters[0].chapterId}`)
+      .set('Authorization', 'Bearer user-1')
+      .expect(200);
+
+    expect(chapter.figures).toEqual([
+      { before: 1, alt: 'Bản đồ', image: expect.stringMatching(/^[0-9a-f]{64}\.png$/), width: 2, height: 1 },
+    ]);
+
+    const picture = await request(app.getHttpServer()).get(`/images/${chapter.figures[0].image}`).expect(200);
+    expect(picture.headers['content-type']).toContain('image/png');
+    expect(picture.headers['cache-control']).toContain('immutable');
+    expect(picture.headers['x-content-type-options']).toBe('nosniff');
+    expect(picture.body).toEqual(PICTURE_PNG);
+  });
+
+  it.each(['missing.png', `${'0'.repeat(64)}.png`, `${'0'.repeat(64)}.svg`, '..%2Fsources%2Fbook.png'])(
+    'has no picture called %s',
+    async (name) => {
+      await request(app.getHttpServer()).get(`/images/${name}`).expect(404);
+    },
+  );
 
   it('has no cover to serve for a book without one', async () => {
     const plain = await upload(await buildEpub()).expect(202);
