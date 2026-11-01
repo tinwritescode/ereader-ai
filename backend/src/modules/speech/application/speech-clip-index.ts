@@ -12,6 +12,8 @@ export const SPEECH_CLIP_INDEX = Symbol('SPEECH_CLIP_INDEX');
 /** Finds stored audio by clip key. Adding the same key twice keeps the first. */
 export interface SpeechClipIndex {
   find(key: string): Promise<string | null>;
+  /** How many of these keys have audio. */
+  count(keys: readonly string[]): Promise<number>;
   add(clip: SpeechClip): Promise<void>;
 }
 
@@ -21,6 +23,10 @@ export class InMemorySpeechClipIndex implements SpeechClipIndex {
 
   async find(key: string): Promise<string | null> {
     return this.clips.get(key)?.objectKey ?? null;
+  }
+
+  async count(keys: readonly string[]): Promise<number> {
+    return keys.filter((key) => this.clips.has(key)).length;
   }
 
   async add(clip: SpeechClip): Promise<void> {

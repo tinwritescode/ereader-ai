@@ -1,7 +1,9 @@
-import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { Account } from '../../accounts/domain/plan';
 import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
 import { toBookResponse, toChapterSummary } from '../../books/presentation/books.controller';
+import { SpeechRequestSchema } from '../../speech/domain/cloud-voice';
 import { BookShareService } from '../application/book-share.service';
 import { BookShare, CreateShareRequestSchema, OpenShareRequestSchema } from '../domain/book-share';
 
@@ -55,5 +57,28 @@ export class BookShareController {
   ) {
     const { chapter, vietnamese } = await this.shares.chapter(token, device, chapterId);
     return { chapterId, label: chapter.label, original: chapter.blocks, vietnamese };
+  }
+
+  @Get('shared/:token/chapters/:chapterId/voices')
+  voices(
+    @Param('token') token: string,
+    @Param('chapterId') chapterId: string,
+    @Headers('x-share-device') device: string | undefined,
+  ) {
+    return this.shares.voices(token, device, chapterId);
+  }
+
+  @Post('shared/:token/chapters/:chapterId/speech')
+  async speech(
+    @Param('token') token: string,
+    @Param('chapterId') chapterId: string,
+    @Headers('x-share-device') device: string | undefined,
+    @Body() body: unknown,
+    @Res() response: Response,
+  ) {
+    const parsed = SpeechRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException({ code: 'SHARE_REQUEST_INVALID' });
+    const audio = await this.shares.clip({ token, device, chapterId, ...parsed.data });
+    response.status(200).type('audio/wav').send(audio);
   }
 }

@@ -1,9 +1,13 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException, Optional, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Account } from '../../accounts/domain/plan';
 import { BookSummary } from '../../books/application/book-store';
 import { BookService } from '../../books/application/book.service';
 import { Block, ChapterRecord } from '../../books/domain/book';
+import { SpeechService } from '../../speech/application/speech.service';
+import { TTS_GATEWAY, TtsGateway } from '../../speech/application/tts-gateway';
+import { CloudVoice } from '../../speech/domain/cloud-voice';
+import { planSpeech } from '../../speech/domain/speech-plan';
 import { CHAPTER_TRANSLATIONS, ChapterTranslations } from '../../translation/application/translation-stores';
 import { BookShare, MAX_TRIES, isClosed } from '../domain/book-share';
 import { hashOf, hashPassword, newToken, passwordMatches } from './share-secrets';
@@ -14,6 +18,8 @@ const taken = () => new ForbiddenException({ code: 'SHARE_TAKEN' });
 
 export type SharedBook = { summary: BookSummary; chapters: ChapterRecord[] };
 export type SharedChapter = { chapter: ChapterRecord; vietnamese: Block[] | null };
+/** The voices each version of a chapter can be heard in. */
+export type SharedVoices = { original: CloudVoice[]; vietnamese: CloudVoice[] };
 
 /** Everything a viewer can do is here, and all of it reads: there is no way in to change a book. */
 @Injectable()
@@ -22,6 +28,9 @@ export class BookShareService {
     @Inject(SHARE_STORE) private readonly store: ShareStore,
     @Inject(CHAPTER_TRANSLATIONS) private readonly translations: ChapterTranslations,
     private readonly books: BookService,
+    private readonly speech: SpeechService,
+    // Names the voices and no more: without speak, a viewer can spend none of the owner's minutes.
+    @Optional() @Inject(TTS_GATEWAY) private readonly tts: Pick<TtsGateway, 'voices'> | null,
   ) {}
 
   /** The token is handed over here and never again: only its hash is kept. */
@@ -78,6 +87,34 @@ export class BookShareService {
     // The owner has other books; the link opens this one.
     if (chapter.bookId !== bookId) throw new NotFoundException({ code: 'CHAPTER_NOT_FOUND' });
     return { chapter, vietnamese: await this.translations.find(chapterId) };
+  }
+
+  async voices(token: string, device: string | undefined, chapterId: string): Promise<SharedVoices> {
+    const { chapter, vietnamese } = await this.chapter(token, device, chapterId);
+    const offered = (await this.tts?.voices()) ?? [];
+    const [original, translated] = await Promise.all([this.voicedIn(offered, chapter.blocks), this.voicedIn(offered, vietnamese ?? [])]);
+    return { original, vietnamese: translated };
+  }
+
+  /** Audio the owner already has; a sentence not stored stays unread, and only this chapter's sentences are heard. */
+  async clip({ token, device, chapterId, text, voiceCode }: {
+    token: string;
+    device: string | undefined;
+    chapterId: string;
+    text: string;
+    voiceCode: string;
+  }): Promise<Buffer> {
+    const { chapter, vietnamese } = await this.chapter(token, device, chapterId);
+    const inChapter = planSpeech([...chapter.blocks, ...(vietnamese ?? [])]).includes(text);
+    const audio = inChapter ? await this.speech.stored(text, voiceCode) : null;
+    if (!audio) throw new NotFoundException({ code: 'SPEECH_NOT_READY' });
+    return audio;
+  }
+
+  private async voicedIn(offered: CloudVoice[], blocks: Block[]): Promise<CloudVoice[]> {
+    const sentences = planSpeech(blocks);
+    const whole = await Promise.all(offered.map(({ code }) => this.speech.hasAll(sentences, code)));
+    return offered.filter((_, index) => whole[index]);
   }
 
   /** Another request got there first: this machine's, or some other's. */

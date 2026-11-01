@@ -5,9 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
 import { LocalDiskStorageGateway } from '../../shared/storage/local-disk.storage-gateway';
+import { usageMonth } from '../accounts/domain/plan';
 import { testAccounts } from '../accounts/testing/fake-identity';
 import { BooksModule } from '../books/books.module';
+import { Block } from '../books/domain/book';
 import { buildEpub } from '../books/testing/epub-fixture';
+import { InMemorySpeechClipIndex } from '../speech/application/speech-clip-index';
+import { TTS_GATEWAY, TtsGateway } from '../speech/application/tts-gateway';
+import { CloudVoice } from '../speech/domain/cloud-voice';
+import { planSpeech } from '../speech/domain/speech-plan';
+import { SpeechModule } from '../speech/speech.module';
 import { CHAPTER_TRANSLATIONS, InMemoryChapterTranslations } from '../translation/application/translation-stores';
 import { BookShareService } from './application/book-share.service';
 import { InMemoryShareStore, SHARE_STORE } from './application/share-store';
@@ -16,26 +23,48 @@ import { BookShareController } from './presentation/book-share.controller';
 const PASSWORD = 'mat-khau-1';
 const FIRST_MACHINE = 'a'.repeat(43);
 const SECOND_MACHINE = 'b'.repeat(43);
+const HAT_DE: CloudVoice = { code: 'hat-de', name: 'Hạt Dẻ', gender: 'female' };
+const NAM_AN: CloudVoice = { code: 'nam-an', name: 'Nam An', gender: 'male' };
+const WAV = Buffer.from('RIFF....WAVEfmt ');
+
+class FakeTts implements TtsGateway {
+  spoken: string[] = [];
+
+  async voices() {
+    return [HAT_DE, NAM_AN];
+  }
+
+  async speak(text: string) {
+    this.spoken.push(text);
+    return WAV;
+  }
+}
 
 describe('sharing a book through a link', () => {
   let app: INestApplication;
   let storageDir: string;
   let translations: InMemoryChapterTranslations;
+  let tts: FakeTts;
+  let fakes: ReturnType<typeof testAccounts>;
 
   beforeEach(async () => {
     storageDir = await mkdtemp(join(tmpdir(), 'share-e2e-'));
     translations = new InMemoryChapterTranslations();
-    const fakes = testAccounts();
+    tts = new FakeTts();
+    fakes = testAccounts();
+    const storage = new LocalDiskStorageGateway(storageDir);
     const moduleRef = await Test.createTestingModule({
       imports: [
         fakes.module,
-        BooksModule.register({ maxUploadBytes: 10 * 1024 * 1024, storage: new LocalDiskStorageGateway(storageDir) }),
+        BooksModule.register({ maxUploadBytes: 10 * 1024 * 1024, storage }),
+        SpeechModule.register({ tts, storage, index: new InMemorySpeechClipIndex() }),
       ],
       controllers: [BookShareController],
       providers: [
         BookShareService,
         { provide: SHARE_STORE, useValue: new InMemoryShareStore() },
         { provide: CHAPTER_TRANSLATIONS, useValue: translations },
+        { provide: TTS_GATEWAY, useValue: tts },
       ],
     }).compile();
     app = moduleRef.createNestApplication();
@@ -180,6 +209,104 @@ describe('sharing a book through a link', () => {
 
     const after = await http().get(chapter).set(on(FIRST_MACHINE)).expect(200);
     expect(after.body).toEqual(before.body);
+  });
+
+  describe('hearing a chapter', () => {
+    const inHand = async () => {
+      const { bookId, chapters } = await importBook();
+      const { token } = await share(bookId);
+      await open(token, FIRST_MACHINE).expect(204);
+      const [chapterId] = chapters;
+      const page = `/shared/${token}/chapters/${chapterId}`;
+      const { body } = await http().get(page).set(on(FIRST_MACHINE)).expect(200);
+      return { bookId, chapterId, page, blocks: body.original as Block[], sentences: planSpeech(body.original) };
+    };
+    const voice = async (sentences: string[], voiceCode = HAT_DE.code) => {
+      for (const text of sentences) await http().post('/speech').set(as('owner')).send({ text, voiceCode }).expect(200);
+      const spoken = tts.spoken.length;
+      return () => expect(tts.spoken).toHaveLength(spoken);
+    };
+    const voices = async (page: string) => (await http().get(`${page}/voices`).set(on(FIRST_MACHINE)).expect(200)).body;
+    const hear = (page: string, text: string, voiceCode = HAT_DE.code, device = FIRST_MACHINE) =>
+      http().post(`${page}/speech`).set(on(device)).send({ text, voiceCode });
+
+    it('offers no voice until the owner has heard the whole of a version', async () => {
+      const { page, sentences } = await inHand();
+      expect(await voices(page)).toEqual({ original: [], vietnamese: [] });
+
+      await voice(sentences.slice(0, -1));
+      expect(await voices(page)).toEqual({ original: [], vietnamese: [] });
+
+      await voice(sentences.slice(-1));
+      expect(await voices(page)).toEqual({ original: [HAT_DE], vietnamese: [] });
+    });
+
+    it('offers each version the voices it has', async () => {
+      const { bookId, chapterId, page, blocks, sentences } = await inHand();
+      const translated = blocks.map((block, index) => ({ ...block, text: `Câu dịch số ${index}.` }));
+      await translations.save({ chapterId, bookId, blocks: translated });
+      await voice(sentences, NAM_AN.code);
+      await voice(planSpeech(translated));
+
+      expect(await voices(page)).toEqual({ original: [NAM_AN], vietnamese: [HAT_DE] });
+    });
+
+    it('plays what is stored, at no cost to the owner', async () => {
+      const { page, sentences } = await inHand();
+      const nothingNewSpoken = await voice(sentences);
+      const usage = () => fakes.store.usage('owner', usageMonth(new Date()));
+      const spent = await usage();
+
+      const { body, headers } = await hear(page, sentences[0]).expect(200);
+
+      expect(headers['content-type']).toContain('audio/wav');
+      expect(body).toEqual(WAV);
+      nothingNewSpoken();
+      expect(await usage()).toEqual(spent);
+    });
+
+    it('never reads a sentence aloud for a viewer', async () => {
+      const { page, sentences } = await inHand();
+
+      const { body } = await hear(page, sentences[0]).expect(404);
+
+      expect(body.code).toBe('SPEECH_NOT_READY');
+      expect(tts.spoken).toEqual([]);
+    });
+
+    it('never hears a voice the sentence was not read in', async () => {
+      const { page, sentences } = await inHand();
+      await voice(sentences, NAM_AN.code);
+
+      await hear(page, sentences[0], HAT_DE.code).expect(404);
+    });
+
+    it('plays only the sentences of the chapter in the link', async () => {
+      const { page } = await inHand();
+      const elsewhere = 'A sentence from another book entirely.';
+      await voice([elsewhere]);
+
+      const { body } = await hear(page, elsewhere).expect(404);
+
+      expect(body.code).toBe('SPEECH_NOT_READY');
+    });
+
+    it('keeps other machines from the voice too', async () => {
+      const { page, sentences } = await inHand();
+      await voice(sentences);
+
+      await hear(page, sentences[0], HAT_DE.code, SECOND_MACHINE).expect(403);
+      await http().get(`${page}/voices`).set(on(SECOND_MACHINE)).expect(403);
+      await http().get(`${page}/voices`).expect(403);
+    });
+
+    it('turns away a request it cannot read', async () => {
+      const { page } = await inHand();
+
+      const { body } = await http().post(`${page}/speech`).set(on(FIRST_MACHINE)).send({ text: '' }).expect(400);
+
+      expect(body.code).toBe('SHARE_REQUEST_INVALID');
+    });
   });
 
   it('tells the owner which links are taken, and never shows a secret again', async () => {

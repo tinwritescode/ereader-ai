@@ -8,6 +8,9 @@ import { TtsGateway } from './tts-gateway';
 // Part of every clip key: bump it when the audio format changes, so old clips are not served.
 const CLIP_FORMAT = 'wav-24k-mono-v1';
 
+const clipKey = (text: string, voiceCode: string) =>
+  createHash('sha256').update(`${CLIP_FORMAT}\n${voiceCode}\n${text}`).digest('hex');
+
 /** Reads a sentence aloud once per voice; later requests are served from storage. */
 @Injectable()
 export class SpeechService {
@@ -19,7 +22,7 @@ export class SpeechService {
   ) {}
 
   async speak(tts: TtsGateway, text: string, voiceCode: string, charge: UsageCharge): Promise<Buffer> {
-    const key = createHash('sha256').update(`${CLIP_FORMAT}\n${voiceCode}\n${text}`).digest('hex');
+    const key = clipKey(text, voiceCode);
     const kept = await this.kept(key);
     if (kept) return kept;
 
@@ -59,6 +62,17 @@ export class SpeechService {
     };
     const results = await Promise.allSettled(Array.from({ length: atOnce }, worker));
     for (const result of results) if (result.status === 'rejected') throw result.reason;
+  }
+
+  /** A sentence already read in this voice, if there is one; never reads it. */
+  stored(text: string, voiceCode: string): Promise<Buffer | null> {
+    return this.kept(clipKey(text, voiceCode));
+  }
+
+  /** Whether every one of [sentences] is already read in this voice. */
+  async hasAll(sentences: readonly string[], voiceCode: string): Promise<boolean> {
+    const keys = new Set(sentences.map((text) => clipKey(text, voiceCode)));
+    return keys.size > 0 && (await this.index.count([...keys])) === keys.size;
   }
 
   // Storage only saves credits: when it fails, reading goes on through the voice service.

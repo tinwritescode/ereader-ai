@@ -25,6 +25,15 @@ export class PostgresSpeechClipIndex implements SpeechClipIndex {
     return rows[0]?.object_key ?? null;
   }
 
+  async count(keys: readonly string[]): Promise<number> {
+    await this.table();
+    const { rows } = await this.pool.query<{ stored: number }>(
+      'SELECT count(*)::int AS stored FROM speech_clips WHERE key = ANY($1)',
+      [keys],
+    );
+    return rows[0]?.stored ?? 0;
+  }
+
   async add(clip: SpeechClip): Promise<void> {
     await this.table();
     await this.pool.query(
