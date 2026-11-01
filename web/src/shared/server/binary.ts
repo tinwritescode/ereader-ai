@@ -2,6 +2,8 @@ import '@tanstack/react-start/server-only'
 import { BackendFailure, authedOnce, authedResponse, publicResponse, viewerResponse } from './backend'
 
 const COVER_CACHE = 'public, max-age=86400'
+/** A picture's name comes from its bytes, so what it answers never changes. */
+const IMAGE_CACHE = 'public, max-age=31536000, immutable'
 
 function failed(error: unknown): Response {
   if (!(error instanceof BackendFailure)) throw error
@@ -23,6 +25,15 @@ export async function coverResponse(id: string): Promise<Response> {
   try {
     const upstream = await publicResponse(`/books/${encodeURIComponent(id)}/cover`)
     return streamed(upstream, upstream.ok ? { 'cache-control': COVER_CACHE } : {})
+  } catch (error) {
+    return failed(error)
+  }
+}
+
+export async function imageResponse(name: string): Promise<Response> {
+  try {
+    const upstream = await publicResponse(`/images/${encodeURIComponent(name)}`)
+    return streamed(upstream, upstream.ok ? { 'cache-control': IMAGE_CACHE } : {})
   } catch (error) {
     return failed(error)
   }

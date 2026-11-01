@@ -108,6 +108,7 @@ function fresh() {
       bookOf('viet', 'Cuộc chiến sinh tồn', 'Suzanne Collins', 'vi', 3),
       bookOf('long', 'Sách rất dài', null, 'vi', 400),
     ],
+    figures: [] as object[],
     tasks: {
       voice: [] as Task[],
       translation: [] as Task[],
@@ -362,6 +363,10 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     response.writeHead(200, { 'content-type': 'image/png' })
     return void response.end(PNG)
   }
+  if (path.startsWith('/images/')) {
+    response.writeHead(200, { 'content-type': 'image/png' })
+    return void response.end(PNG)
+  }
   const shared = /^\/shared\/([^/]+)(?:\/(open)|\/chapters\/([^/]+)(?:\/(voices|speech))?)?$/.exec(path)
   if (shared?.[1]) {
     const share = state.shares.find(({ token }) => token === shared[1])
@@ -402,6 +407,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
         chapterId: shared[3],
         label: 'Chương',
         original,
+        figures: state.figures,
         vietnamese: state.translationReady
           ? original.map((block) => ({
               ...block,
@@ -565,6 +571,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       wordCount: 1,
       minutes: 1,
       blocks: blocks(chapter[1]),
+      figures: state.figures,
     })
   if (path === '/speech/voices') return send(response, 200, { voices: VOICES })
   if (path === '/speech' && method === 'POST') {

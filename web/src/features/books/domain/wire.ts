@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { Book, ChapterSummary, TextBlock } from './book'
+import type { Book, ChapterSummary, Figure, TextBlock } from './book'
 
 export const BookWire = z
   .object({
@@ -22,6 +22,16 @@ export const ChapterWire = z
     minutes: z.int(),
   })
   .transform((chapter): ChapterSummary => chapter)
+
+export const FigureWire = z
+  .object({
+    before: z.int(),
+    image: z.string(),
+    alt: z.string().nullable(),
+    width: z.int(),
+    height: z.int(),
+  })
+  .transform((figure): Figure => figure)
 
 export const TextBlockWire = z
   .object({ kind: z.enum(['heading', 'paragraph']), text: z.string() })

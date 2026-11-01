@@ -2,7 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { TextBlock } from '~/features/books/domain/book'
-import { TextBlockWire } from '~/features/books/domain/wire'
+import { FigureWire, TextBlockWire } from '~/features/books/domain/wire'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 
 const Blocks = z.object({ blocks: z.array(TextBlockWire) })
@@ -10,10 +10,12 @@ const Blocks = z.object({ blocks: z.array(TextBlockWire) })
 const ChapterInput = z.object({ chapterId: z.string().min(1) })
 const path = (chapterId: string) => `/chapters/${encodeURIComponent(chapterId)}`
 
+const Original = Blocks.extend({ figures: z.array(FigureWire) })
+
 const getOriginal = createServerFn()
   .middleware([authMiddleware])
   .validator(ChapterInput)
-  .handler(({ context, data: { chapterId } }) => context.backend.json({ path: path(chapterId), schema: Blocks }))
+  .handler(({ context, data: { chapterId } }) => context.backend.json({ path: path(chapterId), schema: Original }))
 
 const getTranslated = createServerFn()
   .middleware([authMiddleware])
@@ -46,7 +48,7 @@ export function digestBlocks(content: string): TextBlock[] {
 export const originalQuery = (chapterId: string) =>
   queryOptions({
     queryKey: ['chapters', chapterId, 'original'],
-    queryFn: async () => (await getOriginal({ data: { chapterId } })).blocks,
+    queryFn: () => getOriginal({ data: { chapterId } }),
     staleTime: Infinity,
   })
 

@@ -1,7 +1,7 @@
 import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { BookWire, ChapterWire, TextBlockWire } from '~/features/books/domain/wire'
+import { BookWire, ChapterWire, FigureWire, TextBlockWire } from '~/features/books/domain/wire'
 import { VoiceWire } from '~/features/listen/domain/wire'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 import { viewerMiddleware } from '~/shared/server/viewer.middleware'
@@ -66,7 +66,7 @@ const readChapter = createServerFn()
   .handler(({ context, data: { token, chapterId } }) =>
     context.viewerBackend.json({
       path: `${shared(token)}/chapters/${encodeURIComponent(chapterId)}`,
-      schema: z.object({ original: Blocks, vietnamese: Blocks.nullable() }),
+      schema: z.object({ original: Blocks, figures: z.array(FigureWire), vietnamese: Blocks.nullable() }),
     }),
   )
 

@@ -2,10 +2,10 @@ import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
 import type { LinkProps } from '@tanstack/react-router'
 import { m, useReducedMotion } from 'motion/react'
 import { useDebouncedCallback } from '@tanstack/react-pacer'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { chapterHeading, chapterName, isForeign } from '~/features/books/domain/book'
-import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/book'
+import type { Book, ChapterSummary, Figure, TextBlock } from '~/features/books/domain/book'
 import { durationLabel, errorMessage } from '~/features/books/domain/words'
 import { Button } from '~/shared/ui/button'
 import { Sheet } from '~/shared/ui/sheet'
@@ -71,6 +71,41 @@ function Block({ block, index, marked }: { block: TextBlock; index: number; mark
       <mark>{block.text.slice(marked.start, marked.end)}</mark>
       {block.text.slice(marked.end)}
     </Tag>
+  )
+}
+
+function Picture({ figure: { image, alt, width, height } }: { figure: Figure }) {
+  return (
+    <figure className="mb-3.5">
+      <img
+        className="mx-auto h-auto max-w-full"
+        src={`/api/images/${encodeURIComponent(image)}`}
+        alt={alt ?? ''}
+        width={width}
+        height={height}
+        loading="lazy"
+        decoding="async"
+      />
+    </figure>
+  )
+}
+
+/** The blocks with the book's pictures among them; a picture standing last has the blocks' count. */
+function Words({ text, marked }: { text: { blocks: TextBlock[]; figures: Figure[] }; marked: ReaderVoice['marked'] }) {
+  const picturesAt = (index: number) =>
+    text.figures
+      .filter(({ before }) => before === index)
+      .map((figure, at) => <Picture key={`${index}-${at}`} figure={figure} />)
+  return (
+    <>
+      {text.blocks.map((block, index) => (
+        <Fragment key={index}>
+          {picturesAt(index)}
+          <Block block={block} index={index} marked={marked} />
+        </Fragment>
+      ))}
+      {picturesAt(text.blocks.length)}
+    </>
   )
 }
 
@@ -446,18 +481,14 @@ function ReaderBody({
         <>
           {translationNotice}
           <div className="text faded reading-text opacity-55">
-            {text.blocks.map((block, index) => (
-              <Block key={index} block={block} index={index} marked={null} />
-            ))}
+            <Words text={text} marked={null} />
           </div>
         </>
       )
     case 'loaded':
       return (
         <div className="text reading-text">
-          {text.blocks.map((block, index) => (
-            <Block key={index} block={block} index={index} marked={voice.marked} />
-          ))}
+          <Words text={text} marked={voice.marked} />
         </div>
       )
     default: {

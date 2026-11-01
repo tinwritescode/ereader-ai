@@ -19,11 +19,13 @@ export function useChapterText({ chapterId, option }: { chapterId: string; optio
   const digest = useQuery({ ...shortenedQuery({ chapterId, minutes }), enabled: shortened })
 
   const made = shortened ? digest : length === 'vietnamese' ? translated : original
-  if (made.data) return { kind: 'loaded', blocks: made.data }
+  const blocks = shortened ? digest.data : length === 'vietnamese' ? translated.data : original.data?.blocks
+  // A digest is written anew, so the book's pictures have no place in it.
+  if (blocks) return { kind: 'loaded', blocks, figures: shortened ? [] : (original.data?.figures ?? []) }
   if (made.error) {
     const code = codeOf(made.error)
     if (code === 'TRANSLATION_NOT_READY') {
-      return original.data ? { kind: 'untranslated', blocks: original.data } : { kind: 'loading', shortening: false }
+      return original.data ? { kind: 'untranslated', ...original.data } : { kind: 'loading', shortening: false }
     }
     return { kind: 'failed', code, retry: () => void made.refetch() }
   }

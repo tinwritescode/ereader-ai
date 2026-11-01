@@ -21,6 +21,8 @@ export type ChapterSummary = {
 }
 
 export type TextBlock = { kind: 'heading' | 'paragraph'; text: string }
+/** A picture standing before the block at index [before]; the chapter's block count puts it last. */
+export type Figure = { before: number; image: string; alt: string | null; width: number; height: number }
 
 /** Not in Vietnamese, so it can be translated. */
 export function isForeign({ language }: Pick<Book, 'language'>): boolean {

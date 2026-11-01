@@ -102,7 +102,10 @@ export function WithSharedText({
   const version = inVietnamese ? 'vietnamese' : 'original'
   const voices = useQuery({ ...sharedVoicesQuery({ token, chapterId, version }), enabled: chapter.isSuccess })
   const text = (): ChapterText => {
-    if (chapter.data) return { kind: 'loaded', blocks: inVietnamese ? vietnamese : chapter.data.original }
+    if (chapter.data) {
+      const { original: blocks, figures } = chapter.data
+      return { kind: 'loaded', blocks: inVietnamese ? vietnamese : blocks, figures }
+    }
     if (chapter.error) {
       return { kind: 'failed', code: codeOf(chapter.error), retry: () => void chapter.refetch() }
     }
