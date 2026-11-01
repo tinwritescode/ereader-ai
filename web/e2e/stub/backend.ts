@@ -31,7 +31,11 @@ const PLANS = {
   },
 }
 
-type Task = Record<string, unknown> & { id: string; state: string; progress: number }
+type Task = Record<string, unknown> & {
+  id: string
+  state: string
+  progress: number
+}
 
 const manyChapters = Array.from({ length: 400 }, (_, index) => ({
   chapterId: `long-${index + 1}`,
@@ -93,13 +97,22 @@ function fresh() {
     uploadExpireOnce: false,
     translated: new Set<string>(),
     translationReady: false,
-    shares: [] as { shareId: string; token: string; password: string; device: string | null }[],
+    shares: [] as {
+      shareId: string
+      token: string
+      password: string
+      device: string | null
+    }[],
     books: [
       bookOf('deep', 'Deep Work', 'Cal Newport', 'en', 3, true),
       bookOf('viet', 'Cuộc chiến sinh tồn', 'Suzanne Collins', 'vi', 3),
       bookOf('long', 'Sách rất dài', null, 'vi', 400),
     ],
-    tasks: { voice: [] as Task[], translation: [] as Task[], book: [] as Task[] },
+    tasks: {
+      voice: [] as Task[],
+      translation: [] as Task[],
+      book: [] as Task[],
+    },
     accounts: [
       {
         id: 'a1',
@@ -148,7 +161,10 @@ const chapters = (bookId: string) =>
 
 const blocks = (chapterId: string) => [
   { kind: 'heading', text: `Đầu chương ${chapterId}` },
-  { kind: 'paragraph', text: `Câu thứ nhất của ${chapterId}. Câu thứ hai rất ngắn. Câu thứ ba kết thúc đoạn.` },
+  {
+    kind: 'paragraph',
+    text: `Câu thứ nhất của ${chapterId}. Câu thứ hai rất ngắn. Câu thứ ba kết thúc đoạn.`,
+  },
   ...Array.from({ length: 40 }, (_, index) => ({
     kind: 'paragraph',
     text: `Đoạn ${index + 1} kể tiếp câu chuyện. Nó có hai câu.`,
@@ -243,6 +259,30 @@ function wholeBookTask(
   }
 }
 
+const plain = (text: string) => [{ text, marked: false }]
+
+const RELEASES = [
+  {
+    version: '1.1.0',
+    date: '2026-11-01',
+    title: 'Theo dõi tác vụ',
+    added: [
+      [
+        { text: 'Trang Tác vụ', marked: true },
+        { text: ' cho biết việc đang chạy.', marked: false },
+      ],
+    ],
+    fixed: [plain('Hạt Dẻ đọc ít lỗi hơn.')],
+  },
+  {
+    version: '1.0.0',
+    date: '2026-10-01',
+    title: 'Bản đầu tiên',
+    added: [plain('Đọc sách EPUB.')],
+    fixed: [],
+  },
+]
+
 const VOICES = [
   { code: 'hat-de', name: 'Hạt Dẻ', gender: 'female' },
   { code: 'nam-an', name: 'Nam An', gender: 'male' },
@@ -296,9 +336,15 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return void response.end()
   }
   if (path === '/auth/token' && method === 'POST') {
-    const { code, codeVerifier } = await json<{ code: string; codeVerifier: string }>()
+    const { code, codeVerifier } = await json<{
+      code: string
+      codeVerifier: string
+    }>()
     if (code !== 'good-code' || !codeVerifier) return send(response, 401, { code: 'SIGN_IN_FAILED' })
-    return send(response, 200, { accessToken: state.access, refreshToken: state.refresh })
+    return send(response, 200, {
+      accessToken: state.access,
+      refreshToken: state.refresh,
+    })
   }
   if (path === '/auth/refresh' && method === 'POST') {
     state.refreshCalls += 1
@@ -306,7 +352,10 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     if (state.refreshInvalid) return send(response, 401, { code: 'SIGN_IN_REQUIRED' })
     if (refreshToken === 'spent') return send(response, 401, { code: 'SIGN_IN_REQUIRED' })
     state.refresh = `refresh-${tests}-${state.tokenCount}`
-    return send(response, 200, { accessToken: state.access, refreshToken: state.refresh })
+    return send(response, 200, {
+      accessToken: state.access,
+      refreshToken: state.refresh,
+    })
   }
   const cover = /^\/books\/([^/]+)\/cover$/.exec(path)
   if (cover) {
@@ -318,7 +367,10 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     const share = state.shares.find(({ token }) => token === shared[1])
     if (!share) return send(response, 404, { code: 'SHARE_GONE' })
     if (shared[2] === 'open') {
-      const { password, device } = await json<{ password: string; device: string }>()
+      const { password, device } = await json<{
+        password: string
+        device: string
+      }>()
       if (share.device && share.device !== device) return send(response, 403, { code: 'SHARE_TAKEN' })
       if (password !== share.password) return send(response, 401, { code: 'SHARE_PASSWORD_WRONG' })
       share.device = device
@@ -329,10 +381,16 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     if (share.device !== device) return send(response, 403, { code: 'SHARE_TAKEN' })
     const voiced = shared[3] && (state.sharedVoicesChapter ?? shared[3]) === shared[3] ? state.sharedVoices : []
     if (shared[4] === 'voices') {
-      return send(response, 200, { original: VOICES.filter(({ code }) => voiced.includes(code)), vietnamese: [] })
+      return send(response, 200, {
+        original: VOICES.filter(({ code }) => voiced.includes(code)),
+        vietnamese: [],
+      })
     }
     if (shared[4] === 'speech') {
-      const { text, voiceCode } = await json<{ text: string; voiceCode: string }>()
+      const { text, voiceCode } = await json<{
+        text: string
+        voiceCode: string
+      }>()
       if (!voiced.includes(voiceCode)) return send(response, 404, { code: 'SPEECH_NOT_READY' })
       state.sharedSpeech.push(text)
       response.writeHead(200, { 'content-type': 'audio/wav' })
@@ -345,12 +403,19 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
         label: 'Chương',
         original,
         vietnamese: state.translationReady
-          ? original.map((block) => ({ ...block, text: `Bản dịch: ${block.text}` }))
+          ? original.map((block) => ({
+              ...block,
+              text: `Bản dịch: ${block.text}`,
+            }))
           : null,
       })
     }
-    return send(response, 200, { ...state.books[0], chapters: chapters('deep') })
+    return send(response, 200, {
+      ...state.books[0],
+      chapters: chapters('deep'),
+    })
   }
+  if (path === '/changelog') return send(response, 200, { releases: RELEASES })
   if (!authed(request)) return send(response, 401, { code: 'SIGN_IN_REQUIRED' })
 
   if (path === '/me') {
@@ -359,7 +424,11 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       role: state.role,
       plan: state.plan,
       requestedPlan: state.requestedPlan,
-      usage: { digests: state.digestsUsed, vbeeMinutes: state.voiceUsed, bookTranslations: 1 },
+      usage: {
+        digests: state.digestsUsed,
+        vbeeMinutes: state.voiceUsed,
+        bookTranslations: 1,
+      },
       resetsOn: '2026-12-01T00:00:00.000Z',
       plans: PLANS,
     })
@@ -407,7 +476,12 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       const { password } = await json<{ password: string }>()
       if (password.length < 6) return send(response, 400, { code: 'SHARE_PASSWORD_INVALID' })
       const shareId = `share-${state.shares.length + 1}`
-      state.shares.push({ shareId, token: `link-${state.shares.length + 1}`, password, device: null })
+      state.shares.push({
+        shareId,
+        token: `link-${state.shares.length + 1}`,
+        password,
+        device: null,
+      })
       return send(response, 201, {
         shareId,
         createdAt: '2026-11-01T02:00:00.000Z',
@@ -463,7 +537,10 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     if (!state.translationReady) return send(response, 409, { code: 'TRANSLATION_NOT_READY' })
     return send(response, 200, {
       chapterId: translation[1],
-      blocks: blocks(translation[1]).map(({ kind, text }) => ({ kind, text: `Bản dịch: ${text}` })),
+      blocks: blocks(translation[1]).map(({ kind, text }) => ({
+        kind,
+        text: `Bản dịch: ${text}`,
+      })),
     })
   }
   const digest = /^\/chapters\/([^/]+)\/digest$/.exec(path)
@@ -540,7 +617,10 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       return send(response, 204)
     }
     if (task[3] === 'first' && found)
-      found['current'] = { chapterId: (await json<{ chapterId: string }>()).chapterId, percent: 0 }
+      found['current'] = {
+        chapterId: (await json<{ chapterId: string }>()).chapterId,
+        percent: 0,
+      }
     if (task[3] === 'resume' && found) {
       found['state'] = 'running'
       found['code'] = null

@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Button } from '~/shared/ui/button'
 import { limitsOf, planLabel, resetLabel } from '../domain/account'
@@ -27,7 +28,7 @@ function Meter({ name, used, limit, detail }: { name: string; used: number; limi
   )
 }
 
-export function AccountPage({ booksCount }: { booksCount: number }) {
+export function AccountPage({ booksCount, changelogLink }: { booksCount: number; changelogLink: ReactNode }) {
   const account = useAccount()
   const queryClient = useQueryClient()
   const limits = limitsOf(account)
@@ -65,6 +66,7 @@ export function AccountPage({ booksCount }: { booksCount: number }) {
             Quản trị
           </Link>
         )}
+        {changelogLink}
         <Button
           quiet
           onClick={async () => {

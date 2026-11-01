@@ -19,3 +19,5 @@ mobile/.packages
 # crapper, dryer and mutator output
 backend/.metrics/
 backend/target/
+web/.metrics/
+web/target/
