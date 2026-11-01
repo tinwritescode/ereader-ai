@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
 import { Account } from '../../accounts/domain/plan';
 import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
-import { toChapterSummary } from '../../books/presentation/books.controller';
+import { toBookResponse, toChapterSummary } from '../../books/presentation/books.controller';
 import { BookShareService } from '../application/book-share.service';
 import { BookShare, CreateShareRequestSchema, OpenShareRequestSchema } from '../domain/book-share';
 
@@ -43,8 +43,8 @@ export class BookShareController {
 
   @Get('shared/:token')
   async book(@Param('token') token: string, @Headers('x-share-device') device: string | undefined) {
-    const { title, author, chapters } = await this.shares.book(token, device);
-    return { title, author, chapters: chapters.map(toChapterSummary) };
+    const { summary, chapters } = await this.shares.book(token, device);
+    return { ...toBookResponse(summary), chapters: chapters.map(toChapterSummary) };
   }
 
   @Get('shared/:token/chapters/:chapterId')

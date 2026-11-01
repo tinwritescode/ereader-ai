@@ -334,7 +334,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
           : null,
       })
     }
-    return send(response, 200, { title: 'Deep Work', author: 'Cal Newport', chapters: chapters('deep') })
+    return send(response, 200, { ...state.books[0], chapters: chapters('deep') })
   }
   if (!authed(request)) return send(response, 401, { code: 'SIGN_IN_REQUIRED' })
 

@@ -68,11 +68,11 @@ test('a viewer signs in nowhere, reads the book, and has nothing to edit', async
   await viewer.getByLabel('Mật khẩu').fill(PASSWORD)
   await viewer.getByRole('button', { name: 'Mở sách' }).click()
   await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
-  await expect(viewer.getByText('Chỉ đọc')).toBeVisible()
+  await expect(viewer.getByText('chỉ đọc')).toBeVisible()
 
-  await viewer.getByRole('link', { name: /Chương Hai/ }).click()
+  await viewer.getByRole('button', { name: /Chương Hai/ }).click()
   await expect(viewer.locator('[data-block="0"]')).toBeVisible()
-  await expect(viewer.getByText('Chỉ đọc')).toBeVisible()
+  await expect(viewer.getByText('chỉ đọc')).toBeVisible()
   await expect(viewer.locator('input, textarea, [contenteditable]')).toHaveCount(0)
 
   await viewer.reload()
@@ -86,11 +86,48 @@ test('a translated chapter opens in Vietnamese, with the original a press away',
   const viewer = await machine(browser, baseURL)
   await enter(viewer)
 
-  await viewer.getByRole('link', { name: /Chương Hai/ }).click()
+  await viewer.getByRole('button', { name: /Chương Hai/ }).click()
   await expect(viewer.locator('[data-block="0"]')).toContainText('Bản dịch:')
 
-  await viewer.getByRole('button', { name: 'Bản gốc' }).click()
+  await viewer.getByRole('button', { name: 'gốc' }).click()
   await expect(viewer.locator('[data-block="0"]')).not.toContainText('Bản dịch:')
+})
+
+test('the contents read like the book page, with only reading on offer', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  const viewer = await machine(browser, baseURL)
+  await open(viewer, LINK)
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toHaveCount(0)
+  await enter(viewer)
+
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
+  await expect(viewer.locator('[data-cover]')).toBeVisible()
+  await expect(viewer.getByText('Cal Newport, 3 chương')).toBeVisible()
+  await expect(viewer.getByRole('button', { name: 'Chia sẻ' })).toHaveCount(0)
+  await expect(viewer.getByText('Dịch cả sách sang tiếng Việt')).toHaveCount(0)
+  await expect(viewer.getByRole('link', { name: 'Thư viện' })).toHaveCount(0)
+})
+
+test('a chapter reads in the same reader, without what costs the owner', async ({ page, browser, baseURL }) => {
+  await makeLink(page)
+  await stub.set({ translationReady: true })
+  const viewer = await machine(browser, baseURL)
+  await enter(viewer)
+  await viewer.getByRole('button', { name: /Chương Hai/ }).click()
+
+  await expect(viewer.getByRole('group', { name: 'Bản đọc' }).getByRole('button')).toHaveText(['gốc', 'Việt'])
+  await expect(viewer.getByRole('button', { name: 'Trang giấy' })).toBeVisible()
+  await expect(viewer.getByRole('link', { name: '‹ Mục lục' })).toBeVisible()
+  await expect(viewer.getByText('Nghe từ đoạn đang đọc')).toHaveCount(0)
+
+  await viewer.getByRole('button', { name: 'Trang giấy' }).click()
+  await viewer.keyboard.press('Escape')
+  await viewer.getByText('Xong Chương Hai').scrollIntoViewIfNeeded()
+  await viewer.getByRole('link', { name: 'Đọc Chương Ba' }).click()
+  await expect(viewer.getByText('Tên chương 3')).toBeVisible()
+
+  await viewer.getByRole('link', { name: '‹ Mục lục' }).click()
+  await expect(viewer.getByRole('heading', { name: 'Deep Work' })).toBeVisible()
 })
 
 test('a second machine is turned away and asked for nothing', async ({ page, browser, baseURL }) => {

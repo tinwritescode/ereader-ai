@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Account } from '../../accounts/domain/plan';
+import { BookSummary } from '../../books/application/book-store';
 import { BookService } from '../../books/application/book.service';
 import { Block, ChapterRecord } from '../../books/domain/book';
 import { CHAPTER_TRANSLATIONS, ChapterTranslations } from '../../translation/application/translation-stores';
@@ -11,7 +12,7 @@ import { SHARE_STORE, ShareStore } from './share-store';
 const gone = () => new NotFoundException({ code: 'SHARE_GONE' });
 const taken = () => new ForbiddenException({ code: 'SHARE_TAKEN' });
 
-export type SharedBook = { title: string; author: string | null; chapters: ChapterRecord[] };
+export type SharedBook = { summary: BookSummary; chapters: ChapterRecord[] };
 export type SharedChapter = { chapter: ChapterRecord; vietnamese: Block[] | null };
 
 /** Everything a viewer can do is here, and all of it reads: there is no way in to change a book. */
@@ -64,11 +65,11 @@ export class BookShareService {
 
   async book(token: string, device: string | undefined): Promise<SharedBook> {
     const { ownerId, bookId } = await this.held(token, device);
-    const [{ title, author }, chapters] = await Promise.all([
-      this.books.status(ownerId, bookId),
+    const [summary, chapters] = await Promise.all([
+      this.books.summarize(await this.books.status(ownerId, bookId)),
       this.books.chapters(ownerId, bookId),
     ]);
-    return { title, author, chapters };
+    return { summary, chapters };
   }
 
   async chapter(token: string, device: string | undefined, chapterId: string): Promise<SharedChapter> {

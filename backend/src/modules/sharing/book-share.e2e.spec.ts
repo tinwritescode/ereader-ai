@@ -72,7 +72,7 @@ describe('sharing a book through a link', () => {
     await open(token, FIRST_MACHINE).expect(204);
 
     const { body } = await http().get(`/shared/${token}`).set(on(FIRST_MACHINE)).expect(200);
-    expect(body).toMatchObject({ title: expect.any(String), chapters: expect.any(Array) });
+    expect(body).toMatchObject({ bookId, title: expect.any(String), hasCover: expect.any(Boolean), chapterCount: chapters.length });
     expect(body.chapters.map(({ chapterId }: { chapterId: string }) => chapterId)).toEqual(chapters);
     await open(token, FIRST_MACHINE, 'forgotten').expect(204);
   });

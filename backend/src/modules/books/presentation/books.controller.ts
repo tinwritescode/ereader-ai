@@ -120,7 +120,7 @@ export class ChaptersController {
   }
 }
 
-function toBookResponse({ id, status, title, author, language, cover, chapterCount, minutes }: BookSummary) {
+export function toBookResponse({ id, status, title, author, language, cover, chapterCount, minutes }: BookSummary) {
   return { bookId: id, status, title, author, language, hasCover: cover !== null, chapterCount, minutes };
 }
 

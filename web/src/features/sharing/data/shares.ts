@@ -1,25 +1,13 @@
 import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import type { ChapterSummary, TextBlock } from '~/features/books/domain/book'
+import { BookWire, ChapterWire, TextBlockWire } from '~/features/books/domain/wire'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 import { viewerMiddleware } from '~/shared/server/viewer.middleware'
 
 const ShareWire = z.object({ shareId: z.string(), createdAt: z.string(), opened: z.boolean() })
 
-const ChapterWire = z
-  .object({
-    chapterId: z.string(),
-    label: z.string(),
-    subtitle: z.string().nullable(),
-    kind: z.enum(['main', 'front']),
-    minutes: z.int(),
-  })
-  .transform((chapter): ChapterSummary => chapter)
-
-const Blocks = z.array(
-  z.object({ kind: z.enum(['heading', 'paragraph']), text: z.string() }).transform((block): TextBlock => block),
-)
+const Blocks = z.array(TextBlockWire)
 
 const shares = (bookId: string) => `/books/${encodeURIComponent(bookId)}/shares`
 const shared = (token: string) => `/shared/${encodeURIComponent(token)}`
@@ -63,7 +51,7 @@ const readBook = createServerFn()
   .handler(({ context, data: { token } }) =>
     context.viewerBackend.json({
       path: shared(token),
-      schema: z.object({ title: z.string(), author: z.string().nullable(), chapters: z.array(ChapterWire) }),
+      schema: z.object({ chapters: z.array(ChapterWire) }).and(BookWire),
     }),
   )
 

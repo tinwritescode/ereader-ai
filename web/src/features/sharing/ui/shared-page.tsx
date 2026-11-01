@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
-import { chapterHeading } from '~/features/books/domain/book'
-import type { ChapterSummary } from '~/features/books/domain/book'
+import type { ReactNode } from 'react'
+import type { Book, ChapterSummary } from '~/features/books/domain/book'
 import { codeOf, errorMessage } from '~/features/books/domain/words'
-import { Button } from '~/shared/ui/button'
+import type { ChapterText } from '~/features/reading/domain/chapter-text'
+import type { LengthOption } from '~/features/reading/domain/length'
+import { Paper } from '~/shared/ui/shell'
 import { openShare, sharedBookQuery, sharedChapterQuery } from '../data/shares'
+
+/** Written in the margin in red pen. Nothing on these pages writes, and the backend gives a link no way to. */
+export function ReadOnlyNote() {
+  return <span className="inline-block -rotate-2 leading-11 text-red">chỉ đọc</span>
+}
 
 function PasswordForm({ token }: { token: string }) {
   const queryClient = useQueryClient()
@@ -16,18 +22,18 @@ function PasswordForm({ token }: { token: string }) {
   })
   return (
     <form
-      className="centred-page"
+      className="flex max-w-95 flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault()
         open.mutate()
       }}
     >
-      <h1 className="text-[26px]/7">Sách được chia sẻ</h1>
+      <h1 className="text-[17px]/[21px] md:text-[26px]/7">Sách được chia sẻ</h1>
       <p className="soft">Link này chỉ mở được trên một máy. Máy nhập đúng mật khẩu đầu tiên sẽ giữ link.</p>
-      <label className="flex flex-col gap-1 text-left text-sm font-semibold text-ink">
+      <label className="mt-line flex flex-col text-sm font-semibold text-ink">
         Mật khẩu
         <input
-          className="min-h-11 w-full rounded-lg border-2 border-ink bg-paper px-3 text-ink"
+          className="h-9 border-0 border-b-[1.5px] border-ink bg-transparent text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           type="password"
           autoComplete="off"
           required
@@ -36,103 +42,62 @@ function PasswordForm({ token }: { token: string }) {
         />
       </label>
       {open.error && <p className="failure">{errorMessage(codeOf(open.error))}</p>}
-      <button type="submit" className="primary" disabled={open.isPending}>
+      <button type="submit" className="primary mt-2" disabled={open.isPending}>
         Mở sách
       </button>
     </form>
   )
 }
 
-function Chapters({ token, chapters }: { token: string; chapters: ChapterSummary[] }) {
-  return (
-    <ol className="flex flex-col">
-      {chapters.map((chapter) => {
-        const { number, title } = chapterHeading(chapter)
-        return (
-          <li key={chapter.chapterId} className="border-t-[1.5px] border-ink/42">
-            <Link
-              className="block py-2 text-ink no-underline"
-              to="/s/$token"
-              params={{ token }}
-              search={{ chapter: chapter.chapterId }}
-            >
-              {number && <small className="block font-hand text-[18px]/7 text-muted">{number}</small>}
-              <b className="text-[15.5px]/7 font-semibold">{title}</b>
-            </Link>
-          </li>
-        )
-      })}
-    </ol>
-  )
-}
-
-function Chapter({ token, chapterId, next }: { token: string; chapterId: string; next: ChapterSummary | undefined }) {
-  const chapter = useQuery(sharedChapterQuery({ token, chapterId }))
-  const [original, setOriginal] = useState(false)
-  if (chapter.isPending) return <p className="soft">Đang mở chương…</p>
-  if (!chapter.data) return <p className="failure">{errorMessage(codeOf(chapter.error))}</p>
-  const { vietnamese } = chapter.data
-  const blocks = vietnamese && !original ? vietnamese : chapter.data.original
-  return (
-    <>
-      {vietnamese && (
-        <Button quiet onClick={() => setOriginal(!original)}>
-          {original ? 'Tiếng Việt' : 'Bản gốc'}
-        </Button>
-      )}
-      <article className="text reading-text">
-        {blocks.map((block, index) => {
-          const Tag = block.kind === 'heading' ? 'h2' : 'p'
-          return (
-            <Tag key={index} data-block={index}>
-              {block.text}
-            </Tag>
-          )
-        })}
-      </article>
-      {next && (
-        <Link
-          className="ink-link mt-line inline-block"
-          to="/s/$token"
-          params={{ token }}
-          search={{ chapter: next.chapterId }}
-        >
-          Chương sau ›
-        </Link>
-      )}
-    </>
-  )
-}
-
-/** A viewer reads and only reads: nothing here writes, and the backend gives a link no way to. */
-export function SharedPage({ token, chapterId }: { token: string; chapterId: string | undefined }) {
-  const book = useQuery(sharedBookQuery(token))
-  if (book.isPending) return <p className="soft centred-page">Đang mở sách…</p>
-  if (!book.data) {
-    const code = codeOf(book.error)
-    if (code === 'SHARE_LOCKED') return <PasswordForm token={token} />
-    return (
-      <div className="centred-page">
-        <p className="failure">{errorMessage(code)}</p>
-      </div>
-    )
+/** Hands the shared book to the page, once this machine holds the link. */
+export function WithSharedBook({
+  token,
+  children,
+}: {
+  token: string
+  children: (shelf: { book: Book; chapters: ChapterSummary[] }) => ReactNode
+}) {
+  const shared = useQuery(sharedBookQuery(token))
+  if (shared.data) {
+    const { chapters, ...book } = shared.data
+    return children({ book, chapters })
   }
-  const { title, author, chapters } = book.data
-  const at = chapters.findIndex((chapter) => chapter.chapterId === chapterId)
+  const code = shared.error ? codeOf(shared.error) : null
   return (
-    <main className="mx-auto max-w-[38em] px-5 pt-line pb-28">
-      <h1 className="text-[17px]/[21px] md:text-[26px]/7">{title}</h1>
-      <p className="soft leading-7!">{[author, 'Chỉ đọc'].filter(Boolean).join(', ')}</p>
-      {chapterId ? (
-        <>
-          <Link className="ink-link mb-line inline-block" to="/s/$token" params={{ token }}>
-            ‹ Mục lục
-          </Link>
-          <Chapter key={chapterId} token={token} chapterId={chapterId} next={chapters[at + 1]} />
-        </>
-      ) : (
-        <Chapters token={token} chapters={chapters} />
-      )}
-    </main>
+    <Paper ways={null}>
+      {code === null && <p className="soft">Đang mở sách…</p>}
+      {code === 'SHARE_LOCKED' && <PasswordForm token={token} />}
+      {code !== null && code !== 'SHARE_LOCKED' && <p className="failure">{errorMessage(code)}</p>}
+    </Paper>
   )
+}
+
+/** A chapter's words, in Vietnamese where there is a translation unless the viewer chose the original. */
+export function WithSharedText({
+  token,
+  chapterId,
+  minutes,
+  wanted,
+  children,
+}: {
+  token: string
+  chapterId: string
+  minutes: number
+  wanted: LengthOption['length'] | undefined
+  children: (read: { text: ChapterText; option: LengthOption; options: LengthOption[] }) => ReactNode
+}) {
+  const chapter = useQuery(sharedChapterQuery({ token, chapterId }))
+  const vietnamese = chapter.data?.vietnamese ?? null
+  const original: LengthOption = { length: 'original', minutes }
+  const translated: LengthOption = { length: 'vietnamese', minutes }
+  const options = vietnamese ? [original, translated] : [original]
+  const inVietnamese = vietnamese && wanted !== 'original'
+  const text = (): ChapterText => {
+    if (chapter.data) return { kind: 'loaded', blocks: inVietnamese ? vietnamese : chapter.data.original }
+    if (chapter.error) {
+      return { kind: 'failed', code: codeOf(chapter.error), retry: () => void chapter.refetch() }
+    }
+    return { kind: 'loading', shortening: false }
+  }
+  return children({ text: text(), option: inVietnamese ? translated : original, options })
 }
