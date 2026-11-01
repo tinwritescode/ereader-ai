@@ -6,6 +6,7 @@ import { usageMonth } from '../accounts/domain/plan';
 import { testAccounts } from '../accounts/testing/fake-identity';
 import { StorageGateway } from '../../shared/storage/storage-gateway';
 import { InMemoryChapterVoiceStore } from './application/chapter-voice-store';
+import { ChapterVoiceService } from './application/chapter-voice.service';
 import { InMemorySpeechClipIndex } from './application/speech-clip-index';
 import { TtsError, TtsGateway } from './application/tts-gateway';
 import { CloudVoice } from './domain/cloud-voice';
@@ -142,6 +143,7 @@ describe('chapter voice tasks', () => {
     let open = () => {};
     tts.gate = new Promise((resolve) => (open = resolve));
     const first = await post(job('c1')).expect(201);
+    expect(first.body).toMatchObject({ done: 0, total: 2 });
     const second = await post(job('c1')).expect(201);
     expect(second.body.id).toBe(first.body.id);
     expect(await tasks()).toHaveLength(1);
@@ -149,6 +151,14 @@ describe('chapter voice tasks', () => {
     const translated = await post(job('c1', ['Sentence one.'])).expect(201);
     expect(translated.body.id).not.toBe(first.body.id);
     open();
+    await settled();
+  });
+
+  it('starts a new task for a chapter whose last one has finished', async () => {
+    const first = await post(job('c1')).expect(201);
+    await settled();
+    const again = await post(job('c1')).expect(201);
+    expect(again.body.id).not.toBe(first.body.id);
     await settled();
   });
 
@@ -172,9 +182,18 @@ describe('chapter voice tasks', () => {
     expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'SPEECH_FAILED' });
 
     tts.failOn = null;
-    await request(server()).post(`/speech/tasks/${body.id}/resume`).set('Authorization', 'Bearer max-1').expect(201);
+    const resumed = await request(server()).post(`/speech/tasks/${body.id}/resume`).set('Authorization', 'Bearer max-1').expect(201);
+    expect(resumed.body.done).toBe(0);
     expect((await settled())[0]).toMatchObject({ state: 'done', done: 2, code: null });
     expect(tts.spoken.filter((text) => text === 'Câu một.')).toHaveLength(1);
+  });
+
+  it('starts no more sentences after one fails', async () => {
+    const sentences = Array.from({ length: 30 }, (_, index) => `Câu số ${index}.`);
+    tts.failOn = sentences[0];
+    await post(job('c1', sentences)).expect(201);
+    expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'SPEECH_FAILED' });
+    expect(tts.spoken.length).toBeLessThan(sentences.length - 1);
   });
 
   it('stops cleanly, charging nothing, on resuming a task whose voice is no longer offered', async () => {
@@ -196,6 +215,19 @@ describe('chapter voice tasks', () => {
     await accounts.spend({ accountId: 'max-1', month, meter: 'vbeeSeconds', amount: 90_000, limit: 90_000 });
     await post(job('c1')).expect(201);
     expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'VBEE_LIMIT' });
+  });
+
+  it('lists a finished task for seven days', async () => {
+    await post(job('c1')).expect(201);
+    const [task] = await settled();
+    const [saved] = await store.ofAccount('max-1');
+    await store.save({ ...saved, finishedAt: new Date(0) });
+    const account = await accounts.find('max-1');
+    if (!account) throw new Error('no account');
+    const service = app.get(ChapterVoiceService);
+    const week = 7 * 24 * 60 * 60 * 1_000;
+    expect(await service.list(account, new Date(week - 1))).toMatchObject([{ id: task.id }]);
+    expect(await service.list(account, new Date(week))).toEqual([]);
   });
 
   it('keeps tasks between accounts', async () => {

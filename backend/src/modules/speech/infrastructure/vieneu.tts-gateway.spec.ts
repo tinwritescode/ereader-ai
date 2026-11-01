@@ -57,6 +57,7 @@ describe('VieneuTtsGateway', () => {
 
     expect(spoken.subarray(0, 4).toString('latin1')).toBe('RIFF');
     expect(spoken.readUInt32LE(4)).toBe(spoken.length - 8);
+    expect(spoken.readUInt16LE(20)).toBe(1);
     expect(spoken.readUInt16LE(22)).toBe(1);
     expect(spoken.readUInt32LE(24)).toBe(24_000);
     expect(spoken.readUInt32LE(28)).toBe(48_000);

@@ -251,6 +251,14 @@ describe('sharing a book through a link', () => {
       expect(await voices(page)).toEqual({ original: [NAM_AN], vietnamese: [HAT_DE] });
     });
 
+    it('offers a voice for a version of a single sentence once it is heard', async () => {
+      const { bookId, chapterId, page, blocks } = await inHand();
+      await translations.save({ chapterId, bookId, blocks: [{ ...blocks[0], text: 'Một câu.' }] });
+      await voice(['Một câu.']);
+
+      expect(await voices(page)).toEqual({ original: [], vietnamese: [HAT_DE] });
+    });
+
     it('plays what is stored, at no cost to the owner', async () => {
       const { page, sentences } = await inHand();
       const nothingNewSpoken = await voice(sentences);
