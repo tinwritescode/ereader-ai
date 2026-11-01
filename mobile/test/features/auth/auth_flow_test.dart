@@ -14,6 +14,7 @@ import '../listen/fake_listen_choice_store.dart';
 import '../listen/fake_speech.dart';
 import 'fake_auth_repository.dart';
 import '../tasks/fake_tasks.dart';
+import '../changelog/fake_changelog.dart';
 
 Book _book(int index) => Book(
   bookId: 'book-$index',
@@ -48,6 +49,8 @@ void main() {
         spots: FakeReadingSpotStore(),
         tasks: FakeTasksRepository(),
         taskNotices: FakeTaskNoticeStore(),
+        changelog: FakeChangelog(),
+        seenReleases: FakeSeenStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/a.epub', fileName: 'a.epub'),
       ),

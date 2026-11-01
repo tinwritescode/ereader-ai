@@ -12,6 +12,7 @@ import '../test/features/books/fake_reading_spot_store.dart';
 import '../test/features/listen/fake_listen_choice_store.dart';
 import '../test/features/listen/fake_speech.dart';
 import '../test/features/tasks/fake_tasks.dart';
+import '../test/features/changelog/fake_changelog.dart';
 
 /// Walks the app on sample data for `tool/capture_screenshots.sh`, which saves
 /// a screenshot each time this prints `SCREEN:<name>`.
@@ -47,6 +48,8 @@ void main() {
         }),
         tasks: FakeTasksRepository(),
         taskNotices: FakeTaskNoticeStore(),
+        changelog: FakeChangelog(),
+        seenReleases: FakeSeenStore(),
         pickEpub: () async => null,
       ),
     );

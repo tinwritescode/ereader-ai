@@ -22,6 +22,7 @@ import 'features/books/fake_reading_spot_store.dart';
 import 'features/listen/fake_listen_choice_store.dart';
 import 'features/listen/fake_speech.dart';
 import 'features/tasks/fake_tasks.dart';
+import 'features/changelog/fake_changelog.dart';
 
 void main() {
   Future<FakeBooksRepository> pumpApp(
@@ -50,6 +51,8 @@ void main() {
         spots: spots ?? FakeReadingSpotStore(),
         tasks: FakeTasksRepository(),
         taskNotices: FakeTaskNoticeStore(),
+        changelog: FakeChangelog(),
+        seenReleases: FakeSeenStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/loeb.epub', fileName: 'loeb.epub'),
       ),

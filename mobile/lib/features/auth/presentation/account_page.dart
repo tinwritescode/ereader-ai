@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../app/theme.dart';
 import '../../books/presentation/bloc/library_bloc.dart';
 import '../../books/presentation/widgets.dart';
+import '../../changelog/presentation/changelog_cubit.dart';
+import '../../changelog/presentation/changelog_page.dart';
 import 'account_widgets.dart';
 import 'admin_page.dart';
 import 'auth_cubit.dart';
@@ -71,11 +73,52 @@ class _AccountPageState extends State<AccountPage> {
             label: 'Quản trị',
             onPressed: () => Navigator.of(context).push(AdminPage.route()),
           ),
+        const _ChangelogLink(),
         InkLink(
           label: 'Đăng xuất',
           onPressed: context.read<AuthCubit>().signOut,
         ),
       ],
+    );
+  }
+}
+
+/// What changed, with the newest version written beside it; marked until it is read.
+class _ChangelogLink extends StatelessWidget {
+  const _ChangelogLink();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<ChangelogCubit>().state;
+    final newest = state.newest;
+    return TextButton(
+      onPressed: () => Navigator.of(context).push(ChangelogPage.route()),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Có gì mới',
+              style: readingStyle(
+                size: 15,
+                weight: FontWeight.w600,
+                color: Palette.ink,
+              ),
+            ),
+          ),
+          if (newest != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              color: state.unseen ? Palette.marker : null,
+              child: Text(
+                'bản ${newest.version}',
+                style: handStyle(
+                  size: 20,
+                  color: state.unseen ? Palette.red : Palette.muted,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

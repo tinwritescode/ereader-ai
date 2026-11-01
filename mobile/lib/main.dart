@@ -9,6 +9,11 @@ import 'features/auth/domain/auth_repository.dart';
 import 'features/auth/presentation/auth_cubit.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/books/data/datasources/epub_picker.dart';
+import 'features/changelog/data/changelog_repository_impl.dart';
+import 'features/changelog/data/prefs_seen_release_store.dart';
+import 'features/changelog/domain/release.dart';
+import 'features/changelog/presentation/changelog_cubit.dart';
+import 'features/changelog/presentation/release_notices.dart';
 import 'features/books/data/repositories/books_repository_impl.dart';
 import 'features/books/data/repositories/prefs_reading_look_store.dart';
 import 'features/books/data/repositories/prefs_reading_spot_store.dart';
@@ -64,6 +69,8 @@ void main() {
       pickEpub: pickEpubFromDevice,
       tasks: TasksRepositoryImpl(api),
       taskNotices: PrefsTaskNoticeStore(),
+      changelog: ChangelogRepositoryImpl(api),
+      seenReleases: PrefsSeenReleaseStore(),
     ),
   );
 }
@@ -80,6 +87,8 @@ class EReaderApp extends StatelessWidget {
     required this.pickEpub,
     required this.tasks,
     required this.taskNotices,
+    required this.changelog,
+    required this.seenReleases,
   });
 
   final AuthRepository auth;
@@ -91,6 +100,8 @@ class EReaderApp extends StatelessWidget {
   final PickEpub pickEpub;
   final TasksRepository tasks;
   final TaskNoticeStore taskNotices;
+  final ChangelogRepository changelog;
+  final SeenReleaseStore seenReleases;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +121,7 @@ class EReaderApp extends StatelessWidget {
                 LibraryBloc(repository: repository, pickEpub: pickEpub),
           ),
           BlocProvider(create: (_) => TasksCubit(tasks, taskNotices)),
+          BlocProvider(create: (_) => ChangelogCubit(changelog, seenReleases)),
           BlocProvider(create: (_) => ReadingLookCubit(looks)..load()),
           BlocProvider(create: (_) => ReadingSpotsCubit(spots)..load()),
           // Lives above the pages: the voice goes on when a book is closed.
@@ -123,7 +135,8 @@ class EReaderApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: buildTheme(),
             navigatorKey: appNavigator,
-            builder: (_, child) => TaskNotices(child: child!),
+            builder: (_, child) =>
+                TaskNotices(child: ReleaseNotices(child: child!)),
             home: const AuthGate(),
           ),
         ),

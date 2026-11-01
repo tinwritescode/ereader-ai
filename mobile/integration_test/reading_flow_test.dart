@@ -12,6 +12,7 @@ import 'package:integration_test/integration_test.dart';
 
 import '../test/features/auth/fake_auth_repository.dart';
 import '../test/features/tasks/fake_tasks.dart';
+import '../test/features/changelog/fake_changelog.dart';
 
 /// Runs on a simulator against a live backend that already holds one imported book for the account of `ACCESS_TOKEN`:
 /// `flutter test integration_test --dart-define=API_BASE_URL=http://localhost:3013`.
@@ -51,6 +52,8 @@ void main() {
           spots: PrefsReadingSpotStore(),
           tasks: FakeTasksRepository(),
           taskNotices: FakeTaskNoticeStore(),
+          changelog: FakeChangelog(),
+          seenReleases: FakeSeenStore(),
           pickEpub: () async => null,
         ),
       );

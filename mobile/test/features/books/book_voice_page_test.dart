@@ -12,6 +12,7 @@ import '../tasks/fake_tasks.dart';
 import 'fake_books_repository.dart';
 import 'fake_reading_look_store.dart';
 import 'fake_reading_spot_store.dart';
+import '../changelog/fake_changelog.dart';
 
 void main() {
   Future<void> openBook(
@@ -32,6 +33,8 @@ void main() {
         spots: FakeReadingSpotStore(),
         tasks: tasks,
         taskNotices: FakeTaskNoticeStore(),
+        changelog: FakeChangelog(),
+        seenReleases: FakeSeenStore(),
         pickEpub: () async =>
             const EpubSource(path: '/tmp/a.epub', fileName: 'a.epub'),
       ),
