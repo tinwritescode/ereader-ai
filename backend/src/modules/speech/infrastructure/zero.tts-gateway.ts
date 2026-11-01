@@ -7,6 +7,10 @@ import { SAMPLE_RATE, SAYABLE, SILENCE, samplesOf, wavOf } from './wav';
 const TIMEOUT_MS = 120_000;
 // Bumped when the audio changes, so clips kept under the old code are not served.
 const CODE_PREFIX = 'zero2-';
+const ATTEMPTS = 3;
+// Cloud Run turns requests away while it starts another instance.
+const BUSY_WAIT_MS = 5_000;
+const BUSY_STATUSES = [429, 500, 503];
 // The service trims each clip tight, so sentences played in a row would run together.
 const BREATH_AFTER_SENTENCE = Buffer.alloc(Math.round(SAMPLE_RATE * 0.4) * 2);
 
@@ -32,6 +36,7 @@ export type ZeroOptions = {
   url: string;
   apiKey: string;
   timeoutMs?: number;
+  busyWaitMs?: number;
   /** Replaced in tests. */
   fetch?: typeof globalThis.fetch;
 };
@@ -48,10 +53,12 @@ export function zeroOptionsFromEnv(env: Record<string, string | undefined>): Zer
 export class ZeroTtsGateway implements TtsGateway {
   private readonly fetch: typeof globalThis.fetch;
   private readonly timeoutMs: number;
+  private readonly busyWaitMs: number;
 
   constructor(private readonly options: ZeroOptions) {
     this.fetch = options.fetch ?? globalThis.fetch;
     this.timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
+    this.busyWaitMs = options.busyWaitMs ?? BUSY_WAIT_MS;
   }
 
   async voices(): Promise<CloudVoice[]> {
@@ -61,17 +68,27 @@ export class ZeroTtsGateway implements TtsGateway {
   async speak(text: string, voiceCode: string): Promise<Buffer> {
     if (!ZERO_VOICES.some(({ code }) => code === voiceCode)) throw new TtsError('UPSTREAM_ERROR');
     if (!SAYABLE.test(text)) return wavOf(SILENCE);
+    const body = JSON.stringify({ text, voice: voiceCode.slice(CODE_PREFIX.length) });
+    for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
+      const response = await this.ask(body);
+      if (response?.ok) {
+        const samples = samplesOf(Buffer.from(await response.arrayBuffer()));
+        if (!samples) break;
+        return wavOf(Buffer.concat([samples, BREATH_AFTER_SENTENCE]));
+      }
+      if (!response || !BUSY_STATUSES.includes(response.status)) break;
+      if (attempt < ATTEMPTS) await new Promise((resolve) => setTimeout(resolve, this.busyWaitMs * attempt));
+    }
+    throw new TtsError('UPSTREAM_ERROR');
+  }
+
+  private ask(body: string): Promise<Response | null> {
     const { url, apiKey } = this.options;
-    const wav = await this.fetch(`${url}/tts`, {
+    return this.fetch(`${url}/tts`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({ text, voice: voiceCode.slice(CODE_PREFIX.length) }),
+      body,
       signal: AbortSignal.timeout(this.timeoutMs),
-    })
-      .then(async (response) => (response.ok ? Buffer.from(await response.arrayBuffer()) : null))
-      .catch(() => null);
-    const samples = wav && samplesOf(wav);
-    if (!samples) throw new TtsError('UPSTREAM_ERROR');
-    return wavOf(Buffer.concat([samples, BREATH_AFTER_SENTENCE]));
+    }).catch(() => null);
   }
 }

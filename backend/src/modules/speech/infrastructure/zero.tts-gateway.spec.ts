@@ -14,7 +14,7 @@ function gateway(answer: () => Response) {
     });
     return answer();
   };
-  return { calls, zero: new ZeroTtsGateway({ url: 'https://zero.test', apiKey: 'secret', fetch: fetchFake }) };
+  return { calls, zero: new ZeroTtsGateway({ url: 'https://zero.test', apiKey: 'secret', fetch: fetchFake, busyWaitMs: 0 }) };
 }
 
 const speech = () => new Response(new Uint8Array(wavOf(Buffer.alloc(100, 1))));
@@ -57,6 +57,23 @@ describe('ZeroTtsGateway', () => {
     const notAudio = gateway(() => new Response('oops')).zero;
     await expect(refused.speak('Chào.', MAI_CHI)).rejects.toBeInstanceOf(TtsError);
     await expect(notAudio.speak('Chào.', MAI_CHI)).rejects.toBeInstanceOf(TtsError);
+  });
+
+  it('tries again when the service is too busy, but not when it refuses', async () => {
+    const answers = [new Response('busy', { status: 429 }), new Response('busy', { status: 503 }), speech()];
+    const busy = gateway(() => answers.shift() ?? speech());
+    await expect(busy.zero.speak('Chào.', MAI_CHI)).resolves.toBeInstanceOf(Buffer);
+    expect(busy.calls).toHaveLength(3);
+
+    const refused = gateway(() => new Response('no', { status: 401 }));
+    await expect(refused.zero.speak('Chào.', MAI_CHI)).rejects.toBeInstanceOf(TtsError);
+    expect(refused.calls).toHaveLength(1);
+  });
+
+  it('gives up when the service stays busy', async () => {
+    const busy = gateway(() => new Response('busy', { status: 429 }));
+    await expect(busy.zero.speak('Chào.', MAI_CHI)).rejects.toBeInstanceOf(TtsError);
+    expect(busy.calls).toHaveLength(3);
   });
 
   it('stays off until the service is configured', () => {
