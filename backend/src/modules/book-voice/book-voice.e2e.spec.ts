@@ -15,6 +15,7 @@ import { InMemorySpeechClipIndex } from '../speech/application/speech-clip-index
 import { TTS_GATEWAY, TtsError, TtsGateway } from '../speech/application/tts-gateway';
 import { CloudVoice } from '../speech/domain/cloud-voice';
 import { planSpeech } from '../speech/domain/speech-plan';
+import { VieneuTtsGateway } from '../speech/infrastructure/vieneu.tts-gateway';
 import { SpeechModule } from '../speech/speech.module';
 import { CHAPTER_TRANSLATIONS, InMemoryChapterTranslations } from '../translation/application/translation-stores';
 import { BOOK_VOICE_STORE, InMemoryBookVoiceStore } from './application/book-voice-store';
@@ -59,7 +60,7 @@ describe('voicing a whole book', () => {
   let store: InMemoryBookVoiceStore;
   let translations: InMemoryChapterTranslations;
 
-  const start = async () => {
+  const start = async (gateway: TtsGateway = tts) => {
     const fakes = testAccounts();
     accounts = fakes.store;
     await accounts.upsert({ id: 'max-1', email: 'max@example.com' });
@@ -70,12 +71,12 @@ describe('voicing a whole book', () => {
       imports: [
         fakes.module,
         BooksModule.register({ maxUploadBytes: 10 * 1024 * 1024, storage }),
-        SpeechModule.register({ tts, storage, index: new InMemorySpeechClipIndex() }),
+        SpeechModule.register({ tts: gateway, storage, index: new InMemorySpeechClipIndex() }),
       ],
       controllers: [BookVoiceController],
       providers: [
         BookVoiceService,
-        { provide: TTS_GATEWAY, useValue: tts },
+        { provide: TTS_GATEWAY, useValue: gateway },
         { provide: BOOK_VOICE_STORE, useValue: store },
         { provide: CHAPTER_TRANSLATIONS, useValue: translations },
         { provide: AccountSlots, useValue: new AccountSlots() },
@@ -140,6 +141,23 @@ describe('voicing a whole book', () => {
 
     const all = (await Promise.all(chapters.map(sentencesOf))).flat();
     expect([...new Set(tts.spoken)].sort()).toEqual([...new Set(all)].sort());
+  });
+
+  it('finishes a book with a sentence the voice service has nothing to say for', async () => {
+    await app.close();
+    const fetch: typeof globalThis.fetch = async (_url, init) => {
+      const { input } = JSON.parse(String(init?.body));
+      return new Response(new Uint8Array(input === '”' ? 0 : 2));
+    };
+    await start(new VieneuTtsGateway({ url: 'http://voice.test', apiKey: 'k', fetch }));
+    const { bookId, chapters } = await importBook('en');
+    const block = { blockId: 'b1', kind: 'paragraph' as const, text: 'Hết chuyện. ”' };
+    await translations.save({ chapterId: chapters[0], bookId, blocks: [block] });
+    expect(planSpeech([block])).toEqual(['Hết chuyện.', '”']);
+
+    await voice(bookId).expect(201);
+
+    expect((await settled())[0]).toMatchObject({ state: 'done', percent: 100, done: 1, total: 1 });
   });
 
   it('says how long the book will take before starting', async () => {

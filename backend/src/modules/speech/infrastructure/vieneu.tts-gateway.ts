@@ -8,6 +8,9 @@ const HEADER_BYTES = 44;
 const TIMEOUT_MS = 180_000;
 // A 429 from Cloud Run itself does not carry Retry-After.
 const THROTTLE_WAIT_SECONDS = 1;
+// A tenth of a second, so a sentence with nothing to say still plays and hands on to the next.
+const SILENCE = Buffer.alloc(SAMPLE_RATE / 5);
+const SAYABLE = /[\p{Script=Latin}\p{Nd}]/u;
 
 export const VIENEU_HAT_DE: CloudVoice = { code: 'vieneu-clone', name: 'Hạt Dẻ', gender: 'female' };
 export const TRUNG_TIN_VOICE: CloudVoice = { code: 'vieneu-trung-tin', name: 'Trung Tín', gender: 'male' };
@@ -70,8 +73,11 @@ export class VieneuTtsGateway implements TtsGateway {
     if (voice === undefined) throw new TtsError('UPSTREAM_ERROR');
     const body = JSON.stringify({ input: text, voice, response_format: 'pcm', sample_rate: SAMPLE_RATE });
     const samples = await this.request(body, Date.now() + this.timeoutMs);
-    if (samples.length === 0) throw new TtsError('UPSTREAM_ERROR');
-    return wavOf(samples);
+    if (samples.length > 0) return wavOf(samples);
+    // The service drops what it cannot say and answers 200 with no audio, as it also does when it
+    // fails mid-stream, so only text with nothing to say may pass for silence: clips are stored.
+    if (SAYABLE.test(text)) throw new TtsError('UPSTREAM_ERROR');
+    return wavOf(SILENCE);
   }
 
   private async request(body: string, deadline: number): Promise<Buffer> {

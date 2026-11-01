@@ -61,6 +61,18 @@ describe('VieneuTtsGateway', () => {
     await expect(gatewayAnswering(audio([])).gateway.speak('Xin chào.', VIENEU_HAT_DE.code)).rejects.toThrow(TtsError);
   });
 
+  it.each(['—', '”', '” ”', '•', '中'])('hears %s as a moment of silence, since the service has nothing to say for it', async (text) => {
+    const spoken = await gatewayAnswering(audio([])).gateway.speak(text, VIENEU_HAT_DE.code);
+
+    expect(spoken.subarray(0, 4).toString('latin1')).toBe('RIFF');
+    expect(spoken.readUInt32LE(40)).toBeGreaterThan(0);
+    expect(spoken.subarray(44).every((byte) => byte === 0)).toBe(true);
+  });
+
+  it('still refuses empty audio for a number, which the service can read', async () => {
+    await expect(gatewayAnswering(audio([])).gateway.speak('16', VIENEU_HAT_DE.code)).rejects.toThrow(TtsError);
+  });
+
   it('refuses a voice it does not have, without calling the service', async () => {
     const { calls, gateway } = gatewayAnswering();
     await expect(gateway.speak('Xin chào.', 'nobody')).rejects.toThrow(TtsError);
