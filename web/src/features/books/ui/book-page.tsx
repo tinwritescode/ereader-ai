@@ -59,7 +59,7 @@ function ChapterList({
             data-index={index}
             type="button"
             data-current={chapter.chapterId === currentId || undefined}
-            className="row group absolute top-0 left-0 flex min-h-14 w-full items-start gap-2.5 border-t-[1.5px] border-[rgb(42_31_110/0.42)] pr-(--pad) pb-line pl-[calc(var(--m)+var(--gap))] text-left marker-sweep"
+            className="row group absolute top-0 left-0 flex min-h-14 w-full items-start gap-2.5 border-t-[1.5px] border-ink/42 pr-(--pad) pb-line pl-[calc(var(--m)+var(--gap))] text-left marker-sweep"
             style={{ transform: `translateY(${start - virtual.options.scrollMargin}px)` }}
             onClick={() => onChoose(chapter)}
           >

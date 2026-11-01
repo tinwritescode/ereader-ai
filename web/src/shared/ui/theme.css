@@ -45,12 +45,25 @@
   --ease-hand: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-hinge: cubic-bezier(0.3, 1.35, 0.5, 1);
   --animate-draw-down: draw-down 700ms var(--ease-hand) both;
+  --animate-snowfall: snowfall 3200ms linear both;
   @keyframes draw-down {
     from {
       transform: scaleY(0);
     }
   }
+  @keyframes snowfall {
+    90% {
+      opacity: 1;
+    }
+    to {
+      translate: var(--drift) calc(100dvh + 40px);
+      rotate: 200deg;
+      opacity: 0;
+    }
+  }
 }
+
+@custom-variant noel (&:where(.noel, .noel *));
 
 :root {
   /* Left of --m is the margin. */
@@ -75,6 +88,23 @@
   --color-rose: #3a3370;
   --color-track: #3a3370;
   --color-marker: #3a3370;
+}
+/* Christmas in the same notebook: a fir-green pen, cranberry for the red, a gold marker. */
+.noel {
+  --color-paper: #f3f7f4;
+  --color-ink: #14543f;
+  --color-text: #14261f;
+  --color-muted: #4f6b62;
+  --color-rule: #c8ded2;
+  --color-red: #c5233a;
+  --color-rose: #f2c7c9;
+  --color-ruler: #fbeeb8;
+  --color-ruler-edge: #cda63a;
+  --color-marker: #f6d874;
+  --color-track: #dcebe3;
+  --color-plum: #14543f;
+  --color-pen: #c5233a;
+  --color-butter: #f6d874;
 }
 
 @layer base {
@@ -106,6 +136,7 @@
     line-height: 56px;
     font-weight: 600;
     color: var(--color-ink);
+    text-wrap: balance;
   }
   mark {
     background: var(--color-marker);
@@ -228,8 +259,35 @@
     }
   }
   &[data-status='active']::after,
+  &[aria-checked='true']::after,
   &:focus-visible::after {
     clip-path: inset(0);
+  }
+}
+/* What has settled on a book at Christmas. An opening cover shakes it off; it drifts back after. */
+@utility snow-cap {
+  position: absolute;
+  top: -8px;
+  left: -2px;
+  display: none;
+  width: calc(100% + 4px);
+  height: 24px;
+  pointer-events: none;
+  transform-origin: bottom;
+  transition:
+    translate 500ms var(--ease-hand) 300ms,
+    opacity 500ms var(--ease-hand) 300ms;
+  @variant noel {
+    display: block;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    :is(a:hover, a:focus-visible, a:active) & {
+      translate: 0 30px;
+      opacity: 0;
+      transition-duration: 300ms;
+      transition-delay: 0ms;
+      transition-timing-function: ease-in;
+    }
   }
 }
 @utility voice-row {
@@ -285,6 +343,16 @@
     font-weight: 600;
     color: var(--color-ink);
   }
+}
+
+/* Snow lands on the books as the last of it falls past them. */
+@keyframes settle {
+  from {
+    transform: scaleY(0);
+  }
+}
+[data-snowing] [data-snow] {
+  animation: settle 700ms var(--ease-hand) 1800ms backwards;
 }
 
 /* A book's cover flies between the shelf and its page; the page itself only crossfades. */

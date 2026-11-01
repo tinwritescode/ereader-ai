@@ -44,6 +44,15 @@ export function BookCover({ book }: { book: Book }) {
       <span data-cover className={COVER}>
         <Front book={book} />
       </span>
+      {/* Christmas only. Opening the book shakes it off. */}
+      <svg data-snow className="snow-cap" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          className="fill-sheet stroke-ink/50"
+          d="M0 7C6 2 15 1 26 3s19-2 30-1 21 2 28 1 13 1 16 4c1 2-1 3-3 3-3 0-4 2-7 2s-4-3-8-3-5 1-10 1-6 3-10 3-5-3-9-3-7 1-11 1-5-2-10-2-9 2-13 1S-1 9 0 7Z"
+          vectorEffect="non-scaling-stroke"
+          strokeWidth="1"
+        />
+      </svg>
     </span>
   )
 }
