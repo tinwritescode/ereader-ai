@@ -2,29 +2,7 @@ import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import { authMiddleware } from '~/shared/server/auth.middleware'
-import type { Book, ChapterSummary } from '../domain/book'
-
-export const BookWire = z
-  .object({
-    bookId: z.string(),
-    title: z.string(),
-    author: z.string().nullable(),
-    language: z.string().nullable(),
-    hasCover: z.boolean(),
-    chapterCount: z.int(),
-    minutes: z.int(),
-  })
-  .transform((book): Book => book)
-
-const ChapterWire = z
-  .object({
-    chapterId: z.string(),
-    label: z.string(),
-    subtitle: z.string().nullable(),
-    kind: z.enum(['main', 'front']),
-    minutes: z.int(),
-  })
-  .transform((chapter): ChapterSummary => chapter)
+import { BookWire, ChapterWire } from '../domain/wire'
 
 const listBooks = createServerFn()
   .middleware([authMiddleware])

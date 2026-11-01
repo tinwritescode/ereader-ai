@@ -1,4 +1,5 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, linkOptions, useNavigate } from '@tanstack/react-router'
+import type { LinkProps } from '@tanstack/react-router'
 import { m, useReducedMotion } from 'motion/react'
 import { useDebouncedCallback } from '@tanstack/react-pacer'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
@@ -8,6 +9,7 @@ import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/bo
 import { durationLabel, errorMessage } from '~/features/books/domain/words'
 import { Button } from '~/shared/ui/button'
 import { Sheet } from '~/shared/ui/sheet'
+import type { ChapterText } from '../domain/chapter-text'
 import { lengthOptionsFor, sameOption } from '../domain/length'
 import type { LengthOption, ReaderSearch } from '../domain/length'
 import { LINE_SPACINGS, TEXT_SIZES } from '../domain/look'
@@ -101,15 +103,7 @@ function useRead(): { read: number; finished: () => boolean } {
   return { read, finished }
 }
 
-export function ReaderPage({
-  book,
-  chapters,
-  chapterId,
-  search,
-  voice = NO_VOICE,
-  bar,
-  translationNotice,
-}: {
+type ReaderSlots = {
   book: Book
   chapters: ChapterSummary[]
   chapterId: string
@@ -117,8 +111,33 @@ export function ReaderPage({
   voice?: ReaderVoice
   bar?: (blocks: TextBlock[] | null, option: LengthOption, topBlock: () => number) => ReactNode
   translationNotice?: (args: { chapterId: string; onOriginal: () => void }) => ReactNode
+}
+
+/** The page a chapter is read on, whoever is reading it; [text] and the links come from outside. */
+export function Reader({
+  book,
+  chapters,
+  chapterId,
+  search,
+  text,
+  options,
+  onChoose,
+  contents,
+  chapterLink,
+  note,
+  voice = NO_VOICE,
+  bar,
+  translationNotice,
+}: ReaderSlots & {
+  text: ChapterText
+  /** The versions on offer here. */
+  options: LengthOption[]
+  onChoose: (option: LengthOption) => void
+  contents: LinkProps
+  chapterLink: (chapter: ChapterSummary) => LinkProps
+  /** Written in the margin under the tools. */
+  note?: ReactNode
 }) {
-  const navigate = useNavigate()
   const look = readingLook.useValue()
   const [showLook, setShowLook] = useState(false)
   const option = useMemo<LengthOption>(
@@ -128,12 +147,10 @@ export function ReaderPage({
   const index = chapters.findIndex((chapter) => chapter.chapterId === chapterId)
   const chapter = chapters[index]
   const next = chapters[index + 1]
-  const text = useChapterText({ chapterId, option })
   const { read, finished } = useRead()
   const left = minutesLeft({ minutes: option.minutes, read })
   const [offer, setOffer] = useState<ReadingSpot | null>(null)
   const placed = useRef<string | null>(null)
-  const options = chapter ? lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) }) : []
   const blocks = text.kind === 'loaded' ? text.blocks : null
   const key = `${chapterId}:${option.length}:${option.minutes}`
   const { picked, clear: clearPicked } = usePickedSpot(Boolean(bar) && !voice.heardHere(option))
@@ -218,9 +235,6 @@ export function ReaderPage({
 
   if (!chapter) return <p className="failure">{errorMessage('CHAPTER_NOT_FOUND')}</p>
 
-  const choose = (chosen: LengthOption) => {
-    void navigate({ to: '.', search: { ...chosen }, replace: true })
-  }
   const original = options.find(({ length }) => length === 'original')
   const heading = chapterHeading(chapter)
   const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions', string> = {
@@ -235,11 +249,7 @@ export function ReaderPage({
       style={style}
     >
       <div className={TOOLS}>
-        <Link
-          className="pen-line text-ink no-underline md:leading-14"
-          to="/books/$bookId"
-          params={{ bookId: book.bookId }}
-        >
+        <Link className="pen-line text-ink no-underline md:leading-14" {...contents}>
           ‹ Mục lục
         </Link>
         <div
@@ -252,7 +262,7 @@ export function ReaderPage({
               key={entry.length}
               type="button"
               aria-pressed={sameOption(entry, option)}
-              onClick={() => choose(entry)}
+              onClick={() => onChoose(entry)}
             >
               {versionName(entry)}
             </button>
@@ -261,6 +271,7 @@ export function ReaderPage({
         <button type="button" className="min-h-11 text-ink" aria-label="Trang giấy" onClick={() => setShowLook(true)}>
           Aa
         </button>
+        {note}
       </div>
       <div className="relative flex-1 pt-line pr-6 pb-60 pl-(--m) lg:pb-40">
         <div className="relative max-w-(--col)">
@@ -296,10 +307,10 @@ export function ReaderPage({
           <ReaderBody
             text={text}
             voice={voice}
-            onOriginal={original ? () => choose(original) : undefined}
+            onOriginal={original ? () => onChoose(original) : undefined}
             translationNotice={translationNotice?.({
               chapterId,
-              onOriginal: () => (original ? choose(original) : undefined),
+              onOriginal: () => (original ? onChoose(original) : undefined),
             })}
           />
           {blocks && (
@@ -318,17 +329,11 @@ export function ReaderPage({
                   : 'Đây là chương cuối.'}
               </p>
               {next && (
-                <Link
-                  className="primary"
-                  to="/books/$bookId/chapters/$chapterId"
-                  params={{ bookId: book.bookId, chapterId: next.chapterId }}
-                  search={{ length: 'original', minutes: next.minutes }}
-                  viewTransition={{ types: ['page-turn'] }}
-                >
+                <Link className="primary" {...chapterLink(next)}>
                   {`Đọc ${chapterName(next)}`}
                 </Link>
               )}
-              <Link className={next ? 'ink-link' : 'primary'} to="/books/$bookId" params={{ bookId: book.bookId }}>
+              <Link className={next ? 'ink-link' : 'primary'} {...contents}>
                 Về danh sách chương
               </Link>
             </div>
@@ -363,6 +368,34 @@ export function ReaderPage({
   )
 }
 
+export function ReaderPage(slots: ReaderSlots) {
+  const { book, chapters, chapterId, search } = slots
+  const navigate = useNavigate()
+  const { bookId } = book
+  const chapter = chapters.find((entry) => entry.chapterId === chapterId)
+  const option = useMemo<LengthOption>(
+    () => ({ length: search.length, minutes: search.minutes }),
+    [search.length, search.minutes],
+  )
+  return (
+    <Reader
+      {...slots}
+      text={useChapterText({ chapterId, option })}
+      options={chapter ? lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) }) : []}
+      onChoose={(chosen) => void navigate({ to: '.', search: { ...chosen }, replace: true })}
+      contents={linkOptions({ to: '/books/$bookId', params: { bookId } })}
+      chapterLink={(next) =>
+        linkOptions({
+          to: '/books/$bookId/chapters/$chapterId',
+          params: { bookId, chapterId: next.chapterId },
+          search: { length: 'original', minutes: next.minutes },
+          viewTransition: { types: ['page-turn'] },
+        })
+      }
+    />
+  )
+}
+
 function DigestLimit({ onOriginal, onClose }: { onOriginal: (() => void) | undefined; onClose: () => void }) {
   return (
     <Sheet title="Hết lượt rút gọn tháng này" onClose={onClose}>
@@ -382,7 +415,7 @@ function ReaderBody({
   onOriginal,
   translationNotice,
 }: {
-  text: ReturnType<typeof useChapterText>
+  text: ChapterText
   voice: ReaderVoice
   onOriginal: (() => void) | undefined
   translationNotice: ReactNode

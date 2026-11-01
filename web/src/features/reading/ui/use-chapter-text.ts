@@ -1,17 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
-import type { TextBlock } from '~/features/books/domain/book'
 import { codeOf } from '~/features/books/domain/words'
 import { originalQuery, shortenedQuery, translatedQuery } from '../data/text'
+import type { ChapterText } from '../domain/chapter-text'
 import type { LengthOption } from '../domain/length'
 
 const TRANSLATION_POLL_MS = 4000
-
-export type ChapterText =
-  | { kind: 'loading'; shortening: boolean }
-  | { kind: 'loaded'; blocks: TextBlock[] }
-  /** The translation is not made yet; the original stands in, faded, until it is. */
-  | { kind: 'untranslated'; blocks: TextBlock[] }
-  | { kind: 'failed'; code: string; retry: () => void }
 
 export function useChapterText({ chapterId, option }: { chapterId: string; option: LengthOption }): ChapterText {
   const { length, minutes } = option

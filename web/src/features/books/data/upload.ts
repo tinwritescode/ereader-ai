@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BookWire } from './books'
+import { BookWire } from '../domain/wire'
 import type { Book } from '../domain/book'
 
 const Failure = z.object({ code: z.string() })

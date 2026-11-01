@@ -86,23 +86,22 @@ function ChapterList({
 }
 
 type Slots = {
-  chooseLength: (choice: LengthChoice) => ReactNode
   aside?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   resume?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   markOf?: (book: Book, chapter: ChapterSummary, fallback: ReactNode) => ReactNode
   currentId?: string | null
 }
 
-export function BookPage({
-  bookId,
-  chooseLength,
+/** A book's page, whoever is reading it. */
+export function BookView({
+  book,
+  chapters,
+  onChoose,
   aside,
   resume,
   markOf,
   currentId = null,
-}: { bookId: string } & Slots) {
-  const { book, chapters } = useShelf(bookId)
-  const [chosen, setChosen] = useState<ChapterSummary | null>(null)
+}: { book: Book; chapters: ChapterSummary[]; onChoose: (chapter: ChapterSummary) => void } & Slots) {
   const front = chapters.filter(({ kind }) => kind === 'front')
   const [frontOpen, setFrontOpen] = useState(front.some(({ chapterId }) => chapterId === currentId))
   return (
@@ -134,9 +133,23 @@ export function BookPage({
       <ChapterList
         chapters={frontOpen ? chapters : chapters.filter(({ kind }) => kind === 'main')}
         currentId={currentId}
-        onChoose={setChosen}
+        onChoose={onChoose}
         markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}
       />
+    </>
+  )
+}
+
+export function BookPage({
+  bookId,
+  chooseLength,
+  ...slots
+}: { bookId: string; chooseLength: (choice: LengthChoice) => ReactNode } & Slots) {
+  const { book, chapters } = useShelf(bookId)
+  const [chosen, setChosen] = useState<ChapterSummary | null>(null)
+  return (
+    <>
+      <BookView book={book} chapters={chapters} onChoose={setChosen} {...slots} />
       {chosen && chooseLength({ book, chapters, chapter: chosen, onClose: () => setChosen(null) })}
     </>
   )

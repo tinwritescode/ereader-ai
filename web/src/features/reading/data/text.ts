@@ -2,13 +2,10 @@ import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 import type { TextBlock } from '~/features/books/domain/book'
+import { TextBlockWire } from '~/features/books/domain/wire'
 import { authMiddleware } from '~/shared/server/auth.middleware'
 
-const Blocks = z.object({
-  blocks: z.array(
-    z.object({ kind: z.enum(['heading', 'paragraph']), text: z.string() }).transform((block): TextBlock => block),
-  ),
-})
+const Blocks = z.object({ blocks: z.array(TextBlockWire) })
 
 const ChapterInput = z.object({ chapterId: z.string().min(1) })
 const path = (chapterId: string) => `/chapters/${encodeURIComponent(chapterId)}`
