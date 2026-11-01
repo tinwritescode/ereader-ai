@@ -40,7 +40,7 @@ export function gwenOptionsFromEnv(env: Record<string, string | undefined>): Gwe
   };
 }
 
-/** The Gwen-TTS service on Modal, cloning a voice from a reference clip sent with every call. */
+/** Our own Gwen-TTS service, cloning a voice from a reference clip sent with every call. */
 export class GwenTtsGateway implements TtsGateway {
   private readonly fetch: typeof globalThis.fetch;
   private readonly timeoutMs: number;
