@@ -31,10 +31,31 @@ test.describe('listening', () => {
     await open(page, CHAPTER)
     await page.getByRole('button', { name: 'Nghe', exact: true }).click()
     await expect(page.locator('mark')).toHaveText('Đầu chương deep-1')
-    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', { timeout: 10_000 })
-    await expect(page.locator('mark')).toHaveText('Câu thứ hai rất ngắn.', { timeout: 10_000 })
+    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', {
+      timeout: 10_000,
+    })
+    await expect(page.locator('mark')).toHaveText('Câu thứ hai rất ngắn.', {
+      timeout: 10_000,
+    })
     // Moving on needs the clip's `ended` event, so the audio really played.
     expect((await stub.state()).speechCalls).toContain('Câu thứ hai rất ngắn.')
+  })
+
+  test('while sentences come in the chestnut hops along them, then sings as reading starts', async ({ page }) => {
+    await signIn(page)
+    await stub.set({ speechDelay: 400 })
+    await open(page, CHAPTER)
+    await page.getByRole('button', { name: 'Nghe', exact: true }).click()
+    const nut = page.locator('[data-nut]')
+    await expect(page.getByText(/^Đã có 0 trên \d+ câu$/)).toBeVisible()
+    const start = await nut.boundingBox()
+    await expect(nut).toHaveAttribute('data-nut', 'singing', {
+      timeout: 10_000,
+    })
+    await expect(page.getByText(/bắt đầu đọc\.$/)).toBeVisible()
+    await expect.poll(async () => (await nut.boundingBox())?.x).toBeGreaterThan(start?.x ?? Infinity)
+    await expect(page.getByRole('button', { name: 'Tạm dừng' })).toBeVisible()
+    await expect(nut).toHaveCount(0)
   })
 
   test('selecting a sentence reads from that sentence, and a plain click does not', async ({ page }) => {
@@ -50,7 +71,9 @@ test.describe('listening', () => {
       if (text) document.getSelection()?.setBaseAndExtent(text, at, text, at + 3)
     })
     await page.getByRole('button', { name: 'Nghe từ câu này' }).click()
-    await expect(page.locator('mark')).toHaveText('Câu thứ hai rất ngắn.', { timeout: 10_000 })
+    await expect(page.locator('mark')).toHaveText('Câu thứ hai rất ngắn.', {
+      timeout: 10_000,
+    })
   })
 
   test('the keyboard pauses and moves between sentences', async ({ page }) => {
@@ -85,14 +108,18 @@ test.describe('listening', () => {
     await page.getByRole('button', { name: /Chương Một/ }).click()
     await page.getByRole('radio', { name: /Bản gốc/ }).click()
     await page.getByRole('button', { name: 'Nghe bản này' }).click()
-    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', { timeout: 10_000 })
+    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', {
+      timeout: 10_000,
+    })
   })
 
   test('the voice keeps going on other pages, and the library offers to go on listening', async ({ page }) => {
     await signIn(page)
     await open(page, CHAPTER)
     await page.getByRole('button', { name: 'Nghe', exact: true }).click()
-    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', { timeout: 10_000 })
+    await expect(page.locator('mark')).toHaveText('Câu thứ nhất của deep-1.', {
+      timeout: 10_000,
+    })
     await page.getByRole('link', { name: '‹ Mục lục' }).click()
     await expect(page.getByRole('region', { name: 'Đang nghe' })).toContainText('Deep Work')
     await page.getByRole('link', { name: 'Thư viện' }).click()
@@ -153,7 +180,9 @@ test.describe('whole book and tasks', () => {
     await page.getByRole('link', { name: '‹ Thư viện' }).click()
     await page.getByRole('link', { name: /Tác vụ/ }).click()
     await expect(page.getByRole('cell', { name: 'Dịch cả sách' })).toBeVisible()
-    await expect(page.getByText('Đã dịch xong Deep Work.')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Đã dịch xong Deep Work.')).toBeVisible({
+      timeout: 20_000,
+    })
     await expect(page.getByRole('region', { name: 'Đã xong' })).toContainText('Deep Work')
   })
 
@@ -170,7 +199,9 @@ test.describe('whole book and tasks', () => {
     await signIn(page)
     await stub.task(queuedTask)
     await open(page, '/tasks')
-    const cancel = page.getByRole('button', { name: 'Huỷ Chương Một, Deep Work' })
+    const cancel = page.getByRole('button', {
+      name: 'Huỷ Chương Một, Deep Work',
+    })
     await cancel.focus()
     await page.waitForResponse((response) => response.url().includes('/_serverFn/'), { timeout: 6000 })
     await page.waitForTimeout(300)
@@ -186,7 +217,9 @@ test.describe('whole book and tasks', () => {
     await expect(row).toBeVisible()
     await page.getByRole('button', { name: 'Huỷ Chương Một, Deep Work' }).click()
     await expect(row).toHaveCount(0)
-    await expect(page.getByText(/Chưa huỷ được/)).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText(/Chưa huỷ được/)).toBeVisible({
+      timeout: 5000,
+    })
     await expect(row).toBeVisible()
     await stub.set({ cancelDelay: 0, cancelFails: false })
     await page.getByRole('button', { name: 'Huỷ Chương Một, Deep Work' }).click()

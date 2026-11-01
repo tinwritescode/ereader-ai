@@ -10,4 +10,6 @@ export function preparingLine({ ready, needed, slow }: { ready: number; needed: 
   return needed === 0 ? 'Đang chuẩn bị giọng đọc' : `Đã có ${ready} trên ${needed} câu`
 }
 
+export const startingLine = (voice: string) => `${voice} bắt đầu đọc.`
+
 export const rateLabel = (rate: number) => `${String(rate).replace('.', ',')}x`

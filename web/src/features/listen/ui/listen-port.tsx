@@ -1,7 +1,7 @@
 import { useHotkey } from '@tanstack/react-hotkeys'
 import { m } from 'motion/react'
 import { PlayGlyph } from '~/shared/ui/play-glyph'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Book, ChapterSummary, TextBlock } from '~/features/books/domain/book'
 import { chapterName } from '~/features/books/domain/book'
@@ -12,16 +12,23 @@ import { Button } from '~/shared/ui/button'
 import type { ListenSource, ListenState } from '../domain/controller'
 import { useListenState, useListening } from './listen-provider'
 import { VoiceSheet } from './voice-sheet'
-import { failureWords, preparingLine, rateLabel } from './words'
+import type { NutMood } from './waiting-nut'
+import { WaitingNut } from './waiting-nut'
+import { failureWords, preparingLine, rateLabel, startingLine } from './words'
 
 const DOCK =
   'fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-t-3xl bg-plum px-5.5 pt-3.5 pb-4.5 text-sm text-white lg:top-0 lg:left-auto lg:w-75 lg:content-start lg:items-stretch lg:rounded-l-3xl lg:rounded-tr-none lg:p-6 [&_.ink-link]:px-0 [&_.ink-link]:text-inherit [&_button]:min-h-11'
 const START =
   'fixed inset-x-0 bottom-0 z-20 flex min-h-15.5 items-center gap-3 border-t border-rule bg-paper py-2 pr-4 pl-(--m) text-ink md:right-auto md:bottom-auto md:top-[calc(84px+36px*var(--versions)+44px+var(--note))] md:min-h-0 md:w-[calc(var(--m)-42px)] md:flex-col md:items-end md:gap-0 md:border-0 md:bg-transparent md:p-0'
 const QUIET = 'text-[13px] text-white/72'
+const SINGING_MS = 700
 
 type Marked = { block: number; start: number; end: number } | null
-export type PrepareJob = { source: ListenSource; voiceCode: string; sentences: string[] }
+export type PrepareJob = {
+  source: ListenSource
+  voiceCode: string
+  sentences: string[]
+}
 
 type Port = {
   voice: {
@@ -64,7 +71,13 @@ export function ListenPort({
           chapterId,
           chapterLabel: chapterName(chapter),
           option: chosen,
-          next: next ? { chapterId: next.chapterId, chapterLabel: chapterName(next), minutes: next.minutes } : null,
+          next: next
+            ? {
+                chapterId: next.chapterId,
+                chapterLabel: chapterName(next),
+                minutes: next.minutes,
+              }
+            : null,
         }
       : null
   const here = isHere({ state, chapterId, option })
@@ -86,7 +99,13 @@ export function ListenPort({
           minutes={shown.minutes}
           onStart={() => {
             const source = sourceFor(shown)
-            if (source) controller.request({ blocks, source, block: topBlock(), offset: 0 })
+            if (source)
+              controller.request({
+                blocks,
+                source,
+                block: topBlock(),
+                offset: 0,
+              })
           }}
           prepare={(voiceCode) => {
             const source = sourceFor(shown)
@@ -96,6 +115,23 @@ export function ListenPort({
       ),
   }
   return children(port)
+}
+
+/** How many sentences the voice waited for, for a moment after it starts reading them. */
+function useJustReady(stage: ListenState['stage']): number {
+  const waitedFor = useRef(0)
+  const [justReady, setJustReady] = useState(0)
+  useEffect(() => {
+    if (stage.kind === 'preparing') waitedFor.current = stage.needed
+    if (stage.kind === 'playing' && waitedFor.current > 0) setJustReady(waitedFor.current)
+    if (stage.kind !== 'preparing') waitedFor.current = 0
+  }, [stage])
+  useEffect(() => {
+    if (justReady === 0) return
+    const timer = setTimeout(() => setJustReady(0), SINGING_MS)
+    return () => clearTimeout(timer)
+  }, [justReady])
+  return justReady
 }
 
 function ListenBar({
@@ -116,7 +152,11 @@ function ListenBar({
   const stage = here ? state.stage : { kind: 'off' as const }
   const playing = stage.kind === 'playing'
   const docked = stage.kind !== 'off'
-  useHotkey('Space', () => controller.togglePause(), { enabled: playing, preventDefault: true })
+  const justReady = useJustReady(stage)
+  useHotkey('Space', () => controller.togglePause(), {
+    enabled: playing,
+    preventDefault: true,
+  })
   useHotkey('ArrowLeft', () => controller.skip(-1), { enabled: playing })
   useHotkey('ArrowRight', () => controller.skip(1), { enabled: playing })
   const voiceButton = (
@@ -130,6 +170,28 @@ function ListenBar({
     >
       {state.voice?.name ?? 'Chọn giọng'}
     </button>
+  )
+  const waiting = ({
+    line,
+    note,
+    ready,
+    needed,
+    mood,
+  }: {
+    line: string
+    note: ReactNode
+    ready: number
+    needed: number
+    mood: NutMood
+  }) => (
+    <>
+      <span className="min-w-0 flex-1 font-hand text-[21px]/6.5 text-butter">{line}</span>
+      <Button quiet onClick={controller.stop}>
+        Tắt
+      </Button>
+      <span className={`w-full ${QUIET}`}>{note}</span>
+      <WaitingNut ready={ready} needed={needed} mood={mood} />
+    </>
   )
   return (
     <m.div
@@ -160,21 +222,28 @@ function ListenBar({
               </>
             )
           case 'preparing':
-            return (
-              <>
-                <span>{preparingLine(stage)}</span>
-                <span className={QUIET}>
-                  {stage.slow
-                    ? 'Lượt đầu sau khi nghỉ mất khoảng một phút, các câu sau đọc ngay.'
-                    : stage.needed > 0 &&
-                      `Đủ ${stage.needed} câu là ${state.voice?.name ?? ''} đọc, để nghe liền mạch.`}
-                </span>
-                <Button quiet onClick={controller.stop}>
-                  Tắt
-                </Button>
-              </>
-            )
+            return waiting({
+              line: preparingLine(stage),
+              note: stage.slow
+                ? 'Lượt đầu sau khi nghỉ mất khoảng một phút, các câu sau đọc ngay.'
+                : stage.needed > 0 && `Đủ ${stage.needed} câu là ${state.voice?.name ?? ''} đọc, để nghe liền mạch.`,
+              ready: stage.ready,
+              needed: stage.needed,
+              mood: stage.slow ? 'asleep' : 'waiting',
+            })
           case 'playing': {
+            if (justReady > 0)
+              return waiting({
+                line: preparingLine({
+                  ready: justReady,
+                  needed: justReady,
+                  slow: false,
+                }),
+                note: startingLine(state.voice?.name ?? 'Giọng đọc'),
+                ready: justReady,
+                needed: justReady,
+                mood: 'singing',
+              })
             const left = Math.ceil(minutes * (1 - state.done))
             return (
               <>
