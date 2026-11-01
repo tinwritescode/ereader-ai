@@ -41,6 +41,15 @@
   --breakpoint-lg: 1001px;
   /* Every line of notebook text sits on this grid. */
   --spacing-line: 28px;
+  /* Motion is what a hand does to a notebook: a cover on its spine, a pen, a marker. */
+  --ease-hand: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-hinge: cubic-bezier(0.3, 1.35, 0.5, 1);
+  --animate-draw-down: draw-down 700ms var(--ease-hand) both;
+  @keyframes draw-down {
+    from {
+      transform: scaleY(0);
+    }
+  }
 }
 
 :root {
@@ -177,6 +186,52 @@
   font-weight: 600;
   text-decoration: none;
 }
+/* What is under a book's cover: ruled paper, the page edges, and the cover's shadow. */
+@utility pages {
+  border-radius: 2px 5px 5px 2px;
+  background:
+    linear-gradient(to right, transparent 58%, rgb(42 31 110 / 0.2) 76%, transparent 90%),
+    repeating-linear-gradient(to left, var(--color-rule) 0 1px, transparent 1px 3px) right / 7px 100% no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 11px, var(--color-rule) 11px 12px),
+    var(--color-sheet);
+  box-shadow: 3px 4px 0 rgb(42 31 110 / 0.16);
+}
+/* A marker drawn across, left to right. */
+@utility marker-sweep {
+  background: linear-gradient(rgb(251 227 107 / 0.45) 0 0) left / 0% 100% no-repeat;
+  transition: background-size 260ms var(--ease-hand);
+  @variant hover {
+    background-size: 100% 100%;
+  }
+  &:focus-visible {
+    background-size: 100% 100%;
+  }
+}
+/* A pen stroke drawn under a word; it stays under the page you are on. */
+@utility pen-line {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: calc(50% - 0.85em);
+    height: 7px;
+    background: var(--color-red);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 7' preserveAspectRatio='none'%3E%3Cpath d='M1 4c18-3 30 2 48 0s34-3 70 1' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+      center / 100% 100% no-repeat;
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 320ms var(--ease-hand);
+  }
+  @variant hover {
+    &::after {
+      clip-path: inset(0);
+    }
+  }
+  &[data-status='active']::after,
+  &:focus-visible::after {
+    clip-path: inset(0);
+  }
+}
 @utility voice-row {
   display: flex;
   justify-content: space-between;
@@ -229,5 +284,41 @@
     line-height: 1.4;
     font-weight: 600;
     color: var(--color-ink);
+  }
+}
+
+/* A book's cover flies between the shelf and its page; the page itself only crossfades. */
+::view-transition-group(*) {
+  animation-duration: 380ms;
+  animation-timing-function: var(--ease-hand);
+}
+::view-transition-old(root),
+::view-transition-new(root),
+/* Covers with no partner on the other page leave with the page, not after it. */
+::view-transition-old(*):only-child,
+::view-transition-new(*):only-child {
+  animation-duration: 180ms;
+}
+/* The finished chapter turns over, on the left edge, to show the next one underneath. */
+@keyframes page-turn {
+  to {
+    transform: perspective(1800px) rotateY(-100deg);
+  }
+}
+html:active-view-transition-type(page-turn)::view-transition-old(root) {
+  z-index: 1;
+  transform-origin: left center;
+  box-shadow: 10px 0 28px rgb(42 31 110 / 0.28);
+  animation: page-turn 520ms cubic-bezier(0.45, 0, 0.7, 0.6) both;
+}
+html:active-view-transition-type(page-turn)::view-transition-new(root) {
+  animation: none;
+}
+/* The rule in the base layer cannot reach these: they live outside the page's elements. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

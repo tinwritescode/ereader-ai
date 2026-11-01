@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
+import { AnimatePresence, m } from 'motion/react'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { booksQuery } from '../data/books'
@@ -72,28 +73,42 @@ export function LibraryPage({
       {continueReading}
       {books.length === 0 && <p className="soft">Chưa có sách nào. Thêm một file EPUB để bắt đầu đọc.</p>}
       <div className="grid grid-cols-2 gap-x-3.5 gap-y-line md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-x-4.5">
-        {books.map((book) => (
-          <Link
-            key={book.bookId}
-            className="block min-w-0 no-underline"
-            to="/books/$bookId"
-            params={{ bookId: book.bookId }}
-          >
-            <BookCover book={book} />
-            <b className="mt-2.5 line-clamp-2 text-sm/5 font-semibold text-ink">{book.title}</b>
-            <div className="text-[12.5px]/4.5 wrap-anywhere text-muted [&_.hand]:text-[17px]/5">
-              {book.author}
-              <div>{captionOf(book)}</div>
-            </div>
-          </Link>
-        ))}
+        <AnimatePresence initial={false}>
+          {books.map((book) => (
+            // Only a book added now arrives: it drops onto the shelf and settles.
+            <m.div
+              key={book.bookId}
+              className="min-w-0"
+              initial={{ opacity: 0, y: -48, rotate: -7 }}
+              animate={{ opacity: 1, y: 0, rotate: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 19 }}
+            >
+              <Link
+                className="group/book relative block no-underline hover:z-5 focus-visible:z-5"
+                to="/books/$bookId"
+                params={{ bookId: book.bookId }}
+                viewTransition
+              >
+                <BookCover book={book} />
+                <b className="mt-2.5 line-clamp-2 text-sm/5 font-semibold text-ink">{book.title}</b>
+                <div className="text-[12.5px]/4.5 wrap-anywhere text-muted [&_.hand]:text-[17px]/5">
+                  {book.author}
+                  <div>{captionOf(book)}</div>
+                </div>
+              </Link>
+            </m.div>
+          ))}
+        </AnimatePresence>
         <div>
           <button
             type="button"
-            className="flex aspect-[1/1.48] w-full flex-col items-center justify-center rounded-[2px_5px_5px_2px] border-[1.5px] border-dashed border-ink p-3.5 text-[13px]/4.5 font-semibold text-ink"
+            className="group/add flex aspect-[1/1.48] w-full flex-col items-center justify-center rounded-[2px_5px_5px_2px] border-[1.5px] border-dashed border-ink p-3.5 text-[13px]/4.5 font-semibold text-ink"
             onClick={() => input.current?.click()}
           >
-            <i className="font-hand text-[34px]/9 not-italic" aria-hidden="true">
+            <i
+              className="font-hand text-[34px]/9 not-italic transition-transform duration-300 ease-hinge group-hover/add:rotate-90"
+              aria-hidden="true"
+            >
               +
             </i>
             Thêm sách EPUB

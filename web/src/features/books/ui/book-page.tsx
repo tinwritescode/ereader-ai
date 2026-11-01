@@ -59,7 +59,7 @@ function ChapterList({
             data-index={index}
             type="button"
             data-current={chapter.chapterId === currentId || undefined}
-            className="row group absolute top-0 left-0 flex min-h-14 w-full items-start gap-2.5 border-t-[1.5px] border-[rgb(42_31_110/0.42)] pr-(--pad) pb-line pl-[calc(var(--m)+var(--gap))] text-left hover:bg-[rgb(251_227_107/0.45)]"
+            className="row group absolute top-0 left-0 flex min-h-14 w-full items-start gap-2.5 border-t-[1.5px] border-[rgb(42_31_110/0.42)] pr-(--pad) pb-line pl-[calc(var(--m)+var(--gap))] text-left marker-sweep"
             style={{ transform: `translateY(${start - virtual.options.scrollMargin}px)` }}
             onClick={() => onChoose(chapter)}
           >
@@ -72,7 +72,10 @@ function ChapterList({
               </b>
             </span>
             {markOf(chapter, <em className={MINUTES}>{`${chapter.minutes}'`}</em>)}
-            <i className="text-[22px]/7 not-italic text-ink" aria-hidden="true">
+            <i
+              className="text-[22px]/7 not-italic text-ink transition-transform duration-200 ease-hand group-hover:translate-x-1"
+              aria-hidden="true"
+            >
               ›
             </i>
           </button>
@@ -122,7 +125,10 @@ export function BookPage({
           aria-expanded={frontOpen}
           onClick={() => setFrontOpen(!frontOpen)}
         >
-          {`${frontOpen ? '⌄' : '›'} Phần đầu sách, ${front.length} mục`}
+          <i className="inline-block not-italic transition-transform duration-200 ease-hinge in-aria-expanded:rotate-90">
+            ›
+          </i>
+          {` Phần đầu sách, ${front.length} mục`}
         </button>
       )}
       <ChapterList

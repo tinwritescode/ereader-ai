@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router'
-import { m } from 'motion/react'
+import { m, useReducedMotion } from 'motion/react'
 import { useDebouncedCallback } from '@tanstack/react-pacer'
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
@@ -137,6 +137,7 @@ export function ReaderPage({
   const blocks = text.kind === 'loaded' ? text.blocks : null
   const key = `${chapterId}:${option.length}:${option.minutes}`
   const { picked, clear: clearPicked } = usePickedSpot(Boolean(bar) && !voice.heardHere(option))
+  const still = useReducedMotion()
 
   const goTo = useCallback((block: number) => {
     document.querySelector(`[data-block="${block}"]`)?.scrollIntoView({ block: 'start' })
@@ -234,7 +235,11 @@ export function ReaderPage({
       style={style}
     >
       <div className={TOOLS}>
-        <Link className="text-ink no-underline md:leading-14" to="/books/$bookId" params={{ bookId: book.bookId }}>
+        <Link
+          className="pen-line text-ink no-underline md:leading-14"
+          to="/books/$bookId"
+          params={{ bookId: book.bookId }}
+        >
           ‹ Mục lục
         </Link>
         <div
@@ -299,7 +304,14 @@ export function ReaderPage({
           />
           {blocks && (
             <div className="mt-8 flex flex-col gap-1.5">
-              <p className="hand origin-left -rotate-2 text-3xl">{`Xong ${chapterName(chapter)}`}</p>
+              <m.p
+                key={chapterId}
+                className="hand origin-left -rotate-2 text-3xl"
+                initial={{ clipPath: 'inset(-12px 100% -12px 0px)' }}
+                whileInView={{ clipPath: 'inset(-12px 0% -12px 0px)' }}
+                viewport={{ once: true }}
+                transition={{ duration: still ? 0 : 0.8, ease: 'easeInOut' }}
+              >{`Xong ${chapterName(chapter)}`}</m.p>
               <p className="soft">
                 {next
                   ? `Tiếp theo là ${chapterName(next)}, dài ${durationLabel(next.minutes)}.`
@@ -311,6 +323,7 @@ export function ReaderPage({
                   to="/books/$bookId/chapters/$chapterId"
                   params={{ bookId: book.bookId, chapterId: next.chapterId }}
                   search={{ length: 'original', minutes: next.minutes }}
+                  viewTransition={{ types: ['page-turn'] }}
                 >
                   {`Đọc ${chapterName(next)}`}
                 </Link>
