@@ -43,8 +43,9 @@ export class ChapterVoiceService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     for (const task of await this.store.unfinished()) {
-      await this.store.save({ ...task, state: { kind: 'queued' }, done: 0 });
-      this.enqueue(task, task.createdAt);
+      const queued: ChapterVoiceTask = { ...task, state: { kind: 'queued' }, done: 0 };
+      await this.store.save(queued);
+      this.enqueue(queued, task.createdAt);
     }
   }
 

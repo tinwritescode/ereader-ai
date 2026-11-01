@@ -212,10 +212,13 @@ describe('chapter voice tasks', () => {
     open();
     await settled();
     const stored = await store.ofAccount('max-1');
-    await store.save({ ...stored[0], state: { kind: 'running' }, done: 0 });
+    await store.save({ ...stored[0], state: { kind: 'running' }, done: 1 });
 
     await app.close();
+    tts.gate = new Promise((resolve) => (open = resolve));
     await start();
+    expect((await tasks())[0]).toMatchObject({ state: 'running', done: 0 });
+    open();
     expect((await settled())[0]).toMatchObject({ state: 'done', done: 2 });
   });
 });
