@@ -13,6 +13,8 @@ export type EpubFixtureOptions = {
   frontMatter?: boolean;
   /** Where the table of contents lives; EPUB 2 keeps it in an NCX file. */
   toc?: 'nav' | 'ncx';
+  /** Length of each of Chương Ba's two paragraphs. */
+  lastParagraphWords?: number;
 };
 
 export const COVER_PNG = Buffer.from('fake-png-bytes');
@@ -32,6 +34,7 @@ export async function buildEpub({
   frontMatter = false,
   toc = 'nav',
   writtenIn = language,
+  lastParagraphWords = 500,
 }: EpubFixtureOptions = {}): Promise<Buffer> {
   const [one, two, three] = writtenIn.startsWith('vi') ? ['một', 'hai', 'ba'] : ['one', 'two', 'three'];
   const zip = new JSZip();
@@ -88,7 +91,7 @@ export async function buildEpub({
 </body></html>`);
   zip.file('OEBPS/text/c2.xhtml', `<html xmlns="http://www.w3.org/1999/xhtml"><body>
 <h1>Chương Ba</h1>
-<div><p>${words(500, three)}</p><p>${words(500, three)}</p></div>
+<div><p>${words(lastParagraphWords, three)}</p><p>${words(lastParagraphWords, three)}</p></div>
 </body></html>`);
   return zip.generateAsync({ type: 'nodebuffer' });
 }

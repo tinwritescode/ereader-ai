@@ -1,9 +1,11 @@
 import { InMemoryTaskTable, TaskTable } from '../../../shared/tasks/task-table';
 import { Block } from '../../books/domain/book';
 import { BookTranslationTask } from '../domain/book-translation';
+import { StyleSheet } from './translation-prompt';
 
 export const BOOK_TRANSLATION_STORE = Symbol('BOOK_TRANSLATION_STORE');
 export const CHAPTER_TRANSLATIONS = Symbol('CHAPTER_TRANSLATIONS');
+export const STYLE_SHEETS = Symbol('STYLE_SHEETS');
 
 export type BookTranslationStore = TaskTable<BookTranslationTask>;
 
@@ -35,5 +37,24 @@ export class InMemoryChapterTranslations implements ChapterTranslations {
 
   async translatedOf(bookId: string): Promise<string[]> {
     return [...this.chapters.values()].filter((chapter) => chapter.bookId === bookId).map(({ chapterId }) => chapterId);
+  }
+}
+
+/** One style sheet per book. The first one saved stays, so later chapters never contradict earlier ones. */
+export interface StyleSheets {
+  save(bookId: string, sheet: StyleSheet): Promise<void>;
+  find(bookId: string): Promise<StyleSheet | null>;
+}
+
+/** For development and tests: forgotten on restart. */
+export class InMemoryStyleSheets implements StyleSheets {
+  private readonly sheets = new Map<string, StyleSheet>();
+
+  async save(bookId: string, sheet: StyleSheet): Promise<void> {
+    if (!this.sheets.has(bookId)) this.sheets.set(bookId, sheet);
+  }
+
+  async find(bookId: string): Promise<StyleSheet | null> {
+    return this.sheets.get(bookId) ?? null;
   }
 }

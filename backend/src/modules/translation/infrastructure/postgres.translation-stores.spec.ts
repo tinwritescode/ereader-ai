@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import { BookTranslationTask } from '../domain/book-translation';
-import { PostgresBookTranslationStore, PostgresChapterTranslations } from './postgres.translation-stores';
+import { PostgresBookTranslationStore, PostgresChapterTranslations, PostgresStyleSheets } from './postgres.translation-stores';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -9,6 +9,7 @@ const url = process.env.TEST_DATABASE_URL;
 
   afterAll(async () => {
     await pool.query(`DELETE FROM chapter_translations WHERE book_id = 'store-spec'`);
+    await pool.query(`DELETE FROM translation_style_sheets WHERE book_id = 'store-spec'`);
     await pool.query(`DELETE FROM book_translation_tasks WHERE account_id = 'store-spec'`);
     await pool.end();
   });
@@ -23,6 +24,15 @@ const url = process.env.TEST_DATABASE_URL;
     expect(await chapters.find('spec-c1')).toEqual([block('Một lần nữa.')]);
     expect(await chapters.find('spec-missing')).toBeNull();
     expect((await chapters.translatedOf('store-spec')).sort()).toEqual(['spec-c1', 'spec-c2']);
+  });
+
+  it('keeps one style sheet per book, the first written', async () => {
+    const sheets = new PostgresStyleSheets(pool);
+    const sheet = (voice: string) => ({ voice, narrator: 'tôi', characters: [], address: [], terms: [] });
+    expect(await sheets.find('store-spec')).toBeNull();
+    await sheets.save('store-spec', sheet('Đầu tiên.'));
+    await sheets.save('store-spec', sheet('Về sau.'));
+    expect(await sheets.find('store-spec')).toEqual(sheet('Đầu tiên.'));
   });
 
   it('keeps a task whole, with its dates', async () => {

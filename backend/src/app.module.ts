@@ -31,10 +31,13 @@ import {
   CHAPTER_TRANSLATIONS,
   InMemoryBookTranslationStore,
   InMemoryChapterTranslations,
+  InMemoryStyleSheets,
+  STYLE_SHEETS,
 } from './modules/translation/application/translation-stores';
 import {
   PostgresBookTranslationStore,
   PostgresChapterTranslations,
+  PostgresStyleSheets,
 } from './modules/translation/infrastructure/postgres.translation-stores';
 import { BookTranslationController } from './modules/translation/presentation/book-translation.controller';
 
@@ -76,6 +79,7 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
     { provide: AccountSlots, useValue: slots },
     { provide: BOOK_TRANSLATION_STORE, useValue: pool ? new PostgresBookTranslationStore(pool) : new InMemoryBookTranslationStore() },
     { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },
+    { provide: STYLE_SHEETS, useValue: pool ? new PostgresStyleSheets(pool) : new InMemoryStyleSheets() },
     { provide: LLM_GATEWAY, useFactory: () => new OpenAiCompatibleLlmGateway(llmOptionsFromEnv(process.env)) },
   ],
 })

@@ -19,10 +19,12 @@ import {
   CHAPTER_TRANSLATIONS,
   InMemoryBookTranslationStore,
   InMemoryChapterTranslations,
+  InMemoryStyleSheets,
+  STYLE_SHEETS,
 } from './application/translation-stores';
 import { BookTranslationController } from './presentation/book-translation.controller';
 
-type Input = { blocks: { id: string; text: string }[] };
+type Input = { blocks: { id: string; text: string; draft?: string }[]; previous_translation?: string[] };
 type Task = {
   id: string;
   state: string;
@@ -37,10 +39,20 @@ type Task = {
 const hasBlocks = (input: unknown): input is Input =>
   typeof input === 'object' && input !== null && 'blocks' in input && Array.isArray(input.blocks);
 
-/** Answers each block with its text marked as translated. */
+const SHEET = {
+  voice: 'Giọng kể mẫu.',
+  narrator: 'tôi',
+  characters: [{ name: 'Nick', gender: 'nam', role: 'người kể' }],
+  address: [],
+  terms: [{ source: 'old sport', vietnamese: 'bạn già' }],
+};
+
+/** The style sheet first; then each block marked as translated, and each draft as edited. */
 const translate = (request: LlmCompletionRequest<unknown>) => {
-  if (!hasBlocks(request.input)) throw new Error('unexpected input');
-  return { blocks: request.input.blocks.map(({ id, text }) => ({ id, text: `VI ${text}` })) };
+  if (!hasBlocks(request.input)) return SHEET;
+  return {
+    blocks: request.input.blocks.map(({ id, text, draft }) => ({ id, text: draft === undefined ? `VI ${text}` : `ED ${draft}` })),
+  };
 };
 
 describe('translating a whole book', () => {
@@ -67,6 +79,7 @@ describe('translating a whole book', () => {
         { provide: LLM_GATEWAY, useValue: llm },
         { provide: BOOK_TRANSLATION_STORE, useValue: store },
         { provide: CHAPTER_TRANSLATIONS, useValue: translations },
+        { provide: STYLE_SHEETS, useValue: new InMemoryStyleSheets() },
         { provide: AccountSlots, useValue: new AccountSlots() },
       ],
     }).compile();
@@ -126,7 +139,7 @@ describe('translating a whole book', () => {
     const { body: original } = await http().get(`/chapters/${chapters[0]}`).set(as('max-1')).expect(200);
     const { body: translated } = await http().get(`/chapters/${chapters[0]}/translation`).set(as('max-1')).expect(200);
     expect(translated.blocks).toEqual(
-      original.blocks.map((block: { text: string }) => ({ ...block, text: `VI ${block.text}` })),
+      original.blocks.map((block: { text: string }) => ({ ...block, text: `ED VI ${block.text}` })),
     );
     const { body: book } = await http().get(`/books/${bookId}/translation`).set(as('max-1')).expect(200);
     expect([...book.translated].sort()).toEqual([...chapters].sort());
@@ -179,12 +192,83 @@ describe('translating a whole book', () => {
     expect(moved.waiting).toEqual([chapters[0], chapters[2], chapters[1]]);
   });
 
+  it('reads the book once for a style sheet, and translates every chapter under it', async () => {
+    const { bookId } = await importBook();
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+
+    const [first, ...rest] = llm.requests;
+    expect(hasBlocks(first.input)).toBe(false);
+    expect(JSON.stringify(first.input)).toContain('two');
+    expect(rest.length).toBeGreaterThan(0);
+    expect(rest.every((call) => hasBlocks(call.input) && call.instructions.includes('bạn già'))).toBe(true);
+  });
+
+  it('saves the edited text, with the English beside each draft for the editor', async () => {
+    const { bookId, chapters } = await importBook();
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+
+    const edits = llm.requests.flatMap(({ input }) => (hasBlocks(input) ? input.blocks : [])).filter(({ draft }) => draft);
+    expect(edits[0].draft).toBe(`VI ${edits[0].text}`);
+    const { body } = await http().get(`/chapters/${chapters[0]}/translation`).set(as('max-1')).expect(200);
+    expect(body.blocks[0].text).toMatch(/^ED VI /);
+  });
+
+  it('writes a long chapter in order, each part reading on from the one before', async () => {
+    const { body } = await http()
+      .post('/books')
+      .set(as('max-1'))
+      .attach('file', await buildEpub({ language: 'en', lastParagraphWords: 1_000 }), 'book.epub')
+      .expect(202);
+    await http().post(`/books/${body.bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+
+    const drafts = llm.requests.flatMap(({ input }) => (hasBlocks(input) && input.blocks[0].draft === undefined ? [input] : []));
+    const ofLongChapter = drafts.filter(({ blocks }) => blocks[0].text.startsWith('three'));
+    expect(ofLongChapter).toHaveLength(2);
+    expect(ofLongChapter[0].previous_translation).toBeUndefined();
+    expect(ofLongChapter[1].previous_translation?.join(' ')).toMatch(/^VI three/);
+  });
+
+  it('stops and hands the month back when the style sheet cannot be written, and writes it once on going on', async () => {
+    const { bookId } = await importBook();
+    llm.answer = (request) => {
+      if (!hasBlocks(request.input)) throw new LlmError('UPSTREAM_ERROR');
+      return translate(request);
+    };
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    expect((await settled())[0]).toMatchObject({ state: 'stopped', code: 'TRANSLATE_FAILED', done: 0 });
+    expect(await used()).toBe(0);
+
+    llm.answer = translate;
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    expect((await settled())[0]).toMatchObject({ state: 'done', done: 3 });
+  });
+
+  it('keeps the style sheet when a stopped book goes on', async () => {
+    const { bookId } = await importBook();
+    llm.answer = (request) => {
+      if (hasBlocks(request.input) && request.input.blocks.some(({ text }) => text.startsWith('two'))) {
+        throw new LlmError('UPSTREAM_ERROR');
+      }
+      return translate(request);
+    };
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+    llm.answer = translate;
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+    expect(llm.requests.filter(({ input }) => !hasBlocks(input))).toHaveLength(1);
+  });
+
   it('tries again when the model drops a block', async () => {
     const { bookId } = await importBook();
     let calls = 0;
     llm.answer = (request) => {
-      calls += 1;
       const answer = translate(request);
+      if (!('blocks' in answer)) return answer;
+      calls += 1;
       return calls === 1 ? { blocks: answer.blocks.slice(1).length ? answer.blocks.slice(1) : [{ id: 'x', text: 'y' }] } : answer;
     };
     await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);

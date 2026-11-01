@@ -9,7 +9,7 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { LLM_GATEWAY, LlmError, LlmGateway } from '../../../shared/llm/llm-gateway';
+import { LLM_GATEWAY, LlmCompletionRequest, LlmGateway } from '../../../shared/llm/llm-gateway';
 import { mapInBatches } from '../../../shared/map-in-batches';
 import { countWords } from '../../../shared/reading-time';
 import { AccountSlots } from '../../../shared/tasks/account-slots';
@@ -22,15 +22,37 @@ import { Block } from '../../books/domain/book';
 import {
   BookTranslationTask,
   partsOf,
+  passagesFrom,
   putFirst,
 } from '../domain/book-translation';
-import { TRANSLATION_PROMPT_VERSION, TranslationOutputSchema, translationInstructions } from './translation-prompt';
-import { BOOK_TRANSLATION_STORE, BookTranslationStore, CHAPTER_TRANSLATIONS, ChapterTranslations } from './translation-stores';
+import {
+  StyleSheet,
+  StyleSheetSchema,
+  TRANSLATION_PROMPT_VERSION,
+  TranslationOutputSchema,
+  editingInstructions,
+  styleSheetInstructions,
+  translationInstructions,
+} from './translation-prompt';
+import {
+  BOOK_TRANSLATION_STORE,
+  BookTranslationStore,
+  CHAPTER_TRANSLATIONS,
+  ChapterTranslations,
+  STYLE_SHEETS,
+  StyleSheets,
+} from './translation-stores';
 
 // About 2k tokens of English per call: small enough to come back whole, large enough to keep the context.
 const PART_WORDS = 1_200;
-const MAX_INPUT_TOKENS = 10_000;
+// Editing sends a part's English and its draft together, with the style sheet.
+const MAX_INPUT_TOKENS = 60_000;
 const PARTS_AT_ONCE = 4;
+// How much of the book the style sheet is written from.
+const SHEET_WORDS = 8_000;
+const SHEET_OUTPUT_TOKENS = 12_000;
+// Enough of what came before to keep pronouns and tone going across a part's edge.
+const BLOCKS_CARRIED = 6;
 // A model that drops or merges a block gets two more tries before the task stops.
 const TRIES = 3;
 const FINISHED_KEPT_MS = 7 * 24 * 60 * 60 * 1_000;
@@ -48,6 +70,7 @@ export class BookTranslationService implements OnApplicationBootstrap {
   constructor(
     @Inject(BOOK_TRANSLATION_STORE) private readonly store: BookTranslationStore,
     @Inject(CHAPTER_TRANSLATIONS) private readonly translations: ChapterTranslations,
+    @Inject(STYLE_SHEETS) private readonly sheets: StyleSheets,
     @Inject(LLM_GATEWAY) private readonly llm: LlmGateway,
     private readonly books: BookService,
     private readonly accounts: AccountService,
@@ -178,10 +201,16 @@ export class BookTranslationService implements OnApplicationBootstrap {
     const run: Run = { cancelled: false };
     this.runs.set(queued.id, run);
     try {
-      let task = await this.edits.edit(queued, (current) => ({ ...current, state: { kind: 'running' } }));
-      while (task && !run.cancelled && task.remaining.length > 0) {
+      // The head is under way from here: its chapter stays in place, and shows, while the style sheet is written.
+      let task = await this.edits.edit(queued, (current) => ({
+        ...current,
+        state: { kind: 'running' },
+        current: current.remaining.length > 0 ? { done: 0, parts: 1 } : null,
+      }));
+      const sheet = task && (await this.styleSheetOf(task));
+      while (task && sheet && !run.cancelled && task.remaining.length > 0) {
         const [head] = task.remaining;
-        await this.translateChapter(task, head, run);
+        await this.translateChapter(task, head, sheet, run);
         if (run.cancelled) return;
         task = await this.edits.edit(task, (current) => ({
           ...current,
@@ -215,40 +244,89 @@ export class BookTranslationService implements OnApplicationBootstrap {
     }
   }
 
-  private async translateChapter(task: BookTranslationTask, head: ChapterInLine, run: Run): Promise<void> {
+  private async styleSheetOf(task: BookTranslationTask): Promise<StyleSheet> {
+    const known = await this.sheets.find(task.bookId);
+    if (known) return known;
+    const chapters = await this.books.mainChapters(task.accountId, task.bookId);
+    const sheet = await this.answer({
+      promptVersion: TRANSLATION_PROMPT_VERSION,
+      instructions: styleSheetInstructions(),
+      input: {
+        title: task.bookTitle,
+        author: (await this.books.status(task.accountId, task.bookId)).author,
+        passages: passagesFrom(chapters.flatMap(({ blocks }) => blocks), SHEET_WORDS),
+      },
+      outputSchema: StyleSheetSchema,
+      maxInputTokens: MAX_INPUT_TOKENS,
+      maxOutputTokens: SHEET_OUTPUT_TOKENS,
+    });
+    await this.sheets.save(task.bookId, sheet);
+    return sheet;
+  }
+
+  /** Drafts in order, each part reading on from the last, then edits every draft beside its English. */
+  private async translateChapter(task: BookTranslationTask, head: ChapterInLine, sheet: StyleSheet, run: Run): Promise<void> {
     if (await this.translations.find(head.chapterId)) return;
     const chapter = await this.books.chapter(task.accountId, head.chapterId);
     const parts = partsOf(chapter.blocks, PART_WORDS);
-    await this.edits.edit(task, (current) => ({ ...current, current: { done: 0, parts: Math.max(parts.length, 1) } }));
-    const translated = await mapInBatches(parts, PARTS_AT_ONCE, async (part, index) => {
-      if (run.cancelled) return part;
-      const blocks = await this.translatePart({ part, index, partCount: parts.length });
-      await this.edits.edit(task, (current) => ({
+    await this.edits.edit(task, (current) => ({ ...current, current: { done: 0, parts: Math.max(parts.length * 2, 1) } }));
+    const partDone = () =>
+      this.edits.edit(task, (current) => ({
         ...current,
         current: current.current && { ...current.current, done: current.current.done + 1 },
       }));
+
+    const drafts: Block[][] = [];
+    for (const [index, part] of parts.entries()) {
+      if (run.cancelled) return;
+      const carried = drafts.flat().slice(-BLOCKS_CARRIED).map(({ text }) => text);
+      drafts.push(
+        await this.blocksFor(part, {
+          instructions: translationInstructions({ part: index + 1, partCount: parts.length, sheet }),
+          input: {
+            blocks: part.map(({ blockId, text }) => ({ id: blockId, text })),
+            ...(carried.length > 0 ? { previous_translation: carried } : {}),
+          },
+        }),
+      );
+      await partDone();
+    }
+
+    const edited = await mapInBatches(parts, PARTS_AT_ONCE, async (part, index) => {
+      if (run.cancelled) return part;
+      const blocks = await this.blocksFor(part, {
+        instructions: editingInstructions(sheet),
+        input: {
+          blocks: part.map(({ blockId, text }, at) => ({ id: blockId, text, draft: drafts[index][at].text })),
+        },
+      });
+      await partDone();
       return blocks;
     });
-    if (!run.cancelled) await this.translations.save({ chapterId: head.chapterId, bookId: task.bookId, blocks: translated.flat() });
+    if (!run.cancelled) await this.translations.save({ chapterId: head.chapterId, bookId: task.bookId, blocks: edited.flat() });
   }
 
-  private async translatePart({ part, index, partCount }: { part: Block[]; index: number; partCount: number }): Promise<Block[]> {
+  /** The model's text for each block of [part], which must come back whole and in order. */
+  private async blocksFor(part: Block[], { instructions, input }: { instructions: string; input: unknown }): Promise<Block[]> {
     const words = part.reduce((total, block) => total + countWords(block.text), 0);
+    const value = await this.answer({
+      promptVersion: TRANSLATION_PROMPT_VERSION,
+      instructions,
+      input,
+      outputSchema: TranslationOutputSchema.refine(
+        ({ blocks }) => blocks.length === part.length && blocks.every(({ id }, at) => id === part[at].blockId),
+      ),
+      maxInputTokens: MAX_INPUT_TOKENS,
+      // Vietnamese runs longer than English, and reasoning models count their thinking here too.
+      maxOutputTokens: words * 4 + 2_000,
+    });
+    return part.map((block, at) => ({ ...block, text: value.blocks[at].text }));
+  }
+
+  private async answer<T>(request: LlmCompletionRequest<T>): Promise<T> {
     for (let attempt = 1; ; attempt += 1) {
       try {
-        const { value } = await this.llm.complete({
-          promptVersion: TRANSLATION_PROMPT_VERSION,
-          instructions: translationInstructions({ part: index + 1, partCount }),
-          input: { blocks: part.map(({ blockId, text }) => ({ id: blockId, text })) },
-          outputSchema: TranslationOutputSchema,
-          maxInputTokens: MAX_INPUT_TOKENS,
-          // Vietnamese runs longer than English, and reasoning models count their thinking here too.
-          maxOutputTokens: words * 4 + 2_000,
-        });
-        const sameBlocks =
-          value.blocks.length === part.length && value.blocks.every(({ id }, at) => id === part[at].blockId);
-        if (!sameBlocks) throw new LlmError('INVALID_OUTPUT');
-        return part.map((block, at) => ({ ...block, text: value.blocks[at].text }));
+        return (await this.llm.complete(request)).value;
       } catch (error) {
         if (attempt >= TRIES) throw error;
       }
