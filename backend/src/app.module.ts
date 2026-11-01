@@ -16,6 +16,8 @@ import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgre
 import { TTS_GATEWAY } from './modules/speech/application/tts-gateway';
 import { VieneuTtsGateway, vieneuOptionsFromEnv } from './modules/speech/infrastructure/vieneu.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
+import { ChangelogModule } from './modules/changelog/changelog.module';
+import { CHANGELOG_DIR, readChangelog } from './modules/changelog/infrastructure/read-changelog';
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
 import { LLM_GATEWAY } from './shared/llm/llm-gateway';
 import { OpenAiCompatibleLlmGateway } from './shared/llm/openai-compatible.llm-gateway';
@@ -56,6 +58,7 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
 
 @Module({
   imports: [
+    ChangelogModule.register({ releases: readChangelog(CHANGELOG_DIR) }),
     AccountsModule.register({
       store: pool ? new PostgresAccountStore(pool) : new InMemoryAccountStore(),
       identity: new WorkosIdentityGateway(workosOptionsFromEnv(process.env)),
