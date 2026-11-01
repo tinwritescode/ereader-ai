@@ -25,6 +25,10 @@ import { BOOK_VOICE_STORE, InMemoryBookVoiceStore } from './modules/book-voice/a
 import { BookVoiceService } from './modules/book-voice/application/book-voice.service';
 import { PostgresBookVoiceStore } from './modules/book-voice/infrastructure/postgres.book-voice-store';
 import { BookVoiceController } from './modules/book-voice/presentation/book-voice.controller';
+import { BookShareService } from './modules/sharing/application/book-share.service';
+import { InMemoryShareStore, SHARE_STORE } from './modules/sharing/application/share-store';
+import { PostgresShareStore } from './modules/sharing/infrastructure/postgres.share-store';
+import { BookShareController } from './modules/sharing/presentation/book-share.controller';
 import { BookTranslationService } from './modules/translation/application/book-translation.service';
 import {
   BOOK_TRANSLATION_STORE,
@@ -69,16 +73,18 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
       slots,
     }),
   ],
-  controllers: [DigestController, BookTranslationController, BookVoiceController],
+  controllers: [DigestController, BookTranslationController, BookVoiceController, BookShareController],
   providers: [
     DigestService,
     BookTranslationService,
+    BookShareService,
     BookVoiceService,
     { provide: TTS_GATEWAY, useValue: tts },
     { provide: BOOK_VOICE_STORE, useValue: pool ? new PostgresBookVoiceStore(pool) : new InMemoryBookVoiceStore() },
     { provide: AccountSlots, useValue: slots },
     { provide: BOOK_TRANSLATION_STORE, useValue: pool ? new PostgresBookTranslationStore(pool) : new InMemoryBookTranslationStore() },
     { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },
+    { provide: SHARE_STORE, useValue: pool ? new PostgresShareStore(pool) : new InMemoryShareStore() },
     { provide: STYLE_SHEETS, useValue: pool ? new PostgresStyleSheets(pool) : new InMemoryStyleSheets() },
     { provide: LLM_GATEWAY, useFactory: () => new OpenAiCompatibleLlmGateway(llmOptionsFromEnv(process.env)) },
   ],

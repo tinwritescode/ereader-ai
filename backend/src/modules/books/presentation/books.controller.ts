@@ -124,6 +124,6 @@ function toBookResponse({ id, status, title, author, language, cover, chapterCou
   return { bookId: id, status, title, author, language, hasCover: cover !== null, chapterCount, minutes };
 }
 
-function toChapterSummary({ id, index, label, subtitle, kind, wordCount, minutes }: Omit<ChapterRecord, 'blocks'>) {
+export function toChapterSummary({ id, index, label, subtitle, kind, wordCount, minutes }: Omit<ChapterRecord, 'blocks'>) {
   return { chapterId: id, index, label, subtitle, kind, wordCount, minutes };
 }
