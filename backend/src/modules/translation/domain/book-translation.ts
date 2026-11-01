@@ -71,3 +71,22 @@ export function partsOf(blocks: readonly Block[], maxWords: number): Block[][] {
   }
   return parts;
 }
+
+const PASSAGES = 12;
+
+/**
+ * What the translator reads ahead of the book: stretches from all through it, since people and
+ * terms that matter may not appear in the opening. A short book is given whole.
+ */
+export function passagesFrom(blocks: readonly Block[], maxWords: number): string[] {
+  const words = (text: string) => text.split(/\s+/);
+  const stretch = Math.floor(maxWords / PASSAGES);
+  const total = blocks.reduce((sum, { text }) => sum + countWords(text), 0);
+  const every = total / PASSAGES;
+  let seen = 0;
+  return blocks.flatMap(({ text }) => {
+    const chosen = total <= maxWords || seen % every < stretch;
+    seen += countWords(text);
+    return chosen ? [words(text).slice(0, stretch).join(' ')] : [];
+  });
+}

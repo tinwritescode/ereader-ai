@@ -1,6 +1,6 @@
 import { Block } from '../../books/domain/book';
 import { chapterLine } from '../../../shared/tasks/chapter-line';
-import { BookTranslationTask, partsOf, percentDone, putFirst } from './book-translation';
+import { BookTranslationTask, partsOf, passagesFrom, percentDone, putFirst } from './book-translation';
 
 const chapter = (chapterId: string, words = 100) => ({ chapterId, label: chapterId, words });
 
@@ -86,5 +86,28 @@ describe('partsOf', () => {
 
   it('has no parts for an empty chapter', () => {
     expect(partsOf([], 100)).toEqual([]);
+  });
+});
+
+describe('passagesFrom', () => {
+  const text = (words: number) => 'word '.repeat(words).trim();
+  const block = (name: string, words: number): Block => ({ blockId: name, kind: 'paragraph', text: `${name} ${text(words - 1)}` });
+
+  it('gives a short book whole', () => {
+    expect(passagesFrom([block('a', 10), block('b', 10)], 100)).toHaveLength(2);
+  });
+
+  it('reads from all through a long book, not only its opening', () => {
+    const book = Array.from({ length: 1_000 }, (_, index) => block(`p${index}`, 100));
+    const passages = passagesFrom(book, 1_000);
+    const words = passages.join(' ').split(' ').length;
+    expect(words).toBeLessThanOrEqual(1_100);
+    expect(passages[0]).toMatch(/^p0 /);
+    expect(passages.at(-1)).toMatch(/^p9[0-9]{2} /);
+  });
+
+  it('never lets one giant paragraph take the whole sample', () => {
+    const [passage] = passagesFrom([block('huge', 5_000)], 1_200);
+    expect(passage.split(' ')).toHaveLength(100);
   });
 });
