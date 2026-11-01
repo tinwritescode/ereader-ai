@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { planSpeech, spokenMinutes } from './speech-plan';
+import { piecesWithin, planSpeech, spokenMinutes } from './speech-plan';
 
 const golden = z
   .object({
@@ -20,5 +20,11 @@ describe('spokenMinutes', () => {
   it('rounds up the time to read the sentences', () => {
     expect(spokenMinutes(['a'.repeat(901)])).toBe(2);
     expect(spokenMinutes([])).toBe(0);
+  });
+});
+
+describe('piecesWithin', () => {
+  it('cuts at a comma past halfway, keeping every piece under the limit', () => {
+    expect(piecesWithin('một hai ba bốn, năm sáu', 16)).toEqual(['một hai ba bốn,', 'năm sáu']);
   });
 });

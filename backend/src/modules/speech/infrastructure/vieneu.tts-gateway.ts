@@ -1,16 +1,12 @@
 import { z } from 'zod';
 import { TtsError, TtsGateway } from '../application/tts-gateway';
 import { CloudVoice } from '../domain/cloud-voice';
+import { SAMPLE_RATE, SAYABLE, SILENCE, wavOf } from './wav';
 
-const SAMPLE_RATE = 24_000;
-const HEADER_BYTES = 44;
 // Long enough for the service to start from zero, which takes about a minute.
 const TIMEOUT_MS = 180_000;
 // A 429 from Cloud Run itself does not carry Retry-After.
 const THROTTLE_WAIT_SECONDS = 1;
-// A tenth of a second, so a sentence with nothing to say still plays and hands on to the next.
-const SILENCE = Buffer.alloc(SAMPLE_RATE / 5);
-const SAYABLE = /[\p{Script=Latin}\p{Nd}]/u;
 
 export const VIENEU_HAT_DE: CloudVoice = { code: 'vieneu-clone', name: 'Hạt Dẻ', gender: 'female' };
 export const TRUNG_TIN_VOICE: CloudVoice = { code: 'vieneu-trung-tin', name: 'Trung Tín', gender: 'male' };
@@ -34,24 +30,6 @@ const VieneuEnvSchema = z.object({ VIENEU_URL: z.string().url(), VIENEU_API_KEY:
 export function vieneuOptionsFromEnv(env: Record<string, string | undefined>): VieneuOptions | null {
   const parsed = VieneuEnvSchema.safeParse(env);
   return parsed.success ? { url: parsed.data.VIENEU_URL, apiKey: parsed.data.VIENEU_API_KEY } : null;
-}
-
-function wavOf(samples: Buffer): Buffer {
-  const header = Buffer.alloc(HEADER_BYTES);
-  header.write('RIFF', 0, 'latin1');
-  header.writeUInt32LE(HEADER_BYTES - 8 + samples.length, 4);
-  header.write('WAVE', 8, 'latin1');
-  header.write('fmt ', 12, 'latin1');
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(SAMPLE_RATE, 24);
-  header.writeUInt32LE(SAMPLE_RATE * 2, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write('data', 36, 'latin1');
-  header.writeUInt32LE(samples.length, 40);
-  return Buffer.concat([header, samples]);
 }
 
 /** Our own VieNeu service on Cloud Run, reading in the voices cloned from voice/clips. */

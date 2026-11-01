@@ -12,7 +12,9 @@ const TRAILING_SPACE = /[\s\u0085]+$/;
 /** The sentences the app reads aloud from these blocks, in order. */
 export function planSpeech(blocks: readonly { text: string }[]): string[] {
   return blocks.flatMap(({ text }) =>
-    [...text.matchAll(SENTENCE)].flatMap((match) => withinLimit(text, match.index, match.index + match[0].length)),
+    [...text.matchAll(SENTENCE)].flatMap((match) =>
+      withinLimit(text, match.index, match.index + match[0].length, MAX_SENTENCE_CHARACTERS),
+    ),
   );
 }
 
@@ -20,13 +22,18 @@ export function spokenMinutes(sentences: readonly string[]): number {
   return Math.ceil(sentences.reduce((total, text) => total + spokenSeconds(text), 0) / 60);
 }
 
-function withinLimit(text: string, from: number, to: number): string[] {
+/** [text] in pieces of at most [limit] characters, cut the way sentences are. */
+export function piecesWithin(text: string, limit: number): string[] {
+  return withinLimit(text, 0, text.length, limit);
+}
+
+function withinLimit(text: string, from: number, to: number, limit: number): string[] {
   const pieces: string[] = [];
   let start = from;
   while (start < to) {
     while (start < to && SPACE.test(text[start])) start += 1;
     if (start === to) break;
-    const end = to - start <= MAX_SENTENCE_CHARACTERS ? to : cutBefore(text, start, start + MAX_SENTENCE_CHARACTERS);
+    const end = to - start <= limit ? to : cutBefore(text, start, limit);
     const piece = text.slice(start, end).replace(TRAILING_SPACE, '');
     if (piece.length > 0) pieces.push(piece);
     start = end;
@@ -34,10 +41,11 @@ function withinLimit(text: string, from: number, to: number): string[] {
   return pieces;
 }
 
-/** Last comma before [limit], else the last space, else [limit] itself. */
+/** Last comma within [limit] of [start], else the last space, else [limit] itself. */
 function cutBefore(text: string, start: number, limit: number): number {
-  const comma = text.lastIndexOf(',', limit - 1);
-  if (comma > start + Math.floor(MAX_SENTENCE_CHARACTERS / 2)) return comma + 1;
-  const space = text.lastIndexOf(' ', limit - 1);
-  return space > start ? space : limit;
+  const end = start + limit;
+  const comma = text.lastIndexOf(',', end - 1);
+  if (comma > start + Math.floor(limit / 2)) return comma + 1;
+  const space = text.lastIndexOf(' ', end - 1);
+  return space > start ? space : end;
 }
