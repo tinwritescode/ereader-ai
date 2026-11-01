@@ -27,6 +27,28 @@ async function watchTransitions(page: Page) {
 const transitions = (page: Page) =>
   page.evaluate(() => (window as unknown as { startedTransitions: string[][] }).startedTransitions)
 
+/** How many pixels of two same-sized screenshots clearly differ; edge smoothing alone does not count. */
+const pixelsApart = (page: Page, first: Buffer, second: Buffer) =>
+  page.evaluate(
+    async (images) => {
+      const pixels = await Promise.all(
+        images.map(async (base64) => {
+          const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob())
+          const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+          const context = canvas.getContext('2d')
+          context?.drawImage(bitmap, 0, 0)
+          return context?.getImageData(0, 0, bitmap.width, bitmap.height).data ?? new Uint8ClampedArray()
+        }),
+      )
+      const [one = new Uint8ClampedArray(), other = new Uint8ClampedArray()] = pixels
+      let apart = 0
+      for (let index = 0; index < one.length; index += 4)
+        if (Math.abs((one[index] ?? 0) - (other[index] ?? 0)) > 96) apart += 1
+      return apart
+    },
+    [first.toString('base64'), second.toString('base64')],
+  )
+
 test.beforeEach(async () => {
   await stub.reset()
 })
@@ -115,4 +137,19 @@ test('the pen underlines a way round the margin, and leaves the current page und
 
   await tasks.hover()
   await expect.poll(() => style(tasks, 'clip-path', '::after')).toMatch(/inset\(0(px)?\)/)
+})
+
+test('the plus on the add tile lands straight after its turn', async ({ page }) => {
+  await signIn(page)
+  const tile = page.getByRole('button', { name: /kéo file/ })
+  const box = await tile.boundingBox()
+  if (!box) throw new Error('no tile')
+  const clip = { x: box.x + box.width / 2 - 24, y: box.y + box.height / 2 - 44, width: 48, height: 48 }
+  await page.mouse.move(0, 0)
+  await page.waitForTimeout(400)
+  const rest = await page.screenshot({ clip })
+  await tile.hover()
+  await page.waitForTimeout(400)
+  const turned = await page.screenshot({ clip })
+  expect(await pixelsApart(page, rest, turned)).toBe(0)
 })

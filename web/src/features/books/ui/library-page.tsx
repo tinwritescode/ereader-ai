@@ -105,12 +105,18 @@ export function LibraryPage({
             className="group/add flex aspect-[1/1.48] w-full flex-col items-center justify-center rounded-[2px_5px_5px_2px] border-[1.5px] border-dashed border-ink p-3.5 text-[13px]/4.5 font-semibold text-ink"
             onClick={() => input.current?.click()}
           >
-            <i
-              className="font-hand text-[34px]/9 not-italic transition-transform duration-300 ease-hinge group-hover/add:rotate-90"
+            {/* Drawn, not typed: the font's + sits off centre, so a quarter turn would land it crooked. */}
+            <svg
+              className="my-2 block size-5 transition-transform duration-300 ease-hinge group-hover/add:rotate-90"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
               aria-hidden="true"
             >
-              +
-            </i>
+              <path d="M10 2.5v15M2.5 10h15" />
+            </svg>
             Thêm sách EPUB
             <small className="text-xs font-normal text-muted">hoặc kéo file vào đây</small>
           </button>
