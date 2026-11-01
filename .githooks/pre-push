@@ -57,7 +57,7 @@ if touched web; then
   npm run typecheck
   npm run build
   if grep -rlE "TanStackDevtools|solid-primitives" .output; then exit 1; fi
-  npm run e2e
+  npm run e2e -- --max-failures=1
 fi
 
 if touched mobile; then
