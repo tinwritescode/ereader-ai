@@ -15,8 +15,8 @@ import { PostgresChapterVoiceStore } from './modules/speech/infrastructure/postg
 import { PostgresSpeechClipIndex } from './modules/speech/infrastructure/postgres.speech-clip-index';
 import { TTS_GATEWAY } from './modules/speech/application/tts-gateway';
 import { TtsProviders } from './modules/speech/application/tts-providers';
-import { GwenTtsGateway, gwenOptionsFromEnv } from './modules/speech/infrastructure/gwen.tts-gateway';
 import { VieneuTtsGateway, vieneuOptionsFromEnv } from './modules/speech/infrastructure/vieneu.tts-gateway';
+import { ZeroTtsGateway, zeroOptionsFromEnv } from './modules/speech/infrastructure/zero.tts-gateway';
 import { SpeechModule } from './modules/speech/speech.module';
 import { llmOptionsFromEnv } from './shared/llm/llm-config';
 import { LLM_GATEWAY } from './shared/llm/llm-gateway';
@@ -54,8 +54,8 @@ const pool = process.env.DATABASE_URL ? new Pool({ connectionString: process.env
 const slots = new AccountSlots();
 
 const vieneu = vieneuOptionsFromEnv(process.env);
-const gwen = gwenOptionsFromEnv(process.env);
-const ttsProviders = [...(vieneu ? [new VieneuTtsGateway(vieneu)] : []), ...(gwen ? [new GwenTtsGateway(gwen)] : [])];
+const zero = zeroOptionsFromEnv(process.env);
+const ttsProviders = [...(vieneu ? [new VieneuTtsGateway(vieneu)] : []), ...(zero ? [new ZeroTtsGateway(zero)] : [])];
 const tts = ttsProviders.length > 0 ? new TtsProviders(ttsProviders) : null;
 
 @Module({
