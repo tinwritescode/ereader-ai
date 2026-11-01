@@ -71,6 +71,10 @@ class FakeBooksRepository implements BooksRepository {
     chapterSix,
   ];
 
+  /// How many paragraphs follow the first in Chapter One.
+  int chapterOneParagraphs = 40;
+  List<Figure> figures = const [];
+
   @override
   Future<ChapterText> original(String chapterId) async => ChapterText([
     const TextBlock(
@@ -79,9 +83,9 @@ class FakeBooksRepository implements BooksRepository {
     ),
     // Chapter One is long enough to scroll, so a reading spot can sit inside it.
     if (chapterId == chapterOne.chapterId)
-      for (var i = 1; i <= 40; i++)
+      for (var i = 1; i <= chapterOneParagraphs; i++)
         TextBlock(TextBlockKind.paragraph, 'Đoạn $i của chương một.'),
-  ]);
+  ], figures: figures);
 
   @override
   Future<ChapterText> shortened(

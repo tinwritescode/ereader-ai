@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../../app/theme.dart';
 import '../../../auth/presentation/account_widgets.dart';
@@ -131,6 +132,8 @@ class ReaderPage extends StatefulWidget {
 
 class _ReaderPageState extends State<ReaderPage> {
   final _scroll = ScrollController();
+  // Only blocks near the screen exist, so far ones are reached through this.
+  final _list = ListController();
   final _stack = GlobalKey();
   // One key per block, so a sentence can be found on the page.
   final _blockKeys = <int, GlobalKey>{};
@@ -259,8 +262,13 @@ class _ReaderPageState extends State<ReaderPage> {
   }
 
   void _goTo(int block) {
-    final target = _blockKeys[block]?.currentContext;
-    if (target != null) Scrollable.ensureVisible(target, alignment: 0.08);
+    if (_list.isAttached) {
+      _list.jumpToItem(
+        index: _Chapter.itemOf(block),
+        scrollController: _scroll,
+        alignment: 0.08,
+      );
+    }
     _afterLayout(_remember);
   }
 
@@ -339,7 +347,18 @@ class _ReaderPageState extends State<ReaderPage> {
   void _reveal(SpokenSentence sentence) {
     final paragraph = _blockKeys[sentence.block]?.currentContext
         ?.findRenderObject();
-    if (paragraph is! RenderParagraph || !_scroll.hasClients) return;
+    if (paragraph is! RenderParagraph) {
+      // The voice has gone past what is built: go there, then find the words.
+      if (_list.isAttached) {
+        _list.jumpToItem(
+          index: _Chapter.itemOf(sentence.block),
+          scrollController: _scroll,
+          alignment: 0.3,
+        );
+      }
+      return;
+    }
+    if (!_scroll.hasClients) return;
     final boxes = paragraph.getBoxesForSelection(
       TextSelection(baseOffset: sentence.start, extentOffset: sentence.end),
     );
@@ -541,25 +560,24 @@ class _ReaderPageState extends State<ReaderPage> {
                               children: [
                                 Opacity(
                                   opacity: 0.35,
-                                  child: SingleChildScrollView(
-                                    controller: _scroll,
+                                  child: _Chapter(
+                                    scroll: _scroll,
+                                    list: _list,
                                     padding: EdgeInsets.fromLTRB(
                                       0,
                                       safe.top + 52,
                                       24,
                                       safe.bottom + 220,
                                     ),
-                                    child: _Chapter(
-                                      chapter: widget.chapter,
-                                      blocks: original.blocks,
-                                      blockKeys: _blockKeys,
-                                      marked: null,
-                                      look: look,
-                                      colors: colors,
-                                      next: null,
-                                      onNext: null,
-                                      onHold: (_, _, _) {},
-                                    ),
+                                    chapter: widget.chapter,
+                                    text: original,
+                                    blockKeys: _blockKeys,
+                                    marked: null,
+                                    look: look,
+                                    colors: colors,
+                                    next: null,
+                                    onNext: null,
+                                    onHold: (_, _, _) {},
                                   ),
                                 ),
                                 Positioned(
@@ -593,28 +611,26 @@ class _ReaderPageState extends State<ReaderPage> {
                                 ),
                               ],
                             ),
-                            ReaderTextLoaded(:final text) =>
-                              SingleChildScrollView(
-                                controller: _scroll,
-                                padding: EdgeInsets.fromLTRB(
-                                  0,
-                                  safe.top + 52,
-                                  24,
-                                  safe.bottom + 96,
-                                ),
-                                child: _Chapter(
-                                  chapter: widget.chapter,
-                                  blocks: text.blocks,
-                                  blockKeys: _blockKeys,
-                                  marked: marked,
-                                  look: look,
-                                  colors: colors,
-                                  next: widget.next,
-                                  onNext: widget.onNext,
-                                  onHold: (block, offset, global) =>
-                                      _pick(text.blocks, block, offset, global),
-                                ),
+                            ReaderTextLoaded(:final text) => _Chapter(
+                              scroll: _scroll,
+                              list: _list,
+                              padding: EdgeInsets.fromLTRB(
+                                0,
+                                safe.top + 52,
+                                24,
+                                safe.bottom + 96,
                               ),
+                              chapter: widget.chapter,
+                              text: text,
+                              blockKeys: _blockKeys,
+                              marked: marked,
+                              look: look,
+                              colors: colors,
+                              next: widget.next,
+                              onNext: widget.onNext,
+                              onHold: (block, offset, global) =>
+                                  _pick(text.blocks, block, offset, global),
+                            ),
                           },
                         ),
                       ),
@@ -801,10 +817,15 @@ class _Waiting extends StatelessWidget {
   );
 }
 
+/// The chapter as a list that builds only what is near the screen: the title,
+/// then each block with the pictures before it, then the way out.
 class _Chapter extends StatelessWidget {
   const _Chapter({
+    required this.scroll,
+    required this.list,
+    required this.padding,
     required this.chapter,
-    required this.blocks,
+    required this.text,
     required this.blockKeys,
     required this.marked,
     required this.look,
@@ -814,8 +835,13 @@ class _Chapter extends StatelessWidget {
     required this.onHold,
   });
 
+  static int itemOf(int block) => block + 1;
+
+  final ScrollController scroll;
+  final ListController list;
+  final EdgeInsets padding;
   final ChapterSummary chapter;
-  final List<TextBlock> blocks;
+  final ChapterText text;
   final Map<int, GlobalKey> blockKeys;
   final SpokenSentence? marked;
   final ReadingLook look;
@@ -824,8 +850,12 @@ class _Chapter extends StatelessWidget {
   final VoidCallback? onNext;
   final void Function(int block, int offset, Offset global) onHold;
 
-  @override
-  Widget build(BuildContext context) {
+  List<Widget> _picturesAt(int block) => [
+    for (final figure in text.figures)
+      if (figure.before == block) _Picture(figure: figure, colors: colors),
+  ];
+
+  Widget _title() {
     final (:number, :title) = chapterHeading(chapter);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -844,28 +874,85 @@ class _Chapter extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        for (final (index, block) in blocks.indexed)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 14),
-            child: _Block(
-              textKey: blockKeys.putIfAbsent(index, GlobalKey.new),
-              block: block,
-              marked: marked?.block == index ? marked : null,
-              look: look,
-              colors: colors,
-              onHold: (offset, global) => onHold(index, offset, global),
-            ),
-          ),
-        const SizedBox(height: 28),
-        _ChapterEnd(
-          chapter: chapter,
-          next: next,
-          onNext: onNext,
+      ],
+    );
+  }
+
+  Widget _block(int index) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ..._picturesAt(index),
+      Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: _Block(
+          textKey: blockKeys.putIfAbsent(index, GlobalKey.new),
+          block: text.blocks[index],
+          marked: marked?.block == index ? marked : null,
+          look: look,
           colors: colors,
+          onHold: (offset, global) => onHold(index, offset, global),
+        ),
+      ),
+    ],
+  );
+
+  Widget _end() => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ..._picturesAt(text.blocks.length),
+      const SizedBox(height: 28),
+      _ChapterEnd(chapter: chapter, next: next, onNext: onNext, colors: colors),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final blocks = text.blocks.length;
+    return CustomScrollView(
+      controller: scroll,
+      slivers: [
+        SliverPadding(
+          padding: padding,
+          sliver: SuperSliverList.builder(
+            listController: list,
+            itemCount: blocks + 2,
+            itemBuilder: (context, item) => switch (item) {
+              0 => _title(),
+              _ when item <= blocks => _block(item - 1),
+              _ => _end(),
+            },
+          ),
         ),
       ],
     );
   }
+}
+
+/// A picture of the book. Its shape is known before it arrives, so the words
+/// around it stay put, and it is fetched only once it comes near the screen.
+class _Picture extends StatelessWidget {
+  const _Picture({required this.figure, required this.colors});
+
+  final Figure figure;
+  final _PageColors colors;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Semantics(
+      image: true,
+      label: figure.alt,
+      child: AspectRatio(
+        aspectRatio: figure.aspectRatio,
+        child: Image.network(
+          figure.url,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      ),
+    ),
+  );
 }
 
 /// A block of the chapter, with the sentence being read or held in yellow marker.

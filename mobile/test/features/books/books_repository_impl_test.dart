@@ -111,6 +111,66 @@ void main() {
     ]);
   });
 
+  test(
+    'reads where a chapter\'s pictures stand and where to fetch them',
+    () async {
+      final adapter = _FakeAdapter(
+        (_) => (
+          200,
+          {
+            'blocks': [
+              {'kind': 'paragraph', 'text': 'Một.'},
+            ],
+            'figures': [
+              {
+                'before': 1,
+                'image': 'abc.png',
+                'alt': 'Bản đồ',
+                'width': 400,
+                'height': 200,
+              },
+            ],
+          },
+        ),
+      );
+
+      final text = await _repository(adapter).original('c0');
+
+      final figure = text.figures.single;
+      expect(figure.before, 1);
+      expect(figure.url, 'http://api.test/images/abc.png');
+      expect(figure.alt, 'Bản đồ');
+      expect(figure.aspectRatio, 2);
+    },
+  );
+
+  test('a translated chapter keeps the pictures of the original', () async {
+    final adapter = _FakeAdapter(
+      (request) => (
+        200,
+        {
+          'blocks': [
+            {'kind': 'paragraph', 'text': 'Một.'},
+          ],
+          if (!request.uri.path.endsWith('/translation'))
+            'figures': [
+              {
+                'before': 0,
+                'image': 'abc.png',
+                'alt': null,
+                'width': 1,
+                'height': 1,
+              },
+            ],
+        },
+      ),
+    );
+
+    final text = await _repository(adapter).translated('c0');
+
+    expect(text.figures.single.url, 'http://api.test/images/abc.png');
+  });
+
   test('asks for a shortened chapter and splits it into paragraphs', () async {
     final adapter = _FakeAdapter(
       (_) => (

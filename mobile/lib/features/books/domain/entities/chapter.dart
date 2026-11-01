@@ -16,11 +16,29 @@ class ChapterSummary {
   final int minutes;
 }
 
-/// Body text of a chapter, as paragraphs and in-chapter headings.
+/// Body text of a chapter, as paragraphs and in-chapter headings, with the
+/// book's pictures beside them. Numbering blocks stays the text's own affair.
 class ChapterText {
-  const ChapterText(this.blocks);
+  const ChapterText(this.blocks, {this.figures = const []});
 
   final List<TextBlock> blocks;
+  final List<Figure> figures;
+}
+
+/// A picture standing before the block at index [before]; the block count
+/// puts it last.
+class Figure {
+  const Figure({
+    required this.before,
+    required this.url,
+    required this.alt,
+    required this.aspectRatio,
+  });
+
+  final int before;
+  final String url;
+  final String? alt;
+  final double aspectRatio;
 }
 
 enum TextBlockKind { heading, paragraph }

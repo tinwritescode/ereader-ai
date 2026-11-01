@@ -1,6 +1,7 @@
 import 'package:ereader_mobile/features/books/domain/entities/epub_source.dart';
 import 'dart:async';
 
+import 'package:ereader_mobile/features/books/domain/entities/chapter.dart';
 import 'package:ereader_mobile/features/books/domain/entities/book.dart';
 import 'package:ereader_mobile/features/books/domain/repositories/books_repository.dart';
 import 'package:ereader_mobile/features/books/presentation/time_ruler.dart';
@@ -512,6 +513,76 @@ void main() {
       find.text('Đoạn $stoppedAt của chương một.').hitTestable(),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a very long chapter builds only what is near the screen', (
+    tester,
+  ) async {
+    final books = await pumpApp(tester, shelf: [loeb]);
+    books.chapterOneParagraphs = 3000;
+    await tester.tap(find.text('Gerald M. Loeb').last);
+    await tester.pumpAndSettle();
+    await openChapterOneOriginal(tester);
+
+    expect(find.text('Đoạn 1 của chương một.'), findsOneWidget);
+    expect(find.text('Đoạn 2999 của chương một.'), findsNothing);
+    expect(
+      find.textContaining('của chương một.').evaluate().length,
+      lessThan(100),
+    );
+  });
+
+  testWidgets('continuing reaches a spot far past what is built', (
+    tester,
+  ) async {
+    final spots = FakeReadingSpotStore({
+      'book-1': const ReadingSpot(
+        chapterId: 'book-1-c0',
+        chapterLabel: 'Chương Một',
+        minutesLeft: 4,
+        option: LengthOption(ReadingLength.original, 8),
+        block: 2900,
+        quote: 'Đoạn 2900 của chương một.',
+      ),
+    });
+    final books = await pumpApp(tester, shelf: [loeb], spots: spots);
+    books.chapterOneParagraphs = 3000;
+    await tester.tap(find.text('Gerald M. Loeb').last);
+    await tester.pumpAndSettle();
+    await openChapterOneOriginal(tester);
+
+    await tester.tap(find.text('Đọc tiếp'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Đoạn 2900 của chương một.').hitTestable(),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a picture stands between the blocks it stood between', (
+    tester,
+  ) async {
+    final books = await pumpApp(tester, shelf: [loeb]);
+    books.figures = const [
+      Figure(
+        before: 1,
+        url: 'http://api.test/images/a.png',
+        alt: 'Bản đồ',
+        aspectRatio: 2,
+      ),
+    ];
+    await tester.tap(find.text('Gerald M. Loeb').last);
+    await tester.pumpAndSettle();
+    await openChapterOneOriginal(tester);
+
+    final top = tester.getBottomLeft(find.textContaining('Tôi thực sự tin')).dy;
+    final picture = find.byType(Image);
+    final bottom = tester.getTopLeft(find.text('Đoạn 1 của chương một.')).dy;
+    expect(tester.getTopLeft(picture).dy, greaterThanOrEqualTo(top));
+    expect(tester.getBottomLeft(picture).dy, lessThanOrEqualTo(bottom));
+    final size = tester.getSize(picture);
+    expect(size.width / size.height, 2);
   });
 
   testWidgets('starting over keeps the reader at the top', (tester) async {

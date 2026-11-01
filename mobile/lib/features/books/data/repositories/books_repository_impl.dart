@@ -52,24 +52,43 @@ class BooksRepositoryImpl implements BooksRepository {
   @override
   Future<ChapterText> original(String chapterId) => _call(() async {
     final response = await _dio.get<Object>('/chapters/$chapterId');
-    return switch (response.data) {
-      {'blocks': final List<Object?> blocks} => ChapterText(
-        blocks.map(_toTextBlock).toList(),
-      ),
-      _ => throw const BooksException('UNEXPECTED_RESPONSE'),
-    };
+    return ChapterText(
+      _blocksOf(response.data),
+      figures: _figuresOf(response.data),
+    );
   });
 
+  /// Pictures stay with the original, and a translation goes block for block.
   @override
   Future<ChapterText> translated(String chapterId) => _call(() async {
     final response = await _dio.get<Object>('/chapters/$chapterId/translation');
-    return switch (response.data) {
-      {'blocks': final List<Object?> blocks} => ChapterText(
-        blocks.map(_toTextBlock).toList(),
-      ),
-      _ => throw const BooksException('UNEXPECTED_RESPONSE'),
-    };
+    final blocks = _blocksOf(response.data);
+    final chapter = await _dio.get<Object>('/chapters/$chapterId');
+    return ChapterText(blocks, figures: _figuresOf(chapter.data));
   });
+
+  Figure _toFigure(Object? json) => switch (json) {
+    {
+      'before': final int before,
+      'image': final String image,
+      'alt': final String? alt,
+      'width': final int width,
+      'height': final int height,
+    } =>
+      Figure(
+        before: before,
+        url: '${_dio.options.baseUrl}/images/$image',
+        alt: alt,
+        aspectRatio: width / height,
+      ),
+    _ => throw const BooksException('UNEXPECTED_RESPONSE'),
+  };
+
+  /// An older server has no pictures to tell of.
+  List<Figure> _figuresOf(Object? json) => switch (json) {
+    {'figures': final List<Object?> figures} => figures.map(_toFigure).toList(),
+    _ => const [],
+  };
 
   @override
   Future<ChapterText> shortened(String chapterId, {required int minutes}) =>
@@ -140,6 +159,11 @@ ChapterSummary _toChapterSummary(Object? json) => switch (json) {
       subtitle: subtitle,
       minutes: minutes,
     ),
+  _ => throw const BooksException('UNEXPECTED_RESPONSE'),
+};
+
+List<TextBlock> _blocksOf(Object? json) => switch (json) {
+  {'blocks': final List<Object?> blocks} => blocks.map(_toTextBlock).toList(),
   _ => throw const BooksException('UNEXPECTED_RESPONSE'),
 };
 
