@@ -42,6 +42,15 @@ describe('VieneuTtsGateway', () => {
     });
   });
 
+  it('reads Hạt Dẻ with little randomness, which mispronounces less, and leaves Trung Tín as it was', async () => {
+    const { calls, gateway } = gatewayAnswering(audio([1]), audio([1]));
+    await gateway.speak('Chào.', VIENEU_HAT_DE.code);
+    await gateway.speak('Chào.', TRUNG_TIN_VOICE.code);
+    const sent = calls.map(({ init }) => JSON.parse(String(init?.body)));
+    expect(sent[0]).toMatchObject({ voice: 'hat-de', temperature: 0.3 });
+    expect(sent[1]).not.toHaveProperty('temperature');
+  });
+
   it('wraps the samples in the WAV the app plays', async () => {
     const { gateway } = gatewayAnswering(audio([1000, -1000]));
     const spoken = await gateway.speak('Xin chào.', VIENEU_HAT_DE.code);

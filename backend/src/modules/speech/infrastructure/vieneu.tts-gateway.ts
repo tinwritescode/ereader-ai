@@ -17,6 +17,9 @@ const ENROLLED: ReadonlyMap<string, string> = new Map([
   [TRUNG_TIN_VOICE.code, 'trung-tin'],
 ]);
 
+// Below the service's default of 0.8: Hạt Dẻ mispronounces less. Clips kept from before stay as they are.
+const HAT_DE_TEMPERATURE = 0.3;
+
 export type VieneuOptions = {
   url: string;
   apiKey: string;
@@ -49,7 +52,8 @@ export class VieneuTtsGateway implements TtsGateway {
   async speak(text: string, voiceCode: string): Promise<Buffer> {
     const voice = ENROLLED.get(voiceCode);
     if (voice === undefined) throw new TtsError('UPSTREAM_ERROR');
-    const body = JSON.stringify({ input: text, voice, response_format: 'pcm', sample_rate: SAMPLE_RATE });
+    const sampling = voiceCode === VIENEU_HAT_DE.code ? { temperature: HAT_DE_TEMPERATURE } : {};
+    const body = JSON.stringify({ input: text, voice, response_format: 'pcm', sample_rate: SAMPLE_RATE, ...sampling });
     const samples = await this.request(body, Date.now() + this.timeoutMs);
     if (samples.length > 0) return wavOf(samples);
     // The service drops what it cannot say and answers 200 with no audio, as it also does when it
