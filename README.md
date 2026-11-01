@@ -2,13 +2,31 @@
 
 **English** | [Tiếng Việt](README.vi.md)
 
-An iPhone reading app. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the app reads aloud in a Vietnamese voice that runs on the device.
+A reading app for iPhone and the web. Import an EPUB, choose how much time you have, and AI shortens the chapter to fit. To listen instead, the iPhone app reads aloud in a Vietnamese voice that runs on the device; the web app uses the cloud voices.
 
 | Library | Chapters | Choose length | Continue | Read | Listen | Keep listening |
 |---|---|---|---|---|---|---|
 | ![Library](docs/screenshots/library.png) | ![Chapter list](docs/screenshots/book.png) | ![Choose length](docs/screenshots/choose-length.png) | ![Continue reading](docs/screenshots/resume.png) | ![Reader](docs/screenshots/reader.png) | ![Player](docs/screenshots/player.png) | ![Still listening](docs/screenshots/still-listening.png) |
 
 Screenshots come from the simulator with sample data. Regenerate them with `mobile/tool/capture_screenshots.sh`.
+
+## Web app
+
+The web app is a school notebook: ruled paper, a red margin line, and handwriting for the way around. A book's cover swings open under the pointer and flies to the book's own page, and the next chapter arrives with a turned page.
+
+| Library | Book | Read |
+|---|---|---|
+| ![Library](docs/screenshots/web-library.png) | ![Book](docs/screenshots/web-book.png) | ![Read](docs/screenshots/web-reader.png) |
+
+### Christmas mode
+
+Turn on **Giáng sinh** in the margin. The notebook changes pen: fir-green ink, cranberry red and a gold marker. Lights hang on the margin line and snow lies on the books, and opening a book shakes its snow off. Snow falls once, when you turn the mode on, so nothing moves while you read. The choice is saved on the device, and the reading page changes colour only.
+
+| Snow falls once | Opening a book | On a phone |
+|---|---|---|
+| ![Snow falls once](docs/screenshots/web-noel-snowfall.png) | ![Opening a book](docs/screenshots/web-noel-open.png) | ![On a phone](docs/screenshots/web-noel-phone.png) |
+
+Web screenshots come from a local build against the e2e stub, with sample books.
 
 ## Use cases
 
@@ -122,7 +140,7 @@ Only the device voices are offline; cloud voices need a connection. Chapter text
 | Text size, spacing, paper | Saved on the device | |
 | Voice and speed | Reset each time a chapter opens | Remember the choice |
 | Cloud voices | VieNeu-TTS on Google Cloud Run GPU (`voice/`), in the Hạt Dẻ and Trung Tín voices, cloned from short clips in `voice/clips`. The service scales to zero, so the first sentence after a pause waits about a minute. The app keeps about a minute of speech ready, fetching up to 4 sentences at once. A sentence read once is kept (Postgres index, audio in the bucket) and replays without calling the service. Counts against the monthly cloud voice minutes | |
-| Platforms | iOS 16 and later | Android not tested yet |
+| Platforms | iOS 16 and later, and the web | Android not tested yet |
 
 The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Vietnamese). The Planned column comes from that document and doesn't describe the current code.
 
@@ -130,6 +148,7 @@ The full design is in [ebook-ai-architecture.md](ebook-ai-architecture.md) (Viet
 
 - `backend/`: NestJS 11, TypeScript. Modules `books`, `processing`, `ai-reading`.
 - `mobile/`: Flutter 3.41, `flutter_bloc`. Features `books`, `digest`, `listen`.
+- `web/`: TanStack Start, React 19, Tailwind v4, Motion. Features in `web/src/features`.
 - `mobile/tool/build_speech_assets.py`: builds the phoneme table and voice packs in `mobile/assets/speech/`.
 - `design/`: HTML mockups. `reader-flow-v2.html` covers the whole flow; `reader-flow-v3.html` is the current reading page.
 
@@ -167,11 +186,23 @@ flutter run --dart-define=API_BASE_URL=http://localhost:3000
 
 Without `API_BASE_URL`, the app calls `http://localhost:3000`. The first time you tap Nghe (Listen), the app asks before downloading the 282 MB model to the device.
 
+## Run the web app
+
+Requires Node 24. Start the backend with `PORT=3001`, since the web app takes port 3000.
+
+```bash
+cd web
+npm ci
+BACKEND_URL=http://localhost:3001 WEB_URL=http://localhost:3000 WORKOS_CLIENT_ID=<client-id> npm run dev
+```
+
 ## Test
 
 ```bash
 cd backend && npm run build && npm test
 cd mobile && flutter analyze && flutter test --concurrency=1
+cd web && npm run lint && npm run typecheck && npm test
+cd web && npm run build && npx playwright test
 ```
 
 The `pre-push` hook runs these for the parts a push touches. Turn it on once per clone with `git config core.hooksPath .githooks`.
@@ -188,6 +219,8 @@ Integration tests replace the app installed on the simulator, so rebuild the rea
 ## Deploy
 
 The backend runs on Railway from `backend/Dockerfile`. Set `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, and optionally `VIENEU_URL`, `VIENEU_API_KEY` in Railway's environment variables, never in the repo.
+
+The web app is a separate Railway service, built from `web/Dockerfile`. Set `BACKEND_URL`, `WEB_URL` and `WORKOS_CLIENT_ID`.
 
 To build for an iPhone against the deployed backend:
 

@@ -2,13 +2,31 @@
 
 [English](README.md) | **Tiếng Việt**
 
-Ứng dụng đọc sách trên iPhone. Nhập file EPUB, chọn thời gian bạn có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app đọc to bằng giọng tiếng Việt chạy ngay trên máy.
+Ứng dụng đọc sách trên iPhone và web. Nhập file EPUB, chọn thời gian bạn có, AI rút gọn chương cho vừa thời gian đó. Muốn nghe thì app iPhone đọc to bằng giọng tiếng Việt chạy ngay trên máy; bản web dùng giọng qua mạng.
 
 | Thư viện | Chương | Chọn độ dài | Đọc tiếp | Đọc | Nghe | Vẫn nghe |
 |---|---|---|---|---|---|---|
 | ![Thư viện](docs/screenshots/library.png) | ![Danh sách chương](docs/screenshots/book.png) | ![Chọn độ dài](docs/screenshots/choose-length.png) | ![Đọc tiếp](docs/screenshots/resume.png) | ![Màn đọc](docs/screenshots/reader.png) | ![Trình phát](docs/screenshots/player.png) | ![Vẫn đang nghe](docs/screenshots/still-listening.png) |
 
 Ảnh chụp từ simulator với dữ liệu mẫu. Tạo lại bằng `mobile/tool/capture_screenshots.sh`.
+
+## Bản web
+
+Bản web là một quyển vở học sinh: giấy kẻ dòng, đường lề đỏ, chữ viết tay cho phần điều hướng. Rê chuột vào sách, bìa mở ra trên gáy rồi bay sang trang của cuốn đó; chương sau đến bằng một lần lật trang.
+
+| Thư viện | Sách | Đọc |
+|---|---|---|
+| ![Thư viện](docs/screenshots/web-library.png) | ![Sách](docs/screenshots/web-book.png) | ![Đọc](docs/screenshots/web-reader.png) |
+
+### Chế độ Giáng sinh
+
+Bật **Giáng sinh** ở lề. Quyển vở đổi bút: mực xanh thông, đỏ nam việt quất, marker vàng kim. Dây đèn treo trên đường lề, tuyết phủ trên bìa sách, mở sách thì tuyết rơi khỏi bìa. Tuyết chỉ rơi một lần khi bật, nên không có gì chuyển động lúc bạn đọc. Lựa chọn lưu trên từng thiết bị, trang đọc chỉ đổi màu.
+
+| Tuyết rơi một lần | Mở một cuốn sách | Trên điện thoại |
+|---|---|---|
+| ![Tuyết rơi một lần](docs/screenshots/web-noel-snowfall.png) | ![Mở một cuốn sách](docs/screenshots/web-noel-open.png) | ![Trên điện thoại](docs/screenshots/web-noel-phone.png) |
+
+Ảnh bản web chụp từ bản build local với stub của e2e, dùng sách mẫu.
 
 ## Use case
 
@@ -122,7 +140,7 @@ Chỉ giọng trên máy là offline; giọng qua mạng cần mạng. Nội dun
 | Cỡ chữ, giãn dòng, trang giấy | Lưu trên máy | |
 | Giọng và tốc độ | Về mặc định mỗi lần mở chương | Ghi nhớ lựa chọn |
 | Giọng qua mạng | VieNeu-TTS trên Cloud Run GPU của Google (`voice/`), có giọng Hạt Dẻ và Trung Tín, nhân bản từ các đoạn mẫu ngắn trong `voice/clips`. Service tự tắt khi rảnh, nên câu đầu sau khi nghỉ chờ khoảng một phút. App luôn giữ sẵn khoảng 1 phút âm thanh, tải tối đa 4 câu cùng lúc. Câu đã đọc một lần được lưu lại (mục lục trong Postgres, âm thanh trong bucket) và phát lại không cần gọi service. Tính vào số phút giọng qua mạng hằng tháng | |
-| Nền tảng | iOS 16 trở lên | Android chưa kiểm thử |
+| Nền tảng | iOS 16 trở lên, và web | Android chưa kiểm thử |
 
 Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architecture.md). Cột "Dự kiến" lấy từ tài liệu đó, không phải mô tả code hiện tại.
 
@@ -130,6 +148,7 @@ Thiết kế đầy đủ nằm ở [ebook-ai-architecture.md](ebook-ai-architec
 
 - `backend/`: NestJS 11, TypeScript. Module `books`, `processing`, `ai-reading`.
 - `mobile/`: Flutter 3.41, `flutter_bloc`. Feature `books`, `digest`, `listen`.
+- `web/`: TanStack Start, React 19, Tailwind v4, Motion. Feature nằm trong `web/src/features`.
 - `mobile/tool/build_speech_assets.py`: tạo bảng phiên âm và voice pack trong `mobile/assets/speech/`.
 - `design/`: mockup HTML. `reader-flow-v2.html` cho cả luồng; `reader-flow-v3.html` là màn đọc hiện tại.
 
@@ -167,11 +186,23 @@ flutter run --dart-define=API_BASE_URL=http://localhost:3000
 
 Không truyền `API_BASE_URL` thì app gọi `http://localhost:3000`. Lần đầu bấm Nghe, app hỏi rồi tải model 282 MB vào máy.
 
+## Chạy bản web
+
+Cần Node 24. Chạy backend với `PORT=3001`, vì bản web dùng cổng 3000.
+
+```bash
+cd web
+npm ci
+BACKEND_URL=http://localhost:3001 WEB_URL=http://localhost:3000 WORKOS_CLIENT_ID=<client-id> npm run dev
+```
+
 ## Kiểm thử
 
 ```bash
 cd backend && npm run build && npm test
 cd mobile && flutter analyze && flutter test --concurrency=1
+cd web && npm run lint && npm run typecheck && npm test
+cd web && npm run build && npx playwright test
 ```
 
 Hook `pre-push` chạy các lệnh trên cho những phần mà lần push thay đổi. Bật một lần cho mỗi clone bằng `git config core.hooksPath .githooks`.
@@ -188,6 +219,8 @@ Integration test ghi đè app đã cài trên simulator, nên phải build lại
 ## Deploy
 
 Backend chạy trên Railway từ `backend/Dockerfile`. Đặt `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `SUPER_ADMIN_EMAIL`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, và nếu dùng giọng qua mạng thì `VIENEU_URL`, `VIENEU_API_KEY`, trong biến môi trường của Railway, không đưa vào repo.
+
+Bản web là một service Railway riêng, build từ `web/Dockerfile`. Đặt `BACKEND_URL`, `WEB_URL` và `WORKOS_CLIENT_ID`.
 
 Bản iPhone trỏ vào backend đã deploy:
 
