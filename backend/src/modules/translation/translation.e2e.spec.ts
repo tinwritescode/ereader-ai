@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Stream } from 'node:stream';
 import request from 'supertest';
 import { LLM_GATEWAY, LlmCompletionRequest, LlmError } from '../../shared/llm/llm-gateway';
 import { ScriptedLlmGateway } from '../../shared/llm/testing/scripted-llm.gateway';
@@ -11,6 +12,7 @@ import { AccountSlots } from '../../shared/tasks/account-slots';
 import { InMemoryAccountStore } from '../accounts/application/account-store';
 import { usageMonth } from '../accounts/domain/plan';
 import { testAccounts } from '../accounts/testing/fake-identity';
+import { readEpub } from '../books/application/epub-reader';
 import { BooksModule } from '../books/books.module';
 import { buildEpub } from '../books/testing/epub-fixture';
 import { BookTranslationService } from './application/book-translation.service';
@@ -34,6 +36,13 @@ type Task = {
   percent: number;
   waiting: string[];
   current: { chapterId: string; percent: number } | null;
+};
+
+/** Collects a binary answer, which supertest leaves unread unless told how. */
+const bytes = (response: Stream, done: (error: Error | null, body: Buffer) => void) => {
+  const chunks: Buffer[] = [];
+  response.on('data', (chunk: Buffer) => chunks.push(chunk));
+  response.on('end', () => done(null, Buffer.concat(chunks)));
 };
 
 const hasBlocks = (input: unknown): input is Input =>
@@ -351,5 +360,52 @@ describe('translating a whole book', () => {
     // What a fresh process does on boot, against the same stores.
     await app.get(BookTranslationService).onApplicationBootstrap();
     expect((await settled())[0]).toMatchObject({ state: 'done', done: 3 });
+  });
+  it('hands the finished translation over as a Vietnamese EPUB, keeping its pictures and cover', async () => {
+    const file = await buildEpub({ language: 'en', pictures: true, cover: 'epub3', frontMatter: true });
+    const { body: book } = await http().post('/books').set(as('max-1')).attach('file', file, 'book.epub').expect(202);
+    const path = `/books/${book.bookId}/translation/epub`;
+    await http().get(path).set(as('max-1')).expect(409, { code: 'TRANSLATION_NOT_DONE' });
+
+    await http().post(`/books/${book.bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+    const response = await http().get(path).set(as('max-1')).buffer(true).parse(bytes).expect(200);
+
+    expect(response.headers['content-type']).toBe('application/epub+zip');
+    const name = /filename\*=UTF-8''(\S+)/.exec(response.headers['content-disposition'])?.[1] ?? '';
+    expect(response.headers['content-disposition']).toMatch(/^attachment;/);
+    expect(decodeURIComponent(name)).toBe('Synthetic Book (tiếng Việt).epub');
+    const written = await readEpub(response.body);
+    if (written.kind !== 'ok') throw new Error(written.reason);
+    expect(written.book.metadata).toEqual({ title: 'Synthetic Book', author: 'Ada Writer', language: 'vi' });
+    expect(written.book.cover?.mediaType).toBe('image/png');
+    const { body: list } = await http().get(`/books/${book.bookId}/chapters`).set(as('max-1')).expect(200);
+    const main = list.chapters.filter(({ kind }: { kind: string }) => kind === 'main');
+    const expected = await Promise.all(
+      main.map(async ({ chapterId }: { chapterId: string }) => {
+        const { body: chapter } = await http().get(`/chapters/${chapterId}`).set(as('max-1')).expect(200);
+        return {
+          label: chapter.label,
+          subtitle: chapter.subtitle,
+          kind: 'main',
+          blocks: chapter.blocks.map(({ kind, text }: { kind: string; text: string }) => ({ kind, text: `ED VI ${text}` })),
+          figures: chapter.figures.map(({ before, alt, image }: { before: number; alt: string | null; image: string }) => ({ before, alt, image })),
+        };
+      }),
+    );
+    expect(expected.flatMap(({ figures }) => figures)).not.toEqual([]);
+    expect(
+      written.book.chapters.map(({ figures, ...chapter }) => ({
+        ...chapter,
+        figures: figures.map(({ before, alt, image }) => ({ before, alt, image: image.name })),
+      })),
+    ).toEqual(expected);
+  });
+
+  it('hands a translation over to the book’s owner only', async () => {
+    const { bookId } = await importBook();
+    await http().post(`/books/${bookId}/translation`).set(as('max-1')).send({}).expect(201);
+    await settled();
+    await http().get(`/books/${bookId}/translation/epub`).set(as('free-1')).expect(404);
   });
 });

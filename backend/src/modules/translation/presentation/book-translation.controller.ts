@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Res, StreamableFile, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { Account } from '../../accounts/domain/plan';
 import { AuthGuard, CurrentAccount } from '../../accounts/presentation/auth.guard';
 import { BookTranslationService } from '../application/book-translation.service';
@@ -21,6 +22,13 @@ export class BookTranslationController {
   async ofBook(@Param('id') bookId: string, @CurrentAccount() account: Account) {
     const { translated, task } = await this.translations.ofBook(account, bookId);
     return { translated, task: task && toResponse(task, this.translations.position(task)) };
+  }
+
+  @Get('books/:id/translation/epub')
+  async epub(@Param('id') bookId: string, @CurrentAccount() account: Account, @Res({ passthrough: true }) response: Response) {
+    const { title, bytes } = await this.translations.epub(account, bookId);
+    response.attachment(`${title} (tiếng Việt).epub`).type('application/epub+zip');
+    return new StreamableFile(bytes);
   }
 
   @Get('chapters/:id/translation')

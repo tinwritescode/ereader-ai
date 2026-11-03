@@ -3,11 +3,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { countWords, readingMinutes } from '../../../shared/reading-time';
 import { STORAGE_GATEWAY, StorageGateway } from '../../../shared/storage/storage-gateway';
-import { BookCover, BookImportResult, BookRecord, ChapterRecord, PICTURE_TYPES, SHAPE_VERSION } from '../domain/book';
+import { BookCover, BookImportResult, BookRecord, ChapterRecord, Figure, PICTURE_TYPES, SHAPE_VERSION } from '../domain/book';
 import { bookLanguage } from '../domain/book-language';
 import { reshapedChapters } from '../domain/book-reshape';
 import { BOOK_STORE, BookStore, BookSummary } from './book-store';
-import { EpubBook, EpubChapter, EpubCover, readEpub } from './epub-reader';
+import { EpubBook, EpubChapter, EpubCover, EpubFigure, readEpub } from './epub-reader';
+import { writeEpub } from './epub-writer';
 
 export type ImportBookCommand = {
   userId: string;
@@ -92,12 +93,11 @@ export class BookService {
 
   /** Open to anyone holding the name, which comes from the picture's bytes and cannot be guessed. */
   async image(name: string): Promise<EpubCover> {
-    const mediaType = PICTURE_TYPES.get(PICTURE_NAME.exec(name)?.[1] ?? '');
-    const bytes = mediaType && (await this.storage.get(imageKey(name)));
-    if (!mediaType || !bytes) {
+    const image = await this.storedImage(name);
+    if (!image) {
       throw new NotFoundException('IMAGE_NOT_FOUND');
     }
-    return { bytes, mediaType };
+    return image;
   }
 
   async chapters(userId: string, bookId: string): Promise<ChapterRecord[]> {
@@ -107,6 +107,32 @@ export class BookService {
   /** The book proper: what whole-book tasks work through. */
   async mainChapters(userId: string, bookId: string): Promise<ChapterRecord[]> {
     return (await this.chapters(userId, bookId)).filter(({ kind }) => kind === 'main');
+  }
+
+  /**
+   * The book proper written out as an EPUB with the given chapters, which may carry other words than the ones
+   * read in; the cover and the pictures come from the book as kept.
+   */
+  async writeOut(
+    userId: string,
+    bookId: string,
+    { language, chapters }: { language: string; chapters: ChapterRecord[] },
+  ): Promise<Buffer> {
+    const book = await this.status(userId, bookId);
+    const coverBytes = book.cover && (await this.storage.get(book.cover.key));
+    return writeEpub({
+      id: book.id,
+      metadata: { title: book.title, author: book.author, language },
+      cover: book.cover && coverBytes ? { bytes: coverBytes, mediaType: book.cover.mediaType } : null,
+      chapters: await Promise.all(
+        chapters.map(async ({ label, subtitle, blocks, figures }) => ({
+          label,
+          subtitle,
+          blocks: blocks.map(({ kind, text }) => ({ kind, text })),
+          figures: await this.storedFigures(figures),
+        })),
+      ),
+    });
   }
 
   /**
@@ -145,6 +171,23 @@ export class BookService {
       chapters: reshapedChapters(await this.store.chapters(book.id), epub.book.chapters.map(withStoredFigures)),
       shapeVersion: SHAPE_VERSION,
     });
+  }
+
+  /** A picture no longer kept is left out, and the text reads on without it. */
+  private async storedFigures(figures: Figure[]): Promise<EpubFigure[]> {
+    const found = await Promise.all(
+      figures.map(async ({ before, alt, image: name, width, height }) => {
+        const image = await this.storedImage(name);
+        return image ? [{ before, alt, image: { name, width, height, ...image } }] : [];
+      }),
+    );
+    return found.flat();
+  }
+
+  private async storedImage(name: string): Promise<EpubCover | null> {
+    const mediaType = PICTURE_TYPES.get(PICTURE_NAME.exec(name)?.[1] ?? '');
+    const bytes = mediaType && (await this.storage.get(imageKey(name)));
+    return mediaType && bytes ? { bytes, mediaType } : null;
   }
 
   /** Named by their bytes, so a retry or another copy of the book rewrites the same objects. */

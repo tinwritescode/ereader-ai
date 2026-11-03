@@ -162,6 +162,24 @@ export class BookTranslationService implements OnApplicationBootstrap {
     return blocks;
   }
 
+  /** The book proper in Vietnamese, once every chapter of it is translated. */
+  async epub(account: Account, bookId: string): Promise<{ title: string; bytes: Buffer }> {
+    const { title } = await this.books.status(account.id, bookId);
+    const chapters = await this.books.mainChapters(account.id, bookId);
+    const translated = (
+      await Promise.all(
+        chapters.map(async (chapter) => {
+          const blocks = await this.translations.find(chapter.id);
+          return blocks ? [{ ...chapter, blocks }] : [];
+        }),
+      )
+    ).flat();
+    if (translated.length === 0 || translated.length < chapters.length) {
+      throw new ConflictException({ code: 'TRANSLATION_NOT_DONE' });
+    }
+    return { title, bytes: await this.books.writeOut(account.id, bookId, { language: 'vi', chapters: translated }) };
+  }
+
   /** Stops the task and forgets it; chapters already translated stay, and the month's use is not handed back. */
   async cancel(account: Account, id: string): Promise<void> {
     await this.owned(account, id);
