@@ -186,6 +186,25 @@ test.describe('whole book and tasks', () => {
     await expect(page.getByRole('region', { name: 'Đã xong' })).toContainText('Deep Work')
   })
 
+  test('a book translated to its end can be taken away as a Vietnamese EPUB', async ({ page }) => {
+    await signIn(page)
+    await page.getByRole('link', { name: 'Deep Work' }).click()
+    await expect(page.getByText(/Dịch cả sách sang tiếng Việt/)).toBeVisible()
+    await expect(page.getByRole('link', { name: /Tải sách tiếng Việt/ })).toHaveCount(0)
+    await page.getByRole('button', { name: /Dịch cả sách sang tiếng Việt/ }).click()
+    await page.getByRole('button', { name: 'Dịch cả sách', exact: true }).click()
+    await page.getByRole('link', { name: '‹ Thư viện' }).click()
+    await page.getByRole('link', { name: /Tác vụ/ }).click()
+    await expect(page.getByText('Đã dịch xong Deep Work.')).toBeVisible({ timeout: 20_000 })
+    await page.goBack()
+    await page.getByRole('link', { name: 'Deep Work' }).click()
+
+    const download = page.waitForEvent('download')
+    await page.getByRole('link', { name: /Tải sách tiếng Việt/ }).click()
+    // WebKit on macOS hands the name back decomposed, as the file system keeps it.
+    expect((await download).suggestedFilename().normalize('NFC')).toBe('Deep Work (tiếng Việt).epub')
+  })
+
   test('voicing the whole book picks a voice first', async ({ page }) => {
     await signIn(page)
     await page.getByRole('link', { name: 'Cuộc chiến sinh tồn' }).click()

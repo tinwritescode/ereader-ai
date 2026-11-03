@@ -224,6 +224,9 @@ function advance(tasks: Task[]): void {
       task['percent'] = Math.min(task.progress, 100)
       task['done'] = task.progress >= 100 ? task['total'] : 1
       if (task.progress >= 100) {
+        if (task['kind'] === 'bookTranslation')
+          for (let chapter = 1; chapter <= Number(task['total']); chapter += 1)
+            state.translated.add(`${String(task['bookId'])}-${chapter}`)
         task['state'] = 'done'
         task['current'] = null
         task['waiting'] = []
@@ -507,6 +510,18 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   if (revoked && method === 'DELETE') {
     state.shares = state.shares.filter(({ shareId }) => shareId !== revoked[1])
     return send(response, 204)
+  }
+  const epubOfBook = /^\/books\/([^/]+)\/translation\/epub$/.exec(path)
+  if (epubOfBook?.[1] && method === 'GET') {
+    const book = state.books.find((entry) => entry.bookId === epubOfBook[1])
+    const translatedOfBook = [...state.translated].filter((id) => id.startsWith(`${epubOfBook[1]}-`))
+    if (!book || translatedOfBook.length < book.chapterCount)
+      return send(response, 409, { code: 'TRANSLATION_NOT_DONE' })
+    response.writeHead(200, {
+      'content-type': 'application/epub+zip',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${book.title} (tiếng Việt).epub`)}`,
+    })
+    return void response.end('epub-bytes')
   }
   const translationOfBook = /^\/books\/([^/]+)\/translation$/.exec(path)
   if (translationOfBook?.[1] && method === 'GET') {

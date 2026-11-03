@@ -23,6 +23,9 @@ import type { WholeBookOffer, WholeBookTask } from '../domain/task'
 import { bookVoiceQuery, translateBook, translationQuery, voiceBook } from '../data/tasks'
 import { useTaskActions } from './use-task-actions'
 
+const ROW =
+  'block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted'
+
 type Words = { title: string; note: string; doing: string; waiting: string; named: string; finished: string }
 export type StartChapter = { chapterId: string; chapterLabel: string } | null
 
@@ -41,28 +44,17 @@ function WholeBookRow({
     case 'hidden':
       return null
     case 'done':
-      return (
-        <p className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted soft">
-          {words.finished}
-        </p>
-      )
+      return <p className={`${ROW} soft`}>{words.finished}</p>
     case 'open':
       return (
-        <button
-          type="button"
-          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted"
-          onClick={onOffer}
-        >
+        <button type="button" className={ROW} onClick={onOffer}>
           {words.title}
           <small>{words.note}</small>
         </button>
       )
     case 'locked':
       return (
-        <Link
-          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted text-muted!"
-          to="/plans"
-        >
+        <Link className={`${ROW} text-muted!`} to="/plans">
           {words.title}
           <small>gói Max</small>
         </Link>
@@ -70,10 +62,7 @@ function WholeBookRow({
     case 'underWay': {
       const { task } = offer
       return (
-        <Link
-          className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted"
-          to="/tasks"
-        >
+        <Link className={ROW} to="/tasks">
           {task.position !== null
             ? `${words.waiting}, thứ ${task.position} trong hàng`
             : `${words.doing}, chương ${task.done} trên ${task.total}`}
@@ -84,7 +73,7 @@ function WholeBookRow({
     }
     case 'stopped':
       return (
-        <div className="block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted text-red!">
+        <div className={`${ROW} text-red!`}>
           {`${words.named}, bị dừng ở ${offer.task.percent}%`}
           <small>{failureText(offer.task.code)}</small>
           <Button quiet onClick={() => onResume(offer.task)}>
@@ -295,6 +284,13 @@ export function WholeBookRows({
         onOffer={() => setOpen('translate')}
         onResume={resume}
       />
+      {translateOffer.kind === 'done' && (
+        // The backend names the file; a plain link lets the browser keep it as a download.
+        <a className={ROW} href={`/api/books/${encodeURIComponent(book.bookId)}/translation/epub`} download>
+          Tải sách tiếng Việt
+          <small>file EPUB, đọc được trên máy khác</small>
+        </a>
+      )}
       <WholeBookRow
         offer={voiceOffer}
         words={{

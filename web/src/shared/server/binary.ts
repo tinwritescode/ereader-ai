@@ -11,13 +11,15 @@ function failed(error: unknown): Response {
   return Response.json({ code: error.message }, { status })
 }
 
+const PASSED_ON = ['content-type', 'content-length', 'content-disposition']
+
 /** Passes the backend's answer on without holding it in memory. */
 function streamed(upstream: Response, extra: Record<string, string> = {}): Response {
   const headers = new Headers(extra)
-  const type = upstream.headers.get('content-type')
-  if (type) headers.set('content-type', type)
-  const length = upstream.headers.get('content-length')
-  if (length) headers.set('content-length', length)
+  for (const name of PASSED_ON) {
+    const value = upstream.headers.get(name)
+    if (value) headers.set(name, value)
+  }
   return new Response(upstream.body, { status: upstream.status, headers })
 }
 
@@ -34,6 +36,15 @@ export async function imageResponse(name: string): Promise<Response> {
   try {
     const upstream = await publicResponse(`/images/${encodeURIComponent(name)}`)
     return streamed(upstream, upstream.ok ? { 'cache-control': IMAGE_CACHE } : {})
+  } catch (error) {
+    return failed(error)
+  }
+}
+
+/** The translated book as a file to keep, under the name the backend gives it. */
+export async function translatedEpubResponse(bookId: string): Promise<Response> {
+  try {
+    return streamed(await authedResponse(`/books/${encodeURIComponent(bookId)}/translation/epub`))
   } catch (error) {
     return failed(error)
   }
