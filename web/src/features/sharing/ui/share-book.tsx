@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { codeOf, errorMessage } from '~/features/books/domain/words'
 import { Button } from '~/shared/ui/button'
+import { LetterCat } from '~/shared/ui/critters'
 import { Sheet } from '~/shared/ui/sheet'
+import { TILE, TileFace } from '~/shared/ui/tile'
 import { createShare, revokeShare, sharesQuery } from '../data/shares'
 
 const FIELD = 'min-h-11 w-full rounded-lg border-2 border-ink bg-paper px-3 text-ink'
@@ -102,9 +104,9 @@ export function ShareBook({ bookId }: { bookId: string }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <Button quiet onClick={() => setOpen(true)}>
-        Chia sẻ
-      </Button>
+      <button type="button" className={TILE} onClick={() => setOpen(true)}>
+        <TileFace critter={<LetterCat mood="idle" />} title="Chia sẻ" note="Gửi link kèm mật khẩu" />
+      </button>
       {open && (
         <Sheet title="Chia sẻ sách" onClose={() => setOpen(false)}>
           <ShareSheet bookId={bookId} onClose={() => setOpen(false)} />

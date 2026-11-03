@@ -8,6 +8,7 @@ import { ResumeLine, WithStartChapter } from '~/features/reading/ui/spots'
 import { ShareBook } from '~/features/sharing/ui/share-book'
 import { ChapterMark, WholeBookRows } from '~/features/tasks/ui/whole-book'
 import { pageTitle } from '~/shared/ui/page-title'
+import { TileShelf } from '~/shared/ui/tile'
 
 export const Route = createFileRoute('/_app/_shelf/books/$bookId/')({
   loader: async ({ context, params }) => {
@@ -35,7 +36,7 @@ function BookRoute() {
             <ChapterMark bookId={book.bookId} chapterId={chapter.chapterId} fallback={fallback} />
           )}
           aside={(book) => (
-            <>
+            <TileShelf>
               <WithAccount>
                 {(account) => (
                   <WithVoices>
@@ -44,7 +45,7 @@ function BookRoute() {
                 )}
               </WithAccount>
               <ShareBook bookId={book.bookId} />
-            </>
+            </TileShelf>
           )}
         />
       )}

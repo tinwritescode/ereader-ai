@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { Account } from '~/features/account/domain/account'
 import { limitsOf, resetLabel } from '~/features/account/domain/account'
 import type { Book } from '~/features/books/domain/book'
@@ -8,8 +9,11 @@ import { isForeign } from '~/features/books/domain/book'
 import { codeOf, durationLabel, errorMessage } from '~/features/books/domain/words'
 import type { Voice } from '~/features/listen/domain/controller'
 import { Button } from '~/shared/ui/button'
+import { SingingBird, TranslatorNut } from '~/shared/ui/critters'
+import type { Mood } from '~/shared/ui/critters'
 import { useNotice } from '~/shared/ui/notice'
 import { Sheet } from '~/shared/ui/sheet'
+import { TILE, TileFace } from '~/shared/ui/tile'
 import { Track } from '~/shared/ui/track'
 import {
   chaptersWithin,
@@ -23,20 +27,22 @@ import type { WholeBookOffer, WholeBookTask } from '../domain/task'
 import { bookVoiceQuery, translateBook, translationQuery, voiceBook } from '../data/tasks'
 import { useTaskActions } from './use-task-actions'
 
-const ROW =
-  'block py-1 text-left text-sm font-semibold text-ink no-underline [&_small]:block [&_small]:text-[13px] [&_small]:font-normal [&_small]:text-muted'
-
-type Words = { title: string; note: string; doing: string; waiting: string; named: string; finished: string }
+type Words = { title: string; note: string; doing: string; waiting: string; named: string }
 export type StartChapter = { chapterId: string; chapterLabel: string } | null
 
+/** One whole-book job as a tile; [done] is what stands once it is finished, and [critter] who does it. */
 function WholeBookRow({
   offer,
   words,
+  critter,
+  done,
   onOffer,
   onResume,
 }: {
   offer: WholeBookOffer
   words: Words
+  critter: (mood: Mood) => ReactNode
+  done: ReactNode
   onOffer: () => void
   onResume: (task: WholeBookTask) => void
 }) {
@@ -44,41 +50,49 @@ function WholeBookRow({
     case 'hidden':
       return null
     case 'done':
-      return <p className={`${ROW} soft`}>{words.finished}</p>
+      return done
     case 'open':
       return (
-        <button type="button" className={ROW} onClick={onOffer}>
-          {words.title}
-          <small>{words.note}</small>
+        <button type="button" className={TILE} onClick={onOffer}>
+          <TileFace critter={critter('idle')} title={words.title} note={words.note} />
         </button>
       )
     case 'locked':
       return (
-        <Link className={`${ROW} text-muted!`} to="/plans">
-          {words.title}
-          <small>gói Max</small>
+        <Link className={`${TILE} [&_.critter]:opacity-55 [&_.critter]:grayscale`} to="/plans">
+          <TileFace critter={critter('idle')} title={words.title} note="có trong gói Max" />
         </Link>
       )
     case 'underWay': {
       const { task } = offer
       return (
-        <Link className={ROW} to="/tasks">
-          {task.position !== null
-            ? `${words.waiting}, thứ ${task.position} trong hàng`
-            : `${words.doing}, chương ${task.done} trên ${task.total}`}
-          <Track percent={task.percent} />
-          <small>{`${task.percent}%`}</small>
+        <Link className={TILE} to="/tasks">
+          <TileFace
+            critter={critter('busy')}
+            title={
+              task.position !== null
+                ? `${words.waiting}, thứ ${task.position} trong hàng`
+                : `${words.doing}, chương ${task.done} trên ${task.total}`
+            }
+            note={`${task.percent}%`}
+          >
+            <Track percent={task.percent} className="w-40" />
+          </TileFace>
         </Link>
       )
     }
     case 'stopped':
       return (
-        <div className={`${ROW} text-red!`}>
-          {`${words.named}, bị dừng ở ${offer.task.percent}%`}
-          <small>{failureText(offer.task.code)}</small>
-          <Button quiet onClick={() => onResume(offer.task)}>
-            Chạy tiếp
-          </Button>
+        <div className={`${TILE} [&_.tile-title]:text-red`}>
+          <TileFace
+            critter={critter('tired')}
+            title={`${words.named}, bị dừng ở ${offer.task.percent}%`}
+            note={failureText(offer.task.code)}
+          >
+            <Button quiet className="self-start" onClick={() => onResume(offer.task)}>
+              Chạy tiếp
+            </Button>
+          </TileFace>
         </div>
       )
     default: {
@@ -270,37 +284,51 @@ export function WholeBookRows({
   })
   const voiceOffer = voiceOfferFor({ allowed: limits.chapterVoice, standing: voice.data ?? null })
   return (
-    <div className="flex flex-wrap items-center gap-x-6.5 gap-y-2">
+    <>
       <WholeBookRow
         offer={translateOffer}
+        critter={(mood) => <TranslatorNut mood={mood} />}
         words={{
           title: 'Dịch cả sách sang tiếng Việt',
           note: `gói Max, tháng này còn ${limits.monthlyBookTranslations - account.bookTranslationsUsed} lượt`,
           doing: 'Đang dịch cả sách',
           waiting: 'Chờ dịch cả sách',
           named: 'Dịch cả sách',
-          finished: 'Đã dịch cả sách sang tiếng Việt',
         }}
+        done={
+          // The backend names the file; a plain link lets the browser keep it as a download.
+          <a className={TILE} href={`/api/books/${encodeURIComponent(book.bookId)}/translation/epub`} download>
+            <TileFace
+              critter={<TranslatorNut mood="idle" holdingBook />}
+              stamp="xong!"
+              title="Tải sách tiếng Việt"
+              note="Đã dịch xong, file EPUB"
+            />
+          </a>
+        }
         onOffer={() => setOpen('translate')}
         onResume={resume}
       />
-      {translateOffer.kind === 'done' && (
-        // The backend names the file; a plain link lets the browser keep it as a download.
-        <a className={ROW} href={`/api/books/${encodeURIComponent(book.bookId)}/translation/epub`} download>
-          Tải sách tiếng Việt
-          <small>file EPUB, đọc được trên máy khác</small>
-        </a>
-      )}
       <WholeBookRow
         offer={voiceOffer}
+        critter={(mood) => <SingingBird mood={mood} />}
         words={{
           title: 'Tạo giọng đọc cả sách',
-          note: 'gói Max',
+          note: 'gói Max, nghe khỏi chờ',
           doing: 'Đang tạo giọng cả sách',
           waiting: 'Chờ tạo giọng cả sách',
           named: 'Tạo giọng cả sách',
-          finished: 'Đã có giọng đọc cả sách',
         }}
+        done={
+          <p className={TILE}>
+            <TileFace
+              critter={<SingingBird mood="idle" />}
+              stamp="xong!"
+              title="Đã có giọng đọc cả sách"
+              note="Chương nào cũng nghe ngay"
+            />
+          </p>
+        }
         onOffer={() => setOpen('voice')}
         onResume={resume}
       />
@@ -310,7 +338,7 @@ export function WholeBookRows({
       {open === 'voice' && (
         <VoiceBookSheet book={book} account={account} start={start} voices={voices} onClose={() => setOpen(null)} />
       )}
-    </div>
+    </>
   )
 }
 

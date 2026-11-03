@@ -393,3 +393,93 @@ html:active-view-transition-type(page-turn)::view-transition-new(root) {
     animation: none !important;
   }
 }
+/*
+ * Book tiles: a critter hops when its tile is pointed at, and the title gets the marker drawn across it.
+ * A critter at work bobs and lets marks drift up; a finished one wears a red stamp, pressed on once.
+ */
+.critter {
+  transform-origin: 50% 100%;
+}
+.critter-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.critter-float {
+  opacity: 0;
+  transform-box: fill-box;
+}
+.tile-title {
+  background: linear-gradient(rgb(251 227 107 / 0.55) 0 0) left 0 bottom 2px / 0% 45% no-repeat;
+  transition: background-size 260ms var(--ease-hand);
+}
+.tile:is(a, button):is(:hover, :focus-visible) .tile-title {
+  background-size: 100% 45%;
+}
+@keyframes critter-hop {
+  30% {
+    transform: scale(1.08, 0.9);
+  }
+  55% {
+    transform: translateY(-7px) scale(0.95, 1.06);
+  }
+  80% {
+    transform: scale(1.04, 0.96);
+  }
+}
+@keyframes critter-bob {
+  50% {
+    transform: translateY(-2px) rotate(4deg);
+  }
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+}
+@keyframes critter-blink {
+  0%,
+  93%,
+  100% {
+    transform: scaleY(1);
+  }
+  96% {
+    transform: scaleY(0.1);
+  }
+}
+@keyframes critter-float {
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(7px, -16px) rotate(12deg);
+  }
+}
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.8) rotate(-24deg);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .critter-eye {
+    animation: critter-blink 4.2s infinite;
+  }
+  .critter[data-mood='busy'] {
+    animation: critter-bob 1.1s ease-in-out infinite;
+  }
+  .critter[data-mood='busy'] .critter-float {
+    animation: critter-float 1.65s linear infinite;
+  }
+  .tile:is(a, button):is(:hover, :focus-visible) .critter {
+    animation: critter-hop 520ms var(--ease-hand);
+  }
+  .tile:is(a, button):is(:hover, :focus-visible) .critter:not([data-mood='busy']) .critter-float {
+    animation: critter-float 1.2s linear;
+  }
+  .tile-stamp {
+    animation: stamp 420ms var(--ease-hinge) 250ms both;
+  }
+}
+.tile-stamp {
+  rotate: -12deg;
+}
