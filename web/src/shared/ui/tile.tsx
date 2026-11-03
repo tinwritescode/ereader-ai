@@ -3,11 +3,14 @@ import { BusyDots } from './busy-dots'
 
 /** One thing to do with a book, as a sticker in the notebook: a critter, what it does, and a note. */
 export const TILE =
-  'tile group flex min-h-14 items-start gap-2.5 text-left text-ink no-underline outline-offset-4 disabled:opacity-60'
+  'tile group flex items-start gap-2.5 text-left text-ink no-underline outline-offset-4 disabled:opacity-60'
 
-/** Tiles one under another, so every critter stands in line and no tile is ever squeezed beside another. */
+/**
+ * Tiles one under another, so every critter stands in line and no tile is ever squeezed beside another.
+ * The space above leaves room for what pokes out of a critter (a stamp, a hat) clear of what sits above the shelf.
+ */
 export function TileShelf({ children }: { children: ReactNode }) {
-  return <div className="grid max-w-md basis-full gap-y-3">{children}</div>
+  return <div className="grid max-w-md basis-full gap-y-5 pt-4">{children}</div>
 }
 
 /**
