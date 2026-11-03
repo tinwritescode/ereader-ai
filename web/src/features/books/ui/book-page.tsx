@@ -106,19 +106,26 @@ export function BookView({
   const [frontOpen, setFrontOpen] = useState(front.some(({ chapterId }) => chapterId === currentId))
   return (
     <>
-      {/* A phone has no room beside the cover, so the actions take their own full-width row under it. */}
-      <div className="mb-line grid grid-cols-[68px_1fr] gap-x-3 gap-y-4 md:grid-cols-[110px_1fr] md:grid-rows-[auto_1fr] md:gap-x-5 md:gap-y-2">
-        <div className="md:row-span-2">
+      {/*
+        A wide screen sets the head as three columns of about one height: the cover, the title with the way
+        back in, and the actions. Narrower, everything stands on one axis under the cover, so nothing is squeezed.
+      */}
+      <div className="mb-line grid grid-cols-[68px_minmax(0,1fr)] gap-x-3 gap-y-4 md:grid-cols-[110px_minmax(0,1fr)] md:gap-x-5 lg:grid-cols-[110px_fit-content(26rem)_minmax(16.5rem,20rem)] lg:grid-rows-[auto_1fr] lg:gap-x-8 lg:gap-y-3">
+        <div className="lg:row-span-2">
           <BookCover book={book} />
         </div>
         <div>
           <h1 className="max-w-[24em] text-[17px]/[21px] md:text-[26px]/7">{book.title}</h1>
           <p className="soft leading-7!">{[book.author, `${book.chapterCount} chương`].filter(Boolean).join(', ')}</p>
         </div>
-        {(resume ?? aside) && (
-          <div className="col-span-full flex min-w-0 flex-wrap items-center gap-x-6.5 gap-y-2 md:col-span-1 md:col-start-2 md:self-start [&>.primary]:md:w-auto">
-            {resume?.(book, chapters)}
-            {aside?.(book, chapters)}
+        {resume && (
+          <div className="col-span-full min-w-0 empty:hidden lg:col-span-1 lg:col-start-2">
+            {resume(book, chapters)}
+          </div>
+        )}
+        {aside && (
+          <div className="col-span-full min-w-0 lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
+            {aside(book, chapters)}
           </div>
         )}
       </div>

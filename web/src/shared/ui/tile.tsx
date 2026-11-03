@@ -10,7 +10,7 @@ export const TILE =
  * The space above leaves room for what pokes out of a critter (a stamp, a hat) clear of what sits above the shelf.
  */
 export function TileShelf({ children }: { children: ReactNode }) {
-  return <div className="grid max-w-md basis-full gap-y-5 pt-4">{children}</div>
+  return <div className="grid max-w-md gap-y-5 pt-4">{children}</div>
 }
 
 /**

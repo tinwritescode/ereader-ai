@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import type { Book, ChapterSummary } from '~/features/books/domain/book'
 import { durationLabel } from '~/features/books/domain/words'
+import { TILE } from '~/shared/ui/tile'
 import { latestSpot } from '../domain/spot'
 import type { ReadingSpot } from '../domain/spot'
 import { readingSpots } from './stores'
@@ -60,14 +61,30 @@ export function ContinueReading({ books }: { books: Book[] }) {
   return book && latest ? <ContinueCard book={book} spot={latest.spot} /> : null
 }
 
+/** A cloth bookmark tucked under the top of the page; a pull on the tile tugs it. */
+function Ribbon() {
+  return (
+    <svg className="ribbon block h-16 w-12 shrink-0 overflow-visible" viewBox="0 0 48 64" aria-hidden="true">
+      <path className="fill-red stroke-ink" strokeWidth={1.5} strokeLinejoin="round" d="M17 -2h14v60l-7-6.5-7 6.5Z" />
+      <path className="stroke-sheet/45" strokeWidth={1.5} strokeLinecap="round" d="M21 3v44" />
+      <path className="fill-ink/15" d="M17 -2h14v5H17Z" />
+    </svg>
+  )
+}
+
 /** The book page's way back to where this book was left. */
 export function ResumeLine({ book, chapters }: { book: Book; chapters: ChapterSummary[] }) {
   const spot = readingSpots.useValue()[book.bookId]
   // The device keeps the name the chapter had when last read; the book may have been renamed since.
   const label = chapters.find(({ chapterId }) => chapterId === spot?.chapterId)?.label ?? spot?.chapterLabel
   return spot ? (
-    <Link className="primary" {...spotLink({ book, spot, chapters })}>
-      {`${goOnWord(spot)} ${label}, còn ${durationLabel(spot.minutesLeft)}`}
+    <Link className={TILE} {...spotLink({ book, spot, chapters })}>
+      <Ribbon />
+      <span className="flex min-w-0 flex-col">
+        <span className="tile-title self-start font-hand text-[24px]/7 text-red">{goOnWord(spot)}</span>
+        <span className="line-clamp-2 text-[15px]/5 font-semibold">{label}</span>
+        <span className="text-[13px]/5 text-muted">{`còn ${durationLabel(spot.minutesLeft)}`}</span>
+      </span>
     </Link>
   ) : null
 }

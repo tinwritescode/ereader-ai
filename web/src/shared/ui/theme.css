@@ -519,3 +519,14 @@ html:active-view-transition-type(page-turn)::view-transition-new(root) {
     animation-delay: 300ms;
   }
 }
+.ribbon {
+  transform-origin: top;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ribbon {
+    transition: transform 320ms var(--ease-hinge);
+  }
+  .tile:is(a, button):is(:hover, :focus-visible) .ribbon {
+    transform: translateY(4px) rotate(-3deg);
+  }
+}
