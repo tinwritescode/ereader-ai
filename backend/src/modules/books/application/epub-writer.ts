@@ -1,5 +1,4 @@
 import JSZip from 'jszip';
-import { PICTURE_TYPES } from '../domain/book';
 import { EpubChapter, EpubCover, EpubImage } from './epub-reader';
 
 /** What [writeEpub] puts in the file: what [readEpub] reads out of one, all of it in the book proper. */
@@ -16,35 +15,35 @@ const XHTML = 'application/xhtml+xml';
 /** An EPUB 3 file: a cover page, then one file per chapter, each listed in the table of contents. */
 export async function writeEpub({ id, metadata, cover, chapters }: EpubDraft): Promise<Buffer> {
   const pictures = new Map(chapters.flatMap(({ figures }) => figures.map(({ image }) => [image.name, image])));
-  const coverName = cover && `cover.${extensionOf(cover.mediaType)}`;
-  const chapterFiles = chapters.map((chapter, index) => ({ id: `c${index + 1}`, href: `text/c${index + 1}.xhtml`, chapter }));
+  const coverFile = cover && { ...cover, href: `images/cover.${extensionOf(cover.mediaType)}` };
+  const chapterFiles = chapters.map((chapter, index) => ({ id: `c${index}`, href: `text/c${index}.xhtml`, chapter }));
   const items = [
     { id: 'nav', href: 'nav.xhtml', mediaType: XHTML, properties: 'nav' },
-    ...(cover && coverName
+    ...(coverFile
       ? [
-          { id: 'cover-image', href: `images/${coverName}`, mediaType: cover.mediaType, properties: 'cover-image' },
+          { id: 'cover-image', href: coverFile.href, mediaType: coverFile.mediaType, properties: 'cover-image' },
           { id: 'cover', href: 'text/cover.xhtml', mediaType: XHTML, properties: null },
         ]
       : []),
     ...chapterFiles.map(({ id: itemId, href }) => ({ id: itemId, href, mediaType: XHTML, properties: null })),
     ...[...pictures.values()].map(({ name, mediaType }, index) => ({
-      id: `p${index + 1}`,
+      id: `p${index}`,
       href: `images/${name}`,
       mediaType,
       properties: null,
     })),
   ];
-  const spine = [...(cover ? ['cover'] : []), ...chapterFiles.map(({ id: itemId }) => itemId)];
+  const spine = [...(coverFile ? ['cover'] : []), ...chapterFiles.map(({ id: itemId }) => itemId)];
 
   const zip = new JSZip();
   // Readers find the type from the first entry, which must be stored as it is.
   zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' });
   zip.file('META-INF/container.xml', CONTAINER);
-  zip.file('OEBPS/content.opf', packageDocument({ id, metadata, items, spine, withCover: cover !== null }));
+  zip.file('OEBPS/content.opf', packageDocument({ id, metadata, items, spine }));
   zip.file('OEBPS/nav.xhtml', page({ title: metadata.title, body: navBody(chapterFiles) }));
-  if (cover && coverName) {
-    zip.file(`OEBPS/images/${coverName}`, cover.bytes);
-    zip.file('OEBPS/text/cover.xhtml', page({ title: metadata.title, body: `<img src="../images/${coverName}" alt=""/>` }));
+  if (coverFile) {
+    zip.file(`OEBPS/${coverFile.href}`, coverFile.bytes);
+    zip.file('OEBPS/text/cover.xhtml', page({ title: metadata.title, body: `<img src="../${coverFile.href}" alt=""/>` }));
   }
   for (const { href, chapter } of chapterFiles) {
     zip.file(`OEBPS/${href}`, page({ title: chapter.label, body: chapterBody(chapter) }));
@@ -67,13 +66,11 @@ function packageDocument({
   metadata: { title, author, language },
   items,
   spine,
-  withCover,
 }: {
   id: string;
   metadata: EpubDraft['metadata'];
   items: Item[];
   spine: string[];
-  withCover: boolean;
 }): string {
   const modified = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -84,7 +81,6 @@ function packageDocument({
     ${author === null ? '' : `<dc:creator>${escape(author)}</dc:creator>`}
     <dc:language>${escape(language)}</dc:language>
     <meta property="dcterms:modified">${modified}</meta>
-    ${withCover ? '<meta name="cover" content="cover-image"/>' : ''}
   </metadata>
   <manifest>
 ${items.map(manifestItem).join('\n')}
@@ -133,9 +129,9 @@ ${body}
 </html>`;
 }
 
+/** image/svg+xml is cover.svg: the manifest gives the type, so the name only has to look right. */
 function extensionOf(mediaType: string): string {
-  const known = [...PICTURE_TYPES].find(([, type]) => type === mediaType)?.[0];
-  return known ?? (mediaType.replace(/^image\//, '').replace(/[^a-z0-9].*$/i, '') || 'img');
+  return /^image\/(\w+)/.exec(mediaType)?.[1] ?? 'img';
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' };

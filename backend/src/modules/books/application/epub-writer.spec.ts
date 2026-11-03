@@ -50,6 +50,13 @@ describe('writeEpub', () => {
     expect(result.book.chapters).toEqual(book.chapters.map((chapter) => ({ ...chapter, kind: 'main' })));
   });
 
+  it('keeps a cover of any picture type the book came with', async () => {
+    const cover = { bytes: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'), mediaType: 'image/svg+xml' };
+    const result = await readEpub(await writeEpub({ ...book, cover }));
+
+    expect(result.kind === 'ok' && result.book.cover).toEqual(cover);
+  });
+
   it('writes a book with no cover and no author', async () => {
     const result = await readEpub(await writeEpub({ ...book, cover: null, metadata: { ...book.metadata, author: null } }));
 
