@@ -198,3 +198,17 @@ test('the page asks to stay out of search and out of referrers', async ({ page, 
   await expect(viewer.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
   await expect(viewer.locator('meta[name="referrer"]')).toHaveAttribute('content', 'no-referrer')
 })
+
+test('a button at work says so until the server answers', async ({ page }) => {
+  await signIn(page)
+  await open(page, '/books/deep')
+  await page.getByRole('button', { name: 'Chia sẻ' }).click()
+  await page.getByLabel('Mật khẩu cho người nhận').fill(PASSWORD)
+  await stub.set({ writeDelay: 800 })
+  const make = page.getByRole('button', { name: 'Tạo link' })
+  await make.click()
+  await expect(make).toHaveAttribute('aria-busy', 'true')
+  await expect(make).toBeDisabled()
+  await expect(page.getByLabel('Link chia sẻ')).toBeVisible()
+  await expect(make).not.toHaveAttribute('aria-busy', 'true')
+})

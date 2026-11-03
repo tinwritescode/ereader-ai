@@ -81,6 +81,9 @@ function fresh() {
     requestedPlan: null as string | null,
     planRequestDelay: 0,
     cancelDelay: 0,
+    writeDelay: 0,
+    epubDelay: 0,
+    epubFails: false,
     cancelFails: false,
     planRequestFails: false,
     digestsUsed: 3,
@@ -332,6 +335,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     )
     return send(response, 204)
   }
+  if (state.writeDelay && method !== 'GET') await sleep(state.writeDelay)
   if (path === '/user_management/authorize') {
     const target = new URL(url.searchParams.get('redirect_uri') ?? '')
     target.searchParams.set('code', 'good-code')
@@ -515,7 +519,8 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   if (epubOfBook?.[1] && method === 'GET') {
     const book = state.books.find((entry) => entry.bookId === epubOfBook[1])
     const translatedOfBook = [...state.translated].filter((id) => id.startsWith(`${epubOfBook[1]}-`))
-    if (!book || translatedOfBook.length < book.chapterCount)
+    await sleep(state.epubDelay)
+    if (!book || state.epubFails || translatedOfBook.length < book.chapterCount)
       return send(response, 409, { code: 'TRANSLATION_NOT_DONE' })
     response.writeHead(200, {
       'content-type': 'application/epub+zip',

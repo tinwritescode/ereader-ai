@@ -29,5 +29,10 @@ export function useTaskActions() {
     onError: (error) => notice({ text: `Chưa chạy tiếp được. ${errorMessage(codeOf(error))}` }),
     onSettled: settle,
   })
-  return { cancel: cancel.mutate, resume: resume.mutate }
+  // Only the task being resumed shows that it is at work.
+  return {
+    cancel: cancel.mutate,
+    resume: resume.mutate,
+    resuming: resume.isPending ? (resume.variables?.id ?? null) : null,
+  }
 }

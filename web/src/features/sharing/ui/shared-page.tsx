@@ -5,6 +5,7 @@ import type { Book, ChapterSummary } from '~/features/books/domain/book'
 import { codeOf, errorMessage } from '~/features/books/domain/words'
 import type { ChapterText } from '~/features/reading/domain/chapter-text'
 import type { LengthOption } from '~/features/reading/domain/length'
+import { Button } from '~/shared/ui/button'
 import { Paper } from '~/shared/ui/shell'
 import { openShare, sharedBookQuery, sharedChapterQuery, sharedVoicesQuery } from '../data/shares'
 import type { SharedVersion } from '../data/shares'
@@ -43,9 +44,9 @@ function PasswordForm({ token }: { token: string }) {
         />
       </label>
       {open.error && <p className="failure">{errorMessage(codeOf(open.error))}</p>}
-      <button type="submit" className="primary mt-2" disabled={open.isPending}>
+      <Button type="submit" className="mt-2" busy={open.isPending}>
         Mở sách
-      </button>
+      </Button>
     </form>
   )
 }

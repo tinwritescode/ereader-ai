@@ -57,9 +57,9 @@ function ShareSheet({ bookId, onClose }: { bookId: string; onClose: () => void }
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
-        <button type="submit" className="primary" disabled={create.isPending}>
+        <Button type="submit" busy={create.isPending}>
           Tạo link
-        </button>
+        </Button>
       </form>
       {failure && <p className="failure">{errorMessage(codeOf(failure))}</p>}
       {link && (
@@ -86,7 +86,12 @@ function ShareSheet({ bookId, onClose }: { bookId: string; onClose: () => void }
               <span>
                 {new Date(createdAt).toLocaleDateString('vi-VN')}, {opened ? 'Đã khóa vào một máy' : 'Chưa ai mở'}
               </span>
-              <Button quiet disabled={revoke.isPending} onClick={() => revoke.mutate(shareId)}>
+              <Button
+                quiet
+                disabled={revoke.isPending}
+                busy={revoke.isPending && revoke.variables === shareId}
+                onClick={() => revoke.mutate(shareId)}
+              >
                 Thu hồi
               </Button>
             </li>

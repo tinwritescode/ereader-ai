@@ -199,10 +199,20 @@ test.describe('whole book and tasks', () => {
     await page.goBack()
     await page.getByRole('link', { name: 'Deep Work' }).click()
 
+    await stub.set({ epubDelay: 800 })
     const download = page.waitForEvent('download')
-    await page.getByRole('link', { name: /Tải sách tiếng Việt/ }).click()
+    const link = page.getByRole('link', { name: /Tải sách tiếng Việt/ })
+    await link.click()
+    await expect(link).toHaveAttribute('aria-busy', 'true')
+    await expect(link).toContainText('Đang đóng gói sách')
     // WebKit on macOS hands the name back decomposed, as the file system keeps it.
     expect((await download).suggestedFilename().normalize('NFC')).toBe('Deep Work (tiếng Việt).epub')
+    await expect(link).not.toHaveAttribute('aria-busy', 'true')
+
+    await stub.set({ epubDelay: 0, epubFails: true })
+    await link.click()
+    await expect(page.getByText('Chưa tải được sách. Sách chưa dịch xong.')).toBeVisible()
+    await expect(link).toContainText('Tải sách tiếng Việt')
   })
 
   test('voicing the whole book picks a voice first', async ({ page }) => {

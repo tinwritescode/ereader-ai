@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
+import type { MouseEvent } from 'react'
 import type { ReactNode } from 'react'
 import type { Account } from '~/features/account/domain/account'
 import { limitsOf, resetLabel } from '~/features/account/domain/account'
@@ -11,6 +12,7 @@ import type { Voice } from '~/features/listen/domain/controller'
 import { Button } from '~/shared/ui/button'
 import { SingingBird, TranslatorNut } from '~/shared/ui/critters'
 import type { Mood } from '~/shared/ui/critters'
+import { saveFrom } from '~/shared/ui/download'
 import { useNotice } from '~/shared/ui/notice'
 import { Sheet } from '~/shared/ui/sheet'
 import { TILE, TileFace } from '~/shared/ui/tile'
@@ -38,6 +40,7 @@ function WholeBookRow({
   done,
   onOffer,
   onResume,
+  resuming,
 }: {
   offer: WholeBookOffer
   words: Words
@@ -45,6 +48,7 @@ function WholeBookRow({
   done: ReactNode
   onOffer: () => void
   onResume: (task: WholeBookTask) => void
+  resuming: string | null
 }) {
   switch (offer.kind) {
     case 'hidden':
@@ -89,7 +93,7 @@ function WholeBookRow({
             title={`${words.named}, bị dừng ở ${offer.task.percent}%`}
             note={failureText(offer.task.code)}
           >
-            <Button quiet className="self-start" onClick={() => onResume(offer.task)}>
+            <Button quiet busy={resuming === offer.task.id} className="self-start" onClick={() => onResume(offer.task)}>
               Chạy tiếp
             </Button>
           </TileFace>
@@ -149,7 +153,7 @@ function TranslateSheet({
           : `Đã dùng hết ${monthly} lượt dịch sách tháng này. Lượt mới có vào ${resetLabel(account)}.`}
       </p>
       {left > 0 && (
-        <Button disabled={translate.isPending} onClick={() => translate.mutate(undefined, { onSuccess: onClose })}>
+        <Button busy={translate.isPending} onClick={() => translate.mutate(undefined, { onSuccess: onClose })}>
           Dịch cả sách
         </Button>
       )}
@@ -218,13 +222,18 @@ function VoiceBookSheet({
         {standing.chapters > 0 && create}
         {standing.chapters > 0 && (
           <Button
-            disabled={voice.isPending || !voiceCode}
+            busy={voice.isPending}
+            disabled={!voiceCode}
             onClick={() => voice.mutate(undefined, { onSuccess: onClose })}
           >
             {`Tạo giọng ${standing.chapters} chương đã dịch`}
           </Button>
         )}
-        <Button quiet onClick={() => goTranslate.mutate(undefined, { onSuccess: onClose })}>
+        <Button
+          quiet
+          busy={goTranslate.isPending}
+          onClick={() => goTranslate.mutate(undefined, { onSuccess: onClose })}
+        >
           Dịch cả sách trước
         </Button>
         <Button quiet onClick={onClose}>
@@ -249,13 +258,45 @@ function VoiceBookSheet({
           .filter(Boolean)
           .join(' ')}
       </p>
-      <Button disabled={voice.isPending || !voiceCode} onClick={() => voice.mutate(undefined, { onSuccess: onClose })}>
+      <Button
+        busy={voice.isPending}
+        disabled={!voiceCode}
+        onClick={() => voice.mutate(undefined, { onSuccess: onClose })}
+      >
         {enough ? 'Tạo giọng cả sách' : 'Tạo tới khi hết phút'}
       </Button>
       <Button quiet onClick={onClose}>
         Để sau
       </Button>
     </Sheet>
+  )
+}
+
+/** The finished translation to keep. Building the EPUB takes a moment, so the nut packs it where it can be seen. */
+function EpubTile({ book }: { book: Book }) {
+  const notice = useNotice()
+  const url = `/api/books/${encodeURIComponent(book.bookId)}/translation/epub`
+  const save = useMutation({
+    // The backend names the file; this name stands only if it does not.
+    mutationFn: () => saveFrom(url, `${book.title}.epub`),
+    onError: (error) => notice({ text: `Chưa tải được sách. ${errorMessage(codeOf(error))}` }),
+  })
+  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    // A click with a key held is the browser's own (a new tab, a plain save); the link still works there.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    if (!save.isPending) save.mutate()
+  }
+  return (
+    <a className={TILE} href={url} download aria-busy={save.isPending || undefined} onClick={onClick}>
+      <TileFace
+        critter={<TranslatorNut mood={save.isPending ? 'busy' : 'idle'} holdingBook />}
+        stamp="xong!"
+        title="Tải sách tiếng Việt"
+        note={save.isPending ? 'Đang đóng gói sách' : 'Đã dịch xong, file EPUB'}
+        busy={save.isPending}
+      />
+    </a>
   )
 }
 
@@ -273,7 +314,7 @@ export function WholeBookRows({
 }) {
   const translation = useQuery(translationQuery(book.bookId))
   const voice = useQuery(bookVoiceQuery(book.bookId))
-  const { resume } = useTaskActions()
+  const { resume, resuming } = useTaskActions()
   const [open, setOpen] = useState<'translate' | 'voice' | null>(null)
   const limits = limitsOf(account)
   const translateOffer = translateOfferFor({
@@ -295,19 +336,10 @@ export function WholeBookRows({
           waiting: 'Chờ dịch cả sách',
           named: 'Dịch cả sách',
         }}
-        done={
-          // The backend names the file; a plain link lets the browser keep it as a download.
-          <a className={TILE} href={`/api/books/${encodeURIComponent(book.bookId)}/translation/epub`} download>
-            <TileFace
-              critter={<TranslatorNut mood="idle" holdingBook />}
-              stamp="xong!"
-              title="Tải sách tiếng Việt"
-              note="Đã dịch xong, file EPUB"
-            />
-          </a>
-        }
+        done={<EpubTile book={book} />}
         onOffer={() => setOpen('translate')}
         onResume={resume}
+        resuming={resuming}
       />
       <WholeBookRow
         offer={voiceOffer}
@@ -331,6 +363,7 @@ export function WholeBookRows({
         }
         onOffer={() => setOpen('voice')}
         onResume={resume}
+        resuming={resuming}
       />
       {open === 'translate' && (
         <TranslateSheet book={book} account={account} start={start} onClose={() => setOpen(null)} />

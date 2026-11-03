@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BusyDots } from './busy-dots'
 
 /** One thing to do with a book, as a sticker in the notebook: a critter, what it does, and a note. */
 export const TILE =
@@ -11,19 +12,21 @@ export function TileShelf({ children }: { children: ReactNode }) {
 
 /**
  * What a tile shows. [stamp] is a teacher's mark in red pen on the critter, for something finished;
- * [children] go under the note, such as a progress track or a button.
+ * [children] go under the note, such as a progress track or a button; [busy] puts dots after the note while work runs.
  */
 export function TileFace({
   critter,
   title,
   note,
   stamp,
+  busy = false,
   children,
 }: {
   critter: ReactNode
   title: string
   note: string
   stamp?: string
+  busy?: boolean
   children?: ReactNode
 }) {
   return (
@@ -38,7 +41,10 @@ export function TileFace({
       </span>
       <span className="flex min-w-0 flex-col pt-1">
         <span className="tile-title self-start text-sm/5 font-semibold">{title}</span>
-        <span className="text-[13px]/5 text-muted">{note}</span>
+        <span className="text-[13px]/5 text-muted">
+          {note}
+          {busy && <BusyDots />}
+        </span>
         {children}
       </span>
     </>

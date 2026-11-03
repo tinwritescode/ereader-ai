@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table'
 import { Link } from '@tanstack/react-router'
+import { Button } from '~/shared/ui/button'
 import { Track } from '~/shared/ui/track'
 import { GROUP_NAMES, groupOf, rowOf } from '../domain/task'
 import type { LongTask, TaskGroup } from '../domain/task'
@@ -16,14 +17,14 @@ function TaskAction({ task }: { task: LongTask }) {
   if (task.state === 'done') return null
   const stopped = task.state === 'stopped'
   return (
-    <button
-      type="button"
-      className="ink-link"
+    <Button
+      quiet
+      busy={actions.resuming === task.id}
       aria-label={`${stopped ? 'Chạy tiếp' : 'Huỷ'} ${rowOf(task).name}`}
       onClick={() => (stopped ? actions.resume(task) : actions.cancel(task))}
     >
       {stopped ? 'Chạy tiếp' : 'Huỷ'}
-    </button>
+    </Button>
   )
 }
 

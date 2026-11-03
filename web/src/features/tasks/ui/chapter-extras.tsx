@@ -48,7 +48,7 @@ export function TranslationNotice({
         Đọc bản gốc
       </Button>
       {turn === 'later' && task && (
-        <Button quiet disabled={first.isPending} onClick={() => first.mutate(task.id)}>
+        <Button quiet busy={first.isPending} onClick={() => first.mutate(task.id)}>
           Dịch chương này trước
         </Button>
       )}
@@ -112,7 +112,7 @@ export function PrepareChapter({
           <h2 className="sheet-call">Tạo giọng đọc cả chương</h2>
           <p className="soft">Audio làm sẵn, lúc nghe không phải chờ.</p>
           <p className="soft">{`Khoảng ${durationLabel(source.option.minutes)} giọng, còn ${left} phút tháng này. Huỷ thì trả lại phần chưa tạo.`}</p>
-          <Button disabled={create.isPending} onClick={() => create.mutate()}>
+          <Button busy={create.isPending} onClick={() => create.mutate()}>
             Tạo giọng đọc
           </Button>
           <Button quiet onClick={() => setOpen(false)}>

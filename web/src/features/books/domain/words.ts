@@ -19,6 +19,7 @@ const ERROR_MESSAGES: Partial<Record<string, string>> = {
   SHARE_GONE: 'Link này không còn dùng được.',
   SHARE_PASSWORD_WRONG: 'Sai mật khẩu.',
   SHARE_PASSWORD_INVALID: 'Mật khẩu cần ít nhất 6 ký tự.',
+  TRANSLATION_NOT_DONE: 'Sách chưa dịch xong.',
 }
 
 export function errorMessage(code: string): string {
