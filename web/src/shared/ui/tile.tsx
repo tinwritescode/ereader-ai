@@ -4,13 +4,9 @@ import type { ReactNode } from 'react'
 export const TILE =
   'tile group flex min-h-14 items-start gap-2.5 text-left text-ink no-underline outline-offset-4 disabled:opacity-60'
 
-/** Tiles in even columns, as many as the page has room for, so every critter stands in line. */
+/** Tiles one under another, so every critter stands in line and no tile is ever squeezed beside another. */
 export function TileShelf({ children }: { children: ReactNode }) {
-  return (
-    <div className="grid basis-full grid-cols-[repeat(auto-fill,minmax(min(16.5rem,100%),1fr))] items-start gap-x-6 gap-y-3">
-      {children}
-    </div>
-  )
+  return <div className="grid max-w-md basis-full gap-y-3">{children}</div>
 }
 
 /**
@@ -35,7 +31,7 @@ export function TileFace({
       <span className="relative shrink-0">
         {critter}
         {stamp && (
-          <span className="tile-stamp absolute -top-2.5 -left-3.5 font-hand text-[15px]/4 text-red" aria-hidden="true">
+          <span className="tile-stamp absolute -top-3.5 -left-1 font-hand text-[15px]/4 text-red" aria-hidden="true">
             {stamp}
           </span>
         )}

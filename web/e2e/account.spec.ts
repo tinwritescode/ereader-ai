@@ -79,6 +79,38 @@ test.describe('fit and access', () => {
     }
   })
 
+  test("a book's actions stand one under another, and on a phone below the cover and full width", async ({ page }) => {
+    await signIn(page)
+    await page.setViewportSize({ width: 1100, height: 800 })
+    await open(page, '/books/deep')
+    let bottom = 0
+    for (const name of ['Dịch cả sách sang tiếng Việt', 'Tạo giọng đọc cả sách', 'Chia sẻ']) {
+      const tile = await page.getByRole('button', { name }).boundingBox()
+      if (!tile) throw new Error('no tile')
+      expect(tile.y).toBeGreaterThanOrEqual(bottom)
+      bottom = tile.y + tile.height
+    }
+    for (const width of [320, 360, 412]) {
+      await page.setViewportSize({ width, height: 800 })
+      await open(page, '/books/deep')
+      const cover = await page.locator('[data-book]').boundingBox()
+      const tiles = await Promise.all(
+        ['Dịch cả sách sang tiếng Việt', 'Tạo giọng đọc cả sách', 'Chia sẻ'].map((name) =>
+          page.getByRole('button', { name }).boundingBox(),
+        ),
+      )
+      if (!cover) throw new Error('no cover')
+      let above = cover.y + cover.height
+      for (const tile of tiles) {
+        if (!tile) throw new Error('no tile')
+        expect(tile.y, `${width}px`).toBeGreaterThanOrEqual(above)
+        expect(tile.x, `${width}px`).toBeLessThanOrEqual(cover.x)
+        expect(tile.width, `${width}px`).toBeGreaterThanOrEqual(width - 100)
+        above = tile.y + tile.height
+      }
+    }
+  })
+
   test('keyboard focus shows', async ({ page }) => {
     await signIn(page)
     // WebKit's Tab skips buttons unless the system says otherwise, so focus follows a key press here.

@@ -76,7 +76,7 @@ function WholeBookRow({
             }
             note={`${task.percent}%`}
           >
-            <Track percent={task.percent} className="w-40" />
+            <Track percent={task.percent} className="w-40 max-w-full" />
           </TileFace>
         </Link>
       )
