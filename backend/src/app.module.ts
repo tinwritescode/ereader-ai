@@ -31,6 +31,10 @@ import { BookShareService } from './modules/sharing/application/book-share.servi
 import { InMemoryShareStore, SHARE_STORE } from './modules/sharing/application/share-store';
 import { PostgresShareStore } from './modules/sharing/infrastructure/postgres.share-store';
 import { BookShareController } from './modules/sharing/presentation/book-share.controller';
+import { HISTORY_STORE, InMemoryHistoryStore } from './modules/reading-history/application/history-store';
+import { ReadingHistoryService } from './modules/reading-history/application/reading-history.service';
+import { PostgresHistoryStore } from './modules/reading-history/infrastructure/postgres.history-store';
+import { ReadingHistoryController } from './modules/reading-history/presentation/reading-history.controller';
 import { BookTranslationService } from './modules/translation/application/book-translation.service';
 import {
   BOOK_TRANSLATION_STORE,
@@ -76,18 +80,20 @@ const tts = vieneu ? new VieneuTtsGateway(vieneu) : null;
       slots,
     }),
   ],
-  controllers: [DigestController, BookTranslationController, BookVoiceController, BookShareController],
+  controllers: [DigestController, BookTranslationController, BookVoiceController, BookShareController, ReadingHistoryController],
   providers: [
     DigestService,
     BookTranslationService,
     BookShareService,
     BookVoiceService,
+    ReadingHistoryService,
     { provide: TTS_GATEWAY, useValue: tts },
     { provide: BOOK_VOICE_STORE, useValue: pool ? new PostgresBookVoiceStore(pool) : new InMemoryBookVoiceStore() },
     { provide: AccountSlots, useValue: slots },
     { provide: BOOK_TRANSLATION_STORE, useValue: pool ? new PostgresBookTranslationStore(pool) : new InMemoryBookTranslationStore() },
     { provide: CHAPTER_TRANSLATIONS, useValue: pool ? new PostgresChapterTranslations(pool) : new InMemoryChapterTranslations() },
     { provide: SHARE_STORE, useValue: pool ? new PostgresShareStore(pool) : new InMemoryShareStore() },
+    { provide: HISTORY_STORE, useValue: pool ? new PostgresHistoryStore(pool) : new InMemoryHistoryStore() },
     { provide: STYLE_SHEETS, useValue: pool ? new PostgresStyleSheets(pool) : new InMemoryStyleSheets() },
     { provide: LLM_GATEWAY, useFactory: () => new OpenAiCompatibleLlmGateway(llmOptionsFromEnv(process.env)) },
   ],
