@@ -25,11 +25,13 @@ function ChapterList({
   currentId,
   onChoose,
   markOf,
+  lengthsOf,
 }: {
   chapters: ChapterSummary[]
   currentId: string | null
   onChoose: (chapter: ChapterSummary) => void
   markOf: (chapter: ChapterSummary, fallback: ReactNode) => ReactNode
+  lengthsOf: ((chapter: ChapterSummary) => ReactNode) | undefined
 }) {
   const list = useRef<HTMLDivElement>(null)
   const virtual = useWindowVirtualizer({
@@ -53,32 +55,40 @@ function ChapterList({
         if (!chapter) return null
         const { number, title } = chapterHeading(chapter)
         return (
-          <button
+          // The row holds the title and the lengths side by side: a link may not sit inside a button.
+          <div
             key={chapter.chapterId}
             ref={virtual.measureElement}
             data-index={index}
-            type="button"
             data-current={chapter.chapterId === currentId || undefined}
-            className="row group absolute top-0 left-0 flex min-h-14 w-full items-start gap-2.5 border-t-[1.5px] border-ink/42 pr-(--pad) pb-line pl-[calc(var(--m)+var(--gap))] text-left marker-sweep"
+            className="row group absolute top-0 left-0 flex w-full flex-wrap items-start gap-x-4 border-t-[1.5px] border-ink/42 pr-(--pad) pl-[calc(var(--m)+var(--gap))] md:flex-nowrap"
             style={{ transform: `translateY(${start - virtual.options.scrollMargin}px)` }}
-            onClick={() => onChoose(chapter)}
           >
-            <span className="min-w-0 flex-1">
-              {number && (
-                <small className="block font-hand text-[18px]/7 text-muted group-data-current:text-red">{number}</small>
-              )}
-              <b className="text-[15.5px]/7 font-semibold text-ink">
-                {chapter.chapterId === currentId ? <mark>{title}</mark> : title}
-              </b>
-            </span>
-            {markOf(chapter, <em className={MINUTES}>{`${chapter.minutes}'`}</em>)}
-            <i
-              className="text-[22px]/7 not-italic text-ink transition-transform duration-200 ease-hand group-hover:translate-x-1"
-              aria-hidden="true"
+            <button
+              type="button"
+              className="flex min-h-14 min-w-0 flex-1 basis-full items-start gap-2.5 pb-line text-left marker-sweep md:basis-0"
+              onClick={() => onChoose(chapter)}
             >
-              ›
-            </i>
-          </button>
+              <span className="min-w-0 flex-1">
+                {number && (
+                  <small className="block font-hand text-[18px]/7 text-muted group-data-current:text-red">
+                    {number}
+                  </small>
+                )}
+                <b className="text-[15.5px]/7 font-semibold text-ink">
+                  {chapter.chapterId === currentId ? <mark>{title}</mark> : title}
+                </b>
+              </span>
+              {markOf(chapter, <em className={MINUTES}>{`${chapter.minutes}'`}</em>)}
+              <i
+                className="text-[22px]/7 not-italic text-ink transition-transform duration-200 ease-hand group-hover:translate-x-1"
+                aria-hidden="true"
+              >
+                ›
+              </i>
+            </button>
+            {lengthsOf && <div className="-mt-3 pb-6 md:mt-3.5 md:pb-0">{lengthsOf(chapter)}</div>}
+          </div>
         )
       })}
     </div>
@@ -89,6 +99,8 @@ type Slots = {
   aside?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   resume?: (book: Book, chapters: ChapterSummary[]) => ReactNode
   markOf?: (book: Book, chapter: ChapterSummary, fallback: ReactNode) => ReactNode
+  /** The versions on offer beside each chapter's title. */
+  lengthsOf?: (book: Book, chapter: ChapterSummary) => ReactNode
   currentId?: string | null
 }
 
@@ -100,6 +112,7 @@ export function BookView({
   aside,
   resume,
   markOf,
+  lengthsOf,
   currentId = null,
 }: { book: Book; chapters: ChapterSummary[]; onChoose: (chapter: ChapterSummary) => void } & Slots) {
   const front = chapters.filter(({ kind }) => kind === 'front')
@@ -147,6 +160,7 @@ export function BookView({
         currentId={currentId}
         onChoose={onChoose}
         markOf={(chapter, fallback) => (markOf ? markOf(book, chapter, fallback) : fallback)}
+        lengthsOf={lengthsOf && ((chapter) => lengthsOf(book, chapter))}
       />
     </>
   )

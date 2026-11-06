@@ -4,6 +4,7 @@ import { booksQuery, chaptersQuery } from '~/features/books/data/books'
 import { BookPage } from '~/features/books/ui/book-page'
 import { WithVoices } from '~/features/listen/ui/with-voices'
 import { ChooseLength } from '~/features/reading/ui/choose-length'
+import { LengthPills } from '~/features/reading/ui/length-pills'
 import { ResumeLine, WithStartChapter } from '~/features/reading/ui/spots'
 import { ShareBook } from '~/features/sharing/ui/share-book'
 import { ChapterMark, WholeBookRows } from '~/features/tasks/ui/whole-book'
@@ -31,6 +32,7 @@ function BookRoute() {
           bookId={bookId}
           currentId={current?.chapterId ?? null}
           chooseLength={(choice) => <ChooseLength {...choice} />}
+          lengthsOf={(book, chapter) => <LengthPills book={book} chapter={chapter} />}
           resume={(book, chapters) => <ResumeLine book={book} chapters={chapters} />}
           markOf={(book, chapter, fallback) => (
             <ChapterMark bookId={book.bookId} chapterId={chapter.chapterId} fallback={fallback} />

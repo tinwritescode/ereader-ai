@@ -69,3 +69,13 @@ const HINTS: Record<ReadingLength, string> = {
 }
 
 export const lengthHint = (length: ReadingLength): string => HINTS[length]
+
+const WORDS: Record<ReadingLength, string> = {
+  original: 'gốc',
+  vietnamese: 'Việt',
+  shortened: 'rút gọn',
+  keyPoints: 'ý chính',
+}
+
+/** The version's name where its minutes stand beside it, e.g. "6' rút gọn". */
+export const lengthWord = (length: ReadingLength): string => WORDS[length]
