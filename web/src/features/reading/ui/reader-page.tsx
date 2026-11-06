@@ -11,7 +11,7 @@ import { Button } from '~/shared/ui/button'
 import { Sheet } from '~/shared/ui/sheet'
 import type { ChapterText } from '../domain/chapter-text'
 import type { SessionReport } from '../domain/history'
-import { lengthOptionsFor, sameOption } from '../domain/length'
+import { lengthHint, lengthOptionsFor, lengthWord, sameOption } from '../domain/length'
 import type { LengthOption, ReaderSearch } from '../domain/length'
 import { LINE_SPACINGS, TEXT_SIZES } from '../domain/look'
 import { minutesLeft, nextChapterSpot } from '../domain/spot'
@@ -45,12 +45,6 @@ const NO_VOICE: ReaderVoice = { marked: null, start: () => {}, heardHere: () => 
 export type ReadReport = Extract<SessionReport, { mode: 'read' }>
 
 type Spot = Pick<ReadingSpot, 'block' | 'offset'>
-
-function versionName({ length, minutes }: LengthOption): string {
-  if (length === 'original') return 'gốc'
-  if (length === 'vietnamese') return 'Việt'
-  return length === 'keyPoints' ? 'ý chính' : `${minutes} phút`
-}
 
 function savedSpotFor({
   spot,
@@ -301,11 +295,13 @@ export function Reader({
 
   const original = options.find(({ length }) => length === 'original')
   const heading = chapterHeading(chapter)
-  const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions' | '--note', string> = {
+  const style: CSSProperties & Record<'--text-size' | '--line-height' | '--versions' | '--note' | '--hint', string> = {
     '--text-size': `${TEXT_SIZES[look.size]}px`,
     '--line-height': `${LINE_SPACINGS[look.spacing]}`,
     '--versions': `${options.length}`,
     '--note': note ? '48px' : '0px',
+    // Three lines kept for the hint in the narrowest margin, so what sits under it never moves.
+    '--hint': '68px',
   }
 
   return (
@@ -329,10 +325,15 @@ export function Reader({
               aria-pressed={sameOption(entry, option)}
               onClick={() => onChoose(entry)}
             >
-              {versionName(entry)}
+              {lengthWord(entry.length)}
+              {/* A phone's bar has room for the names only; a listener still hears the minutes. */}
+              <span className="max-md:sr-only">{` ${entry.minutes}'`}</span>
             </button>
           ))}
         </div>
+        <p className="hidden h-(--hint) w-full max-w-36 overflow-hidden pb-2 text-right font-read text-[13px]/5 whitespace-normal text-muted md:block">
+          {lengthHint(option.length)}
+        </p>
         <button type="button" className="min-h-11 text-ink" aria-label="Trang giấy" onClick={() => setShowLook(true)}>
           Aa
         </button>

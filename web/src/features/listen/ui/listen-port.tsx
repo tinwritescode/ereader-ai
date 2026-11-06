@@ -19,7 +19,7 @@ import { failureWords, preparingLine, rateLabel, startingLine } from './words'
 const DOCK =
   'fixed inset-x-0 bottom-0 z-20 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-t-3xl bg-plum px-5.5 pt-3.5 pb-4.5 text-sm text-white lg:top-0 lg:left-auto lg:w-75 lg:content-start lg:items-stretch lg:rounded-l-3xl lg:rounded-tr-none lg:p-6 [&_.ink-link]:px-0 [&_.ink-link]:text-inherit [&_button]:min-h-11'
 const START =
-  'fixed inset-x-0 bottom-0 z-20 flex min-h-15.5 items-center gap-3 border-t border-rule bg-paper py-2 pr-4 pl-(--m) text-ink md:right-auto md:bottom-auto md:top-[calc(84px+36px*var(--versions)+44px+var(--note))] md:min-h-0 md:w-[calc(var(--m)-42px)] md:flex-col md:items-end md:gap-0 md:border-0 md:bg-transparent md:p-0'
+  'fixed inset-x-0 bottom-0 z-20 flex min-h-15.5 items-center gap-3 border-t border-rule bg-paper py-2 pr-4 pl-(--m) text-ink md:right-auto md:bottom-auto md:top-[calc(84px+36px*var(--versions)+var(--hint,0px)+44px+var(--note))] md:min-h-0 md:w-[calc(var(--m)-42px)] md:flex-col md:items-end md:gap-0 md:border-0 md:bg-transparent md:p-0'
 const QUIET = 'text-[13px] text-white/72'
 const SINGING_MS = 700
 

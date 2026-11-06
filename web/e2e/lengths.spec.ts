@@ -33,3 +33,15 @@ test('the title still opens the length sheet, which can start listening', async 
   await page.getByRole('button', { name: /Chương Một/ }).click()
   await expect(page.getByRole('heading', { name: /dài 12 phút/ })).toBeVisible()
 })
+
+test('the reader names each version with its minutes, and says what the chosen one keeps', async ({ page }) => {
+  await signIn(page)
+  await open(page, '/books/deep/chapters/deep-1?length=shortened&minutes=6')
+  const versions = page.getByRole('group', { name: 'Bản đọc' }).getByRole('button')
+  await expect(versions).toHaveText(["gốc 12'", "Việt 12'", "rút gọn 6'", "ý chính 3'"])
+  await expect(page.getByText('Giữ mọi luận điểm, bỏ ví dụ lặp lại.')).toBeVisible()
+
+  await page.getByRole('button', { name: "ý chính 3'" }).click()
+  await expect(page).toHaveURL(/length=keyPoints&minutes=3/)
+  await expect(page.getByText('Chỉ những điều tác giả muốn bạn nhớ.')).toBeVisible()
+})

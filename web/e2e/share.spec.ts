@@ -115,7 +115,7 @@ test('a chapter reads in the same reader, without what costs the owner', async (
   await enter(viewer)
   await viewer.getByRole('button', { name: /Chương Hai/ }).click()
 
-  await expect(viewer.getByRole('group', { name: 'Bản đọc' }).getByRole('button')).toHaveText(['gốc', 'Việt'])
+  await expect(viewer.getByRole('group', { name: 'Bản đọc' }).getByRole('button')).toHaveText(["gốc 12'", "Việt 12'"])
   await expect(viewer.getByRole('button', { name: 'Trang giấy' })).toBeVisible()
   await expect(viewer.getByRole('link', { name: '‹ Mục lục' })).toBeVisible()
   await expect(viewer.getByText('Nghe từ đoạn đang đọc')).toHaveCount(0)

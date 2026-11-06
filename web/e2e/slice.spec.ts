@@ -106,7 +106,7 @@ test('choosing a length opens the chapter, and the versions switch', async ({ pa
   await expect(page.getByRole('dialog')).toContainText('Chương Một dài 12 phút')
   await page.getByRole('button', { name: 'Đọc bản gốc' }).click()
   await expect(page.getByText('Câu thứ hai rất ngắn.')).toBeVisible()
-  await page.getByRole('button', { name: '6 phút' }).click()
+  await page.getByRole('button', { name: "rút gọn 6'" }).click()
   await expect(page.getByText('Bản 6 phút của deep-1.')).toBeVisible()
   await page.getByRole('button', { name: 'Việt' }).click()
   await expect(page.getByText('Chương này chưa được dịch')).toBeVisible()
