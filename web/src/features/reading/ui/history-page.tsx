@@ -8,6 +8,7 @@ import { clearHistory, historyQuery, removeSession, setRecording } from '../data
 import { historyDays, resumeOf, statusOf } from '../domain/history'
 import type { HistoryEntry, HistoryMode, HistorySession } from '../domain/history'
 import { lengthName } from '../domain/length'
+import { CHOICE_PILL, LINE_NOTE } from './notebook'
 
 type Filter = HistoryMode | 'all'
 const FILTERS: { filter: Filter; label: string }[] = [
@@ -15,12 +16,6 @@ const FILTERS: { filter: Filter; label: string }[] = [
   { filter: 'read', label: 'Đọc' },
   { filter: 'listen', label: 'Nghe' },
 ]
-
-const PILL =
-  'min-h-11 rounded-full border-[1.5px] border-ink bg-sheet px-4.5 font-hand text-[20px]/6 text-ink aria-pressed:bg-ink aria-pressed:text-white'
-/** Written in the margin, against the red line. */
-const TIME =
-  'absolute top-3 -left-[calc(var(--m)+var(--gap))] w-(--m) pr-2.25 text-right font-hand text-[21px]/7 text-muted'
 
 const BOOK_ICON = 'M5 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H5zM19 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z'
 const EARS_ICON = 'M4 15v-3a8 8 0 0 1 16 0v3M3 14h5v7H5a2 2 0 0 1-2-2zM21 14h-5v7h3a2 2 0 0 0 2-2z'
@@ -76,7 +71,7 @@ function Line({ entry: { session, time, minutes }, title }: { entry: HistoryEntr
   const resume = resumeOf(session)
   return (
     <li className="relative flex flex-wrap items-start gap-x-5 gap-y-2.5 border-t-[1.5px] border-ink/40 py-3">
-      <span className={TIME}>{time}</span>
+      <span className={LINE_NOTE}>{time}</span>
       <ModeIcon mode={session.mode} />
       <div className="flex min-w-0 flex-[1_1_360px] flex-col gap-0.5">
         <b className="text-[15.5px]/6 font-semibold text-ink">{session.chapterLabel}</b>
@@ -190,7 +185,7 @@ export function HistoryPage({ books }: { books: Book[] }) {
               <button
                 key={entry.filter}
                 type="button"
-                className={PILL}
+                className={CHOICE_PILL}
                 aria-pressed={filter === entry.filter}
                 onClick={() => setFilter(entry.filter)}
               >
