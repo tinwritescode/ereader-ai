@@ -104,6 +104,15 @@ describe('listening', () => {
     expect(heard.map((entry) => entry.kind === 'sentence' && entry.sentence.text)).toEqual(['Câu một.', 'Câu hai.'])
   })
 
+  it('names the voice each sentence was heard in', async () => {
+    useTimers()
+    const { controller, heard, finishClip, start } = setup()
+    await start()
+    controller.chooseVoice(VOICES[1]!)
+    await finishClip()
+    expect(heard.map((entry) => entry.kind === 'sentence' && entry.voice.name)).toEqual(['Một', 'Hai'])
+  })
+
   it('pauses mid sentence and goes on from it', async () => {
     useTimers()
     const { controller, log, start } = setup()

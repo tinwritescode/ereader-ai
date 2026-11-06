@@ -102,7 +102,7 @@ type JsonCall<Schema extends z.ZodType> = {
   body?: unknown
   schema: Schema
 }
-type EmptyCall = { path: string; method: 'POST' | 'PATCH' | 'DELETE'; body?: unknown }
+type EmptyCall = { path: string; method: 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown }
 
 function initOf({ method = 'GET', body }: { method?: string; body?: unknown }): RequestInit {
   return body === undefined

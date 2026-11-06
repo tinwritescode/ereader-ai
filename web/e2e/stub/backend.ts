@@ -112,6 +112,8 @@ function fresh() {
       bookOf('long', 'Sách rất dài', null, 'vi', 400),
     ],
     figures: [] as object[],
+    history: [] as (Record<string, unknown> & { sessionId: string; startedAt: string; endedAt: string })[],
+    recording: true,
     tasks: {
       voice: [] as Task[],
       translation: [] as Task[],
@@ -326,6 +328,8 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
       uploads: state.uploads,
       requestedPlan: state.requestedPlan,
       accounts: state.accounts,
+      history: state.history,
+      recording: state.recording,
     })
   }
   if (path === '/__stub/task') {
@@ -460,6 +464,39 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     const account = state.accounts.find((entry) => entry.id === admin[1])
     if (account) account.plan = plan
     return send(response, 200, account)
+  }
+  if (path === '/history' && method === 'GET') {
+    const sessions = state.history.toSorted((a, b) => b.endedAt.localeCompare(a.endedAt))
+    return send(response, 200, { recording: state.recording, sessions })
+  }
+  if (path === '/history' && method === 'DELETE') {
+    state.history = []
+    return send(response, 204)
+  }
+  if (path === '/history/recording' && method === 'PUT') {
+    state.recording = (await json<{ on: boolean }>()).on
+    return send(response, 204)
+  }
+  const historySession = /^\/history\/sessions\/([^/]+)$/.exec(path)
+  if (historySession?.[1] && method === 'PUT') {
+    const report = await json<Record<string, unknown> & { done: boolean }>()
+    if (!state.recording) return send(response, 204)
+    const sessionId = historySession[1]
+    const now = new Date().toISOString()
+    const kept = state.history.find((entry) => entry.sessionId === sessionId)
+    const session = {
+      ...report,
+      sessionId,
+      startedAt: kept?.startedAt ?? now,
+      endedAt: now,
+      done: Boolean(kept?.['done']) || report.done,
+    }
+    state.history = [...state.history.filter((entry) => entry.sessionId !== sessionId), session]
+    return send(response, 204)
+  }
+  if (historySession?.[1] && method === 'DELETE') {
+    state.history = state.history.filter((entry) => entry.sessionId !== historySession[1])
+    return send(response, 204)
   }
   if (path === '/books' && method === 'GET') return send(response, 200, state.books)
   if (path === '/books' && method === 'POST') {

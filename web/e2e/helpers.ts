@@ -16,6 +16,8 @@ export const stub = {
     uploads: string[]
     requestedPlan: string | null
     accounts: { id: string; plan: string }[]
+    history: Record<string, unknown>[]
+    recording: boolean
   }> => (await fetch(`${stubUrl()}/__stub/state`)).json(),
 }
 

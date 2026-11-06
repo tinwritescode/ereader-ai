@@ -41,6 +41,9 @@ export function Shell({ tasksCount, children }: { tasksCount: ReactNode; childre
             <Link className={WAY} to="/" activeOptions={{ exact: true }}>
               Thư viện
             </Link>
+            <Link className={WAY} to="/history">
+              Lịch sử
+            </Link>
             <Link className={WAY} to="/tasks">
               {tasksCount} Tác vụ
             </Link>

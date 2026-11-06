@@ -10,11 +10,13 @@ import { durationLabel, errorMessage } from '~/features/books/domain/words'
 import { Button } from '~/shared/ui/button'
 import { Sheet } from '~/shared/ui/sheet'
 import type { ChapterText } from '../domain/chapter-text'
+import type { SessionReport } from '../domain/history'
 import { lengthOptionsFor, sameOption } from '../domain/length'
 import type { LengthOption, ReaderSearch } from '../domain/length'
 import { LINE_SPACINGS, TEXT_SIZES } from '../domain/look'
 import { minutesLeft, nextChapterSpot } from '../domain/spot'
 import type { ReadingSpot } from '../domain/spot'
+import { recordSession } from './history-recorder'
 import { LookSheet } from './look-sheet'
 import { usePickedSpot } from './sentence-pick'
 import { clearSpot, readingLook, readingSpots, recordSpot } from './stores'
@@ -39,6 +41,11 @@ export type ReaderVoice = {
 
 const NO_VOICE: ReaderVoice = { marked: null, start: () => {}, heardHere: () => false }
 
+/** Where the eyes are in the chapter, for the account's history. */
+export type ReadReport = Extract<SessionReport, { mode: 'read' }>
+
+type Spot = Pick<ReadingSpot, 'block' | 'offset'>
+
 function versionName({ length, minutes }: LengthOption): string {
   if (length === 'original') return 'gốc'
   if (length === 'vietnamese') return 'Việt'
@@ -55,7 +62,7 @@ function savedSpotFor({
   chapterId: string
   option: LengthOption
   blocks: TextBlock[]
-}): ReadingSpot | null {
+}): Spot | null {
   if (!spot?.option || spot.chapterId !== chapterId || !sameOption(spot.option, option)) return null
   return (spot.block > 0 || spot.offset > 0) && spot.block < blocks.length ? spot : null
 }
@@ -146,6 +153,8 @@ type ReaderSlots = {
   voice?: ReaderVoice
   bar?: (blocks: TextBlock[] | null, option: LengthOption, topBlock: () => number) => ReactNode
   translationNotice?: (args: { chapterId: string; onOriginal: () => void }) => ReactNode
+  /** Told where reading got to, as it goes. */
+  onProgress?: (report: ReadReport) => void
 }
 
 /** The page a chapter is read on, whoever is reading it; [text] and the links come from outside. */
@@ -163,6 +172,7 @@ export function Reader({
   voice = NO_VOICE,
   bar,
   translationNotice,
+  onProgress,
 }: ReaderSlots & {
   text: ChapterText
   /** The versions on offer here. */
@@ -184,7 +194,7 @@ export function Reader({
   const next = chapters[index + 1]
   const { read, finished } = useRead()
   const left = minutesLeft({ minutes: option.minutes, read })
-  const [offer, setOffer] = useState<ReadingSpot | null>(null)
+  const [offer, setOffer] = useState<Spot | null>(null)
   const placed = useRef<string | null>(null)
   const blocks = text.kind === 'loaded' ? text.blocks : null
   const key = `${chapterId}:${option.length}:${option.minutes}`
@@ -198,7 +208,23 @@ export function Reader({
 
   const remember = useCallback(() => {
     if (offer || !blocks || !chapter || voice.heardHere(option)) return
-    if (finished()) {
+    const max = document.documentElement.scrollHeight - window.innerHeight
+    const done = finished()
+    const block = done ? Math.max(blocks.length - 1, 0) : topBlock()
+    const quote = blocks[block]?.text.slice(0, 120) ?? null
+    onProgress?.({
+      mode: 'read',
+      bookId: book.bookId,
+      chapterId,
+      chapterLabel: chapterName(chapter),
+      ...option,
+      block,
+      offset: 0,
+      quote,
+      progress: done ? 1 : Math.min(1, window.scrollY / max),
+      done,
+    })
+    if (done) {
       if (next)
         recordSpot({
           bookId: book.bookId,
@@ -212,8 +238,6 @@ export function Reader({
       else clearSpot(book.bookId)
       return
     }
-    const block = topBlock()
-    const max = document.documentElement.scrollHeight - window.innerHeight
     recordSpot({
       bookId: book.bookId,
       spot: {
@@ -223,11 +247,11 @@ export function Reader({
         option,
         block,
         offset: 0,
-        quote: blocks[block]?.text.slice(0, 120) ?? null,
+        quote,
         listened: false,
       },
     })
-  }, [blocks, book.bookId, chapter, chapterId, finished, next, offer, option, voice])
+  }, [blocks, book.bookId, chapter, chapterId, finished, next, offer, onProgress, option, voice])
 
   const rememberPaced = useDebouncedCallback(remember, { wait: SAVE_SPOT_MS })
 
@@ -240,7 +264,12 @@ export function Reader({
     if (placed.current === at) return
     const first = placed.current === null
     placed.current = at
-    const saved = savedSpotFor({ spot: readingSpots.read()[book.bookId], chapterId, option, blocks: opened })
+    // A spot in the link came from the account, maybe from another machine; it wins over this device's.
+    const linked =
+      search.block !== undefined && search.block < opened.length
+        ? { block: search.block, offset: search.offset ?? 0 }
+        : null
+    const saved = linked ?? savedSpotFor({ spot: readingSpots.read()[book.bookId], chapterId, option, blocks: opened })
     if (search.listen && !voice.heardHere(option)) {
       const from = search.resume ? saved : null
       voice.start({ blocks: opened, option, block: from?.block ?? 0, offset: from?.offset ?? 0 })
@@ -416,6 +445,7 @@ export function ReaderPage(slots: ReaderSlots) {
   return (
     <Reader
       {...slots}
+      onProgress={recordSession}
       text={useChapterText({ chapterId, option })}
       options={chapter ? lengthOptionsFor({ chapterMinutes: chapter.minutes, vietnamese: isForeign(book) }) : []}
       onChoose={(chosen) => void navigate({ to: '.', search: { ...chosen }, replace: true })}

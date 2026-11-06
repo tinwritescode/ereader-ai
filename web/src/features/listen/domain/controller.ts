@@ -42,7 +42,7 @@ export type ListenState = {
 }
 
 export type Heard =
-  | { kind: 'sentence'; source: ListenSource; sentence: SpokenSentence; done: number }
+  | { kind: 'sentence'; source: ListenSource; sentence: SpokenSentence; done: number; voice: Voice }
   | { kind: 'finished'; source: ListenSource }
 
 export type ListenChoice = { voiceCode: string; rate: number }
@@ -262,12 +262,12 @@ export class ListenController<Clip> {
 
   private reached(index: number): void {
     const sentence = this.plan[index]
-    const { source } = this.state
-    if (!sentence || !source) return
+    const { source, voice } = this.state
+    if (!sentence || !source || !voice) return
     this.current = index
     const done = index / this.plan.length
     this.set({ stage: { kind: 'playing', sentence, index, total: this.plan.length, paused: this.paused }, done })
-    this.deps.onHeard({ kind: 'sentence', source, sentence, done })
+    this.deps.onHeard({ kind: 'sentence', source, sentence, done, voice })
   }
 
   private ended(): void {

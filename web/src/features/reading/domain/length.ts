@@ -10,6 +10,9 @@ export type LengthOption = z.infer<typeof LengthOption>
 export const ReaderSearch = LengthOption.extend({
   listen: z.boolean().optional(),
   resume: z.boolean().optional(),
+  /** The spot to go on from, when it was kept on the account rather than this device. */
+  block: z.int().min(0).optional(),
+  offset: z.int().min(0).optional(),
 })
 export type ReaderSearch = z.infer<typeof ReaderSearch>
 
